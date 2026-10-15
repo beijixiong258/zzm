@@ -1,0 +1,26 @@
+import { renderToStaticMarkup } from "react-dom/server";
+import { describe, it, expect } from "vitest";
+import fs from "node:fs";
+import path from "node:path";
+import Home from "../src/Home";
+import { pageTitle, platformTitle, populationLabel } from "../src/course-presentation";
+import { permittedSection } from "../src/stage7-settings";
+import type { Course, User, SessionSummary } from "../src/types";
+import type { Route } from "../src/routes";
+const user: User = {id:"synthetic-staff",name:"Synthetic Teacher",email:"fixture@example.invalid",role:"teacher"};
+const course: Course={id:"first",code:"EDUC7703",title:"Synthetic course",description:"First paragraph.\n\n(1) First aim.\n(2) Second aim.",student_count:1,admin_count:1,teacher_count:2};
+const second: Course={...course,id:"second",code:"EDUC1145",admin_count:0,teacher_count:1,student_count:2};
+const session={id:"s",course_id:"first",title:"Synthetic session",number:1,subtitle:"",status:"draft",question_count:0,estimated_minutes:40,learning_objectives:[]} as SessionSummary;
+const noop=()=>{},done=async()=>{};
+const html=(c=course,sessions=[session])=>renderToStaticMarkup(<Home user={user} courses={[c]} sessionMap={{[c.id]:sessions}} loading={false} history={false} onOpen={noop} onPreview={noop} onRefresh={done} onRoster={noop} onVersions={noop}/>);
+describe("Stage11 parent course presentation",()=>{
+ it("real entry HTML has a generic title for login before React boots",()=>{const s=fs.readFileSync(path.resolve(import.meta.dirname,"../index.html"),"utf8");expect(s).toContain("<title>AIcademiya</title>");expect(s).not.toContain("EDUC7703");});
+ it("home title follows selected course, not a hardcoded or first-course code",()=>{expect(pageTitle(user,{page:"home"},course,undefined)).toBe("AIcademiya · EDUC7703");expect(pageTitle(user,{page:"home"},second,undefined)).toBe("AIcademiya · EDUC1145");});
+ it.each(["teacher","workspace","record","roster","versions","course-materials"] as const)("%s title follows its actual course",page=>{expect(pageTitle(user,{page},course,second)).toBe("AIcademiya · EDUC1145");});
+ it.each(["settings","profile","accounts","history","course-trash"] as const)("global %s page never inherits a course title",page=>{expect(pageTitle(user,{page},course,second)).toBe("AIcademiya");});
+ it("anonymous, forced-password and missing course use only the platform name",()=>{expect(platformTitle()).toBe("AIcademiya");expect(pageTitle(null,{page:"home"},course,course)).toBe("AIcademiya");expect(pageTitle({...user,must_change_password:true},{page:"home"},course,course)).toBe("AIcademiya");expect(pageTitle(user,{page:"workspace"} as Route,course,undefined)).toBe("AIcademiya");});
+ it.each(["Session","Admin","Teacher","Student"] as const)("%s plural is correct for zero,one,two",noun=>{expect(populationLabel(0,noun)).toBe(noun+"s");expect(populationLabel(1,noun)).toBe(noun);expect(populationLabel(2,noun)).toBe(noun+"s");});
+ it("renders four true supplied course population values with literal authored newlines",()=>{const h=html();expect(h).toContain('class="course-description"');expect(h).toContain(course.description);expect(h).toContain("<strong>1</strong>Session");expect(h).toContain("<strong>1</strong>Admin");expect(h).toContain("<strong>2</strong>Teachers");expect(h).toContain("<strong>1</strong>Student");expect(h).not.toContain("Learners");});
+ it("course description remains escaped text, not executable HTML",()=>{const h=html({...course,description:'A\n<script>window.unsafe=true</script>\nB'});expect(h).toContain('&lt;script&gt;');expect(h).not.toContain('<script>');});
+ it("teacher gets Course Students section but not model/search/global admin authority",()=>{expect(permittedSection(user,"users")).toBe("users");expect(permittedSection(user,"model")).toBe("account");expect(permittedSection(user,"search")).toBe("account");expect(permittedSection({...user,role:"student"},"users")).toBe("account");});
+});

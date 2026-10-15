@@ -1,0 +1,94 @@
+// Actual built Stage9 UI -> FastAPI/SQLite. No application-route interception or real providers.
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import crypto from 'node:crypto';
+import {createRequire} from 'node:module';
+import {parseArgs} from 'node:util';
+const require=createRequire(new URL('../frontend/package.json',import.meta.url));
+const {chromium,expect}=require('@playwright/test');
+const {values:a}=parseArgs({options:{'base-url':{type:'string'},'artifact-dir':{type:'string'},'confirm-test-data':{type:'boolean'}}});
+const base=a['base-url'],out=a['artifact-dir'];
+if(!base||!out||!a['confirm-test-data']||new URL(base).port==='18773')throw Error('Explicit isolated QA required; never production');
+await fs.mkdir(out,{recursive:true});
+const checks=[],errors=[],shots=[],requests=[],ids={};let browser,page;
+const api=async(ctx,method,url,data,expected=200,extra={})=>{
+ const r=await ctx.request.fetch(base+url,{method,...(data===undefined?{}:{data}),...extra});
+ requests.push({method,path:url,status:r.status()});expect(r.status()).toBe(expected);
+ return r.headers()['content-type']?.startsWith('application/json')?r.json():r.body();
+};
+const shot=async(name)=>{const f=path.join(out,name+'.png');await page.screenshot({path:f,animations:'disabled',caret:'hide',timeout:60000});shots.push(f)};
+const imageBuffer=async(color)=>Buffer.from((await page.evaluate(color=>{
+ const canvas=document.createElement('canvas');canvas.width=512;canvas.height=256;const c=canvas.getContext('2d');c.fillStyle='#eeeeee';c.fillRect(0,0,512,256);c.fillStyle=color;c.fillRect(128,0,256,256);return canvas.toDataURL('image/png').split(',')[1];
+},color)),'base64');
+try{
+ browser=await chromium.launch({executablePath:'C:/Program Files/Google/Chrome/Application/chrome.exe',headless:true});
+ const student=await browser.newContext({viewport:{width:1440,height:1000}}),admin=await browser.newContext({viewport:{width:1440,height:1000}}),other=await browser.newContext({viewport:{width:390,height:844}}),teacher=await browser.newContext();
+ page=await student.newPage();page.setDefaultTimeout(15000);page.on('pageerror',e=>errors.push(e.message));
+ expect((await api(student,'GET','/openapi.json')).info.version).toBe(process.env.AICADEMIYA_QA_TARGET_API||'0.8.0');expect((await api(student,'GET','/api/bootstrap')).demo_enabled).toBe(true);
+ await page.goto(base);await expect(page.getByRole('button',{name:'Sign in',exact:true})).toBeEnabled();await expect(page.locator('.login-form-heading .brand--standard')).toHaveCount(1);await expect(page.locator('.public-header')).toHaveCount(0);
+ checks.push('User-selected light Login retains enabled authentication; preview-only disabling is not applied');
+ const user=(await api(student,'POST','/api/auth/demo',{role:'student'})).user;
+ await api(admin,'POST','/api/auth/demo',{role:'admin'});await api(other,'POST','/api/auth/demo',{role:'student',student_index:2});await api(teacher,'POST','/api/auth/demo',{role:'teacher'});
+ await page.goto(base+'/#/settings/account');await page.reload();await expect(page.getByRole('heading',{name:'Account',exact:true})).toBeVisible();
+ await expect(page.getByRole('navigation',{name:'Settings sections'}).getByRole('button',{name:'Feedback',exact:true})).toBeVisible();
+ for(const name of ['AI Model','Web Search',process.env.AICADEMIYA_QA_TARGET_API==='0.9.0'?'Global User Accounts':'User Management','Course Students'])await expect(page.getByRole('navigation',{name:'Settings sections'}).getByRole('button',{name,exact:true})).toHaveCount(0);
+ const mark=await page.locator('.sidebar .brand-mark').boundingBox(),copy=await page.locator('.sidebar .brand-copy').boundingBox();expect(mark.x+mark.width).toBeLessThanOrEqual(copy.x);expect(Math.abs(mark.y+mark.height/2-copy.y-copy.height/2)).toBeLessThan(5);await expect(page.locator('.sidebar .brand-sub')).toHaveText('LEARN WITH INTENTION');
+ checks.push('Actual student Settings exposes Account/Feedback only; signed-in brand is genuinely horizontal');
+ const red=await imageBuffer('#b22e35'),blue=await imageBuffer('#25588e');await fs.writeFile(path.join(out,'Synthetic-red.png'),red);await fs.writeFile(path.join(out,'Synthetic-blue.png'),blue);
+ const avatar=page.getByRole('region',{name:'Profile avatar',exact:true});
+ const nameInput=page.locator('.profile-page .teacher-editor-grid input').first();await nameInput.fill('Synthetic unsaved display name');
+ await avatar.getByLabel('Choose avatar image').setInputFiles({name:'Synthetic-red.png',mimeType:'image/png',buffer:red});
+ await expect(avatar.getByAltText('Unsaved centered avatar preview')).toBeVisible();expect((await api(student,'GET','/api/auth/me')).user.avatar_url).toBeNull();
+ expect(await avatar.getByAltText('Unsaved centered avatar preview').evaluate(img=>[img.naturalWidth,img.naturalHeight])).toEqual([256,256]);
+ await avatar.getByRole('button',{name:'Save avatar',exact:true}).click();await expect(avatar.getByText('Avatar saved and verified.',{exact:true})).toBeVisible();
+ await expect(nameInput).toHaveValue('Synthetic unsaved display name');let saved=(await api(student,'GET','/api/auth/me')).user.avatar_url;
+ await expect(page.locator('.profile-entry img')).toHaveAttribute('src',saved);await expect(page.locator('.profile-entry img')).toBeVisible();expect(await page.locator('.profile-entry img').evaluate(img=>img.naturalWidth)).toBe(256);await shot('account-avatar-desktop');
+ checks.push('Actual file preview is256 and unsaved; POST/me/image readback updates sidebar without erasing dirty display name');
+ await nameInput.fill(user.name);await page.reload();await expect(page.locator('.profile-entry img')).toHaveAttribute('src',saved);
+ await avatar.getByLabel('Choose avatar image').setInputFiles({name:'Synthetic-invalid.png',mimeType:'image/png',buffer:Buffer.from('not an image')});await expect(avatar.getByRole('alert')).toContainText(/decoded|image/i);expect((await api(student,'GET','/api/auth/me')).user.avatar_url).toBe(saved);
+ await avatar.getByLabel('Choose avatar image').setInputFiles({name:'Synthetic-blue.png',mimeType:'image/png',buffer:blue});await avatar.getByRole('button',{name:'Save avatar',exact:true}).click();await expect(avatar.getByText('Avatar saved and verified.',{exact:true})).toBeVisible();
+ const replaced=(await api(student,'GET','/api/auth/me')).user.avatar_url;expect(replaced).not.toBe(saved);await api(student,'GET',saved,undefined,404);
+ checks.push('Avatar survives reload; invalid input preserves saved image and replacement invalidates original URL');
+ await avatar.getByRole('button',{name:'Remove avatar',exact:true}).click();await expect(avatar.getByText('Avatar removed and verified.',{exact:true})).toBeVisible();expect((await api(student,'GET','/api/auth/me')).user.avatar_url).toBeNull();await expect(page.locator('.profile-entry img')).toHaveCount(0);await api(student,'GET',replaced,undefined,404);
+ checks.push('Actual Remove restores sidebar initials and nullable me; removed image is inaccessible');
+ await page.setViewportSize({width:390,height:844});await avatar.getByLabel('Choose avatar image').setInputFiles({name:'Synthetic-blue.png',mimeType:'image/png',buffer:blue});await avatar.getByRole('button',{name:'Save avatar',exact:true}).scrollIntoViewIfNeeded();await expect(avatar.getByRole('button',{name:'Save avatar',exact:true})).toBeInViewport();await shot('account-avatar-mobile-preview');await avatar.getByRole('button',{name:'Save avatar',exact:true}).click();await expect(avatar.getByText('Avatar saved and verified.',{exact:true})).toBeVisible();
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+ saved=(await api(student,'GET','/api/auth/me')).user.avatar_url;ids.avatar_user=user.id;ids.avatar_url=saved;ids.avatar_sha256=crypto.createHash('sha256').update(await api(student,'GET',saved)).digest('hex');
+ await page.getByRole('button',{name:'Navigation',exact:true}).click();await expect(page.locator('.sidebar.mobile-open .brand-sub')).toBeInViewport();const mobileMark=await page.locator('.sidebar .brand-mark').boundingBox(),mobileCopy=await page.locator('.sidebar .brand-copy').boundingBox();expect(mobileMark.x+mobileMark.width).toBeLessThanOrEqual(mobileCopy.x);await shot('horizontal-sidebar-mobile');await page.locator('.nav-scrim').click({position:{x:375,y:400}});
+ checks.push('390px avatar controls and horizontal sidebar remain reachable without overflow');
+ await page.setViewportSize({width:1440,height:1000});await page.getByRole('navigation',{name:'Settings sections'}).getByRole('button',{name:'Feedback',exact:true}).click();await expect(page.getByRole('heading',{name:'Feedback',exact:true})).toBeVisible();await expect(page.getByRole('button',{name:'Administrator inbox',exact:true})).toHaveCount(0);
+ const compose=page.getByRole('region',{name:'Send feedback',exact:true}),subject='Synthetic browser feedback',message='A concrete synthetic experience.\n<script>window.syntheticUnsafe=true</script>\nKeep this text literal.';
+ await compose.getByLabel('Category',{exact:true}).selectOption('idea');await compose.getByLabel('Subject',{exact:true}).fill(subject);await compose.getByLabel('Message',{exact:true}).fill(message);
+ await page.reload();await expect(compose.getByLabel('Subject',{exact:true})).toHaveValue(subject);await expect(compose.getByLabel('Message',{exact:true})).toHaveValue(message);
+ await compose.getByRole('button',{name:'Send feedback',exact:true}).click();await expect(compose.getByLabel('Subject',{exact:true})).toHaveValue('');
+ let own=await api(student,'GET','/api/feedback');expect(own.total).toBe(1);const fid=own.items[0].id;expect(own.items[0].message).toBe(message);ids.feedback_reviewed=fid;
+ await page.locator(`[data-feedback-id="${fid}"]`).click();await expect(page.locator('.feedback-detail .feedback-literal').first()).toHaveText(message);expect(await page.evaluate(()=>window.syntheticUnsafe)).toBeUndefined();await expect(page.locator('.feedback-detail script')).toHaveCount(0);await shot('feedback-own-desktop');
+ checks.push('Feedback draft survives reload and real submission is independently read back; HTML-like text remains literal');
+ const otherPage=await other.newPage();await otherPage.goto(base+'/#/settings/feedback');await expect(otherPage.getByLabel('Subject',{exact:true})).toHaveValue('');await expect(otherPage.locator('.feedback-count')).toHaveText('0 feedback items');await api(other,'GET','/api/feedback/'+fid,undefined,404);await api(other,'GET','/api/admin/feedback',undefined,403);await otherPage.close();
+ checks.push('Another student has an isolated draft/history and no cross-account detail/admin access');
+ for(let i=0;i<30;i++)await api(student,'POST','/api/feedback',{request_id:`s9-browser-page-${i}`,category:i%2?'bug':'general',subject:`Synthetic browser page ${i}`,message:'Synthetic pagination entry'});
+ await page.getByRole('button',{name:'Refresh list',exact:true}).click();await expect(page.locator('.feedback-count')).toContainText('of 31');
+ const seen=[];for(let n=0;n<5;n++){
+  await expect(page.getByRole('button',{name:'Refresh list',exact:true})).toBeEnabled();seen.push(...await page.locator('[data-feedback-id]').evaluateAll(els=>els.map(el=>el.dataset.feedbackId)));await fs.writeFile(path.join(out,'pagination-rows.json'),JSON.stringify(seen));
+  if(await page.getByRole('button',{name:'Next page',exact:true}).isDisabled())break;
+  await page.getByRole('button',{name:'Next page',exact:true}).click();
+ }
+ expect(seen.length).toBe(31);expect(new Set(seen).size).toBe(31);
+ await page.getByLabel('Filter category',{exact:true}).selectOption('idea');await expect(page.locator('.feedback-count')).toHaveText('1–1 of 1');await expect(page.locator('[data-feedback-id]')).toHaveCount(1);
+ checks.push('Real31-row pagination covers every distinct own entry and category filter uses accurate total');
+ const ap=await admin.newPage();ap.setDefaultTimeout(15000);ap.on('pageerror',e=>errors.push(e.message));await ap.goto(base+'/#/settings/feedback');await expect(ap.locator('.feedback-count')).toHaveText('0 feedback items');await ap.getByRole('button',{name:'Administrator inbox',exact:true}).click();await ap.getByLabel('Filter category',{exact:true}).selectOption('idea');await ap.locator(`[data-feedback-id="${fid}"]`).click();await expect(ap.locator('.feedback-author')).toContainText(user.email);
+ const reply='Synthetic administrator response from the actual browser.';await ap.getByLabel('Your reply',{exact:true}).fill(reply);await ap.getByLabel('Review status',{exact:true}).selectOption('reviewed');await ap.getByRole('button',{name:'Save reply and status',exact:true}).click();await expect.poll(async()=>(await api(student,'GET','/api/feedback/'+fid)).reply).toBe(reply);await expect(ap.locator('.feedback-detail .feedback-literal').nth(1)).toHaveText(reply);await expect(ap.getByRole('button',{name:'Save reply and status',exact:true})).toBeDisabled();
+ let item=await api(admin,'GET','/api/admin/feedback/'+fid);expect(item.revision).toBe(2);expect(item.status).toBe('reviewed');
+ page=ap;await shot('feedback-inbox-desktop');checks.push('Admin own list is distinct from inbox; real human reply/review is saved and visible to author');
+ const retained='Synthetic retained draft after concurrent review.';await ap.getByLabel('Your reply',{exact:true}).fill(retained);await api(admin,'PATCH','/api/admin/feedback/'+fid,{status:'reviewed',reply:'Synthetic concurrent edit',expected_revision:2});await ap.getByRole('button',{name:'Save reply and status',exact:true}).click();await expect(ap.locator('.feedback-detail')).toContainText('Another administrator changed this item');await expect(ap.getByLabel('Your reply',{exact:true})).toHaveValue(retained);await expect(ap.getByRole('button',{name:'Save reply and status',exact:true})).toBeDisabled();
+ await ap.getByRole('button',{name:'Load latest revision, keep draft',exact:true}).click();await expect(ap.getByLabel('Your reply',{exact:true})).toHaveValue(retained);await expect(ap.getByRole('button',{name:'Save reply and status',exact:true})).toBeEnabled();await ap.getByRole('button',{name:'Save reply and status',exact:true}).click();await expect(ap.locator('.feedback-detail .feedback-literal').nth(1)).toHaveText(retained);await expect(ap.getByRole('button',{name:'Save reply and status',exact:true})).toBeDisabled();item=await api(student,'GET','/api/feedback/'+fid);expect(item.revision).toBe(4);expect(item.reply).toBe(retained);
+ checks.push('Actual409 preserves administrator draft; explicit latest-revision load allows verified recovery');
+ await ap.setViewportSize({width:390,height:844});await ap.getByLabel('Your reply',{exact:true}).scrollIntoViewIfNeeded();await expect(ap.getByLabel('Your reply',{exact:true})).toBeInViewport();expect(await ap.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);await shot('feedback-inbox-mobile');
+ page=(await student.pages())[0];await page.setViewportSize({width:390,height:844});await page.reload();await page.getByLabel('Filter category',{exact:true}).selectOption('idea');await page.locator(`[data-feedback-id="${fid}"]`).click();await expect(page.locator('.feedback-detail .feedback-literal').nth(1)).toHaveText(retained);await page.locator('.feedback-detail').scrollIntoViewIfNeeded();await shot('feedback-own-mobile');
+ checks.push('390px administrator reply and author readback remain usable with current saved text');
+ const tp=await teacher.newPage();await tp.goto(base+'/#/settings/feedback');await expect(tp.getByRole('heading',{name:'Feedback',exact:true})).toBeVisible();await expect(tp.getByRole('button',{name:'Administrator inbox',exact:true})).toHaveCount(0);await api(teacher,'GET','/api/admin/feedback',undefined,403);await tp.close();
+ checks.push('Teacher also has Feedback but cannot acquire administrator inbox privilege');
+ ids.expected_reply=retained;ids.expected_revision=4;ids.feedback_total=(await api(admin,'GET','/api/admin/feedback')).total;
+ expect(errors).toEqual([]);checks.push('No browser exceptions, application HTTP interception or real model/search usage');
+}catch(e){errors.push(String(e));if(page)await shot('failure').catch(()=>{});process.exitCode=1}
+finally{await browser?.close();const report={status:errors.length?'failed':'passed',checks,errors,shots,requests,ids,owned_browser_closed:true,real_application_http:true,intercepted_application_routes:0,synthetic_only:true,real_model_or_search_calls:0};await fs.writeFile(path.join(out,'result.json'),JSON.stringify(report,null,2));console.log(JSON.stringify({status:report.status,checks:checks.length,errors,result:path.join(out,'result.json')}));}

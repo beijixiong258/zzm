@@ -1,0 +1,33 @@
+{
+  "name": "aicademiya-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1 --port 18774 --strictPort",
+    "build": "tsc -b && vite build",
+    "build:brand": "node tests/brand-assets.mjs",
+    "preview": "vite preview --host 127.0.0.1 --port 18774 --strictPort",
+    "test": "vitest run",
+    "check:browser": "node tests/browser-check.mjs",
+    "check:stage2": "node tests/stage2-browser.mjs",
+    "format": "prettier --write src tests vite.config.ts"
+  },
+  "dependencies": {
+    "lucide-react": "^0.468.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@vitejs/plugin-react": "^5.0.0",
+    "prettier": "^3.9.9",
+    "typescript": "~5.9.3",
+    "vite": "^7.1.0",
+    "vitest": "^3.2.0"
+  }
+}

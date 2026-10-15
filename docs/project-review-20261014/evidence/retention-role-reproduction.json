@@ -1,0 +1,30 @@
+{
+  "status": "reproduced",
+  "method": "Current role-change, staff assignment, access and maintenance helpers over a fresh synthetic database",
+  "before": {
+    "workspace": 1,
+    "messages": 1,
+    "preview_binding": 1,
+    "staff_assigned": true
+  },
+  "after": {
+    "workspace": 0,
+    "messages": 0,
+    "preview_binding": 1,
+    "staff_assigned": true,
+    "account_role": "teacher"
+  },
+  "maintenance": {
+    "accounts": [],
+    "enrollments": [
+      {
+        "course_id": "review-course",
+        "user_id": "review-learner"
+      }
+    ],
+    "dry_run": false
+  },
+  "production_writes": false,
+  "model_calls": 0,
+  "scratch": "C:\\Users\\17193\\AppData\\Local\\hermes\\cache\\scratch\\aicademiya-retention-review-38c700a080"
+}

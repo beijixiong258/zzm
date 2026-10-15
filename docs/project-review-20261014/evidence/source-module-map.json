@@ -1,0 +1,2832 @@
+{
+  "backend_count": 55,
+  "frontend_count": 93,
+  "runtime_tools_count": 31,
+  "records": [
+    {
+      "path": "app/backend/aicademiya/__init__.py",
+      "module_report": "07-deployment-data-tools.md",
+      "read_evidence": [
+        {
+          "method": "父模块接口/结构与选段阅读",
+          "ranges": []
+        }
+      ]
+    },
+    {
+      "path": "app/backend/aicademiya/access_control.py",
+      "module_report": "01-accounts-security.md",
+      "read_evidence": [
+        {
+          "method": "full_file_static_read",
+          "ranges": [
+            [
+              1,
+              47
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "path": "app/backend/aicademiya/account_avatars.py",
+      "module_report": "01-accounts-security.md",
+      "read_evidence": [
+        {
+          "method": "full_file_static_read",
+          "ranges": [
+            [
+              1,
+              92
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "path": "app/backend/aicademiya/account_features_migration.py",
+      "module_report": "01-accounts-security.md",
+      "read_evidence": [
+        {
+          "method": "full_file_static_read",
+          "ranges": [
+            [
+              1,
+              30
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "path": "app/backend/aicademiya/account_import.py",
+      "module_report": "01-accounts-security.md",
+      "read_evidence": [
+        {
+          "method": "full_file_static_read",
+          "ranges": [
+            [
+              1,
+              141
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "path": "app/backend/aicademiya/ai.py",
+      "module_report": "06-ai-search-services.md",
+      "read_evidence": [
+        {
+          "method": "父模块接口/结构与选段阅读",
+          "ranges": []
+        }
+      ]
+    },
+    {
+      "path": "app/backend/aicademiya/auth.py",
+      "module_report": "01-accounts-security.md",
+      "read_evidence": [
+        {
+          "method": "full_file_static_read",
+          "ranges": [
+            [
+              1,
+              67
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "path": "app/backend/aicademiya/authoring.py",
+      "module_report": "02-course-authoring-versions.md",
+      "read_evidence": [
+        {
+          "method": "full_file_static_read",
+          "ranges": [
+            [
+              1,
+              531
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "path": "app/backend/aicademiya/config.py",
+      "module_report": "01-accounts-security.md",
+      "read_evidence": [
+        {
+          "method": "full_file_static_read",
+          "ranges": [
+            [
+              1,
+              78
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "path": "app/backend/aicademiya/course_lifecycle.py",
+      "module_report": "02-course-authoring-versions.md",
+      "read_evidence": [
+        {
+          "method": "full_file_static_read",
+          "ranges": [
+            [
+              1,
+              110
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "path": "app/backend/aicademiya/course_staff.py",
+      "module_report": "01-accounts-security.md",
+      "read_evidence": [
+        {
+          "method": "full_file_static_read",
+          "ranges": [
+            [
+              1,
+              160
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "path": "app/backend/aicademiya/create_teacher.py",
+      "module_report": "07-deployment-data-tools.md",
+      "read_evidence": [
+        {
+          "method": "父模块接口/结构与选段阅读",
+          "ranges": []
+        }
+      ]
+    },
+    {
+      "path": "app/backend/aicademiya/db.py",
+      "module_report": "02-course-authoring-versions.md",
+      "read_evidence": [
+        {
+          "method": "full_file_static_read",
+          "ranges": [
+            [
+              1,
+              246
+            ]
+          ]
+        },
+        {
+          "method": "selected-line-read",
+          "ranges": [
+            [
+              85,
+              89
+            ],
+            [
+              119,
+              120
+            ],
+            [
+              123,
+              134
+            ],
+            [
+              160,
+              165
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "path": "app/backend/aicademiya/document_api.py",
+      "module_report": "05-materials-documents.md",
+      "read_evidence": [
+        {
+          "method": "父模块接口/结构与选段阅读",
+          "ranges": []
+        }
+      ]
+    },
+    {
+      "path": "app/backend/aicademiya/document_bundle.py",
+      "module_report": "05-materials-documents.md",
+      "read_evidence": [
+        {
+          "method": "父模块接口/结构与选段阅读",
+          "ranges": []
+        }
+      ]
+    },
+    {
+      "path": "app/backend/aicademiya/document_jobs.py",
+      "module_report": "05-materials-documents.md",
+      "read_evidence": [
+        {
+          "method": "父模块接口/结构与选段阅读",
+          "ranges": []
+        }
+      ]
+    },
+    {
+      "path": "app/backend/aicademiya/document_storage.py",
+      "module_report": "05-materials-documents.md",
+      "read_evidence": [
+        {
+          "method": "selected_ranges_static_read",
+          "ranges": [
+            [
+              1,
+              65
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "path": "app/backend/aicademiya/document_supplements.py",
+      "module_report": "05-materials-documents.md",
+      "read_evidence": [
+        {
+          "method": "父模块接口/结构与选段阅读",
+          "ranges": []
+        }
+      ]
+    },
+    {
+      "path": "app/backend/aicademiya/evidence.py",
+      "module_report": "03-learning-tutor.md",
+      "read_evidence": [
+        {
+          "method": "full-text-read",
+          "ranges": [
+            [
+              1,
+              46
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "path": "app/backend/aicademiya/extraction_limits.py",
+      "module_report": "05-materials-documents.md",
+      "read_evidence": [
+        {
+          "method": "父模块接口/结构与选段阅读",
+          "ranges": []
+        }
+      ]
+    },
+    {
+      "path": "app/backend/aicademiya/feedback.py",
+      "module_report": "01-accounts-security.md",
+      "read_evidence": [
+        {
+          "method": "full_file_static_read",
+          "ranges": [
+            [
+              1,
+              153
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "path": "app/backend/aicademiya/global_accounts.py",
+      "module_report": "01-accounts-security.md",
+      "read_evidence": [
+        {
+          "method": "full_file_static_read",
+          "ranges": [
+            [
+              1,
+              139
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "path": "app/backend/aicademiya/guided_director.py",
+      "module_report": "03-learning-tutor.md",
+      "read_evidence": [
+        {
+          "method": "full-text-read",
+          "ranges": [
+            [
+              1,
+              284
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "path": "app/backend/aicademiya/guided_engine.py",
+      "module_report": "03-learning-tutor.md",
+      "read_evidence": [
+        {
+          "method": "full-text-read",
+          "ranges": [
+            [
+              1,
+              234
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "path": "app/backend/aicademiya/guided_migration.py",
+      "module_report": "03-learning-tutor.md",
+      "read_evidence": [
+        {
+          "method": "full_file_static_read",
+          "ranges": [
+            [
+              1,
+              28
+            ]
+          ]
+        },
+        {
+          "method": "full-text-read",
+          "ranges": [
+            [
+              1,
+              28
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "path": "app/backend/aicademiya/guided_reading.py",
+      "module_report": "03-learning-tutor.md",
+      "read_evidence": [
+        {
+          "method": "full-text-read",
+          "ranges": [
+            [
+              1,
+              170
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "path": "app/backend/aicademiya/guided_routes.py",
+      "module_report": "03-learning-tutor.md",
+      "read_evidence": [
+        {
+          "method": "full-text-read",
+          "ranges": [
+            [
+              1,
+              235
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "path": "app/backend/aicademiya/guided_state.py",
+      "module_report": "03-learning-tutor.md",
+      "read_evidence": [
+        {
+          "method": "full-text-read",
+          "ranges": [
+            [
+              1,
+              136
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "path": "app/backend/aicademiya/http_security.py",
+      "module_report": "01-accounts-security.md",
+      "read_evidence": [
+        {
+          "method": "full_file_static_read",
+          "ranges": [
+            [
+              1,
+              119
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "path": "app/backend/aicademiya/learning_routes.py",
+      "module_report": "03-learning-tutor.md",
+      "read_evidence": [
+        {
+          "method": "full_file_static_read",
+          "ranges": [
+            [
+              1,
+              316
+            ]
+          ]
+        },
+        {
+          "method": "full-text-read",
+          "ranges": [
+            [
+              1,
+              316
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "path": "app/backend/aicademiya/link_materials.py",
+      "module_report": "05-materials-documents.md",
+      "read_evidence": [
+        {
+          "method": "selected_ranges_static_read",
+          "ranges": [
+            [
+              184,
+              252
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "path": "app/backend/aicademiya/main.py",
+      "module_report": "07-deployment-data-tools.md",
+      "read_evidence": [
+        {
+          "method": "full_file_static_read",
+          "ranges": [
+            [
+              1,
+              590
+            ]
+          ]
+        },
+        {
+          "method": "selected-line-read",
+          "ranges": [
+            [
+              54,
+              62
+            ],
+            [
+              392,
+              407
+            ],
+            [
+              578,
+              588
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "path": "app/backend/aicademiya/manage_admin.py",
+      "module_report": "07-deployment-data-tools.md",
+      "read_evidence": [
+        {
+          "method": "父模块接口/结构与选段阅读",
+          "ranges": []
+        }
+      ]
+    },
+    {
+      "path": "app/backend/aicademiya/material_extraction.py",
+      "module_report": "05-materials-documents.md",
+      "read_evidence": [
+        {
+          "method": "父模块接口/结构与选段阅读",
+          "ranges": []
+        }
+      ]
+    },
+    {
+      "path": "app/backend/aicademiya/material_library.py",
+      "module_report": "05-materials-documents.md",
+      "read_evidence": [
+        {
+          "method": "full_file_static_read",
+          "ranges": [
+            [
+              1,
+              87
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "path": "app/backend/aicademiya/material_security.py",
+      "module_report": "05-materials-documents.md",
+      "read_evidence": [
+        {
+          "method": "父模块接口/结构与选段阅读",
+          "ranges": []
+        }
+      ]
+    },
+    {
+      "path": "app/backend/aicademiya/materials.py",
+      "module_report": "05-materials-documents.md",
+      "read_evidence": [
+        {
+          "method": "父模块接口/结构与选段阅读",
+          "ranges": []
+        }
+      ]
+    },
+    {
+      "path": "app/backend/aicademiya/migrations.py",
+      "module_report": "02-course-authoring-versions.md",
+      "read_evidence": [
+        {
+          "method": "full_file_static_read",
+          "ranges": [
+            [
+              1,
+              100
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "path": "app/backend/aicademiya/model_connection.py",
+      "module_report": "06-ai-search-services.md",
+      "read_evidence": [
+        {
+          "method": "父模块接口/结构与选段阅读",
+          "ranges": []
+        }
+      ]
+    },
+    {
+      "path": "app/backend/aicademiya/models.py",
+      "module_report": "02-course-authoring-versions.md",
+      "read_evidence": [
+        {
+          "method": "full_file_static_read",
+          "ranges": [
+            [
+              1,
+              362
+            ]
+          ]
+        },
+        {
+          "method": "selected-line-read",
+          "ranges": [
+            [
+              99,
+              111
+            ],
+            [
+              140,
+              144
+            ],
+            [
+              192,
+              196
+            ],
+            [
+              220,
+              224
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "path": "app/backend/aicademiya/reading_context.py",
+      "module_report": "03-learning-tutor.md",
+      "read_evidence": [
+        {
+          "method": "full-text-read",
+          "ranges": [
+            [
+              1,
+              382
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "path": "app/backend/aicademiya/roster.py",
+      "module_report": "01-accounts-security.md",
+      "read_evidence": [
+        {
+          "method": "full_file_static_read",
+          "ranges": [
+            [
+              1,
+              344
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "path": "app/backend/aicademiya/service_settings.py",
+      "module_report": "06-ai-search-services.md",
+      "read_evidence": [
+        {
+          "method": "父模块接口/结构与选段阅读",
+          "ranges": []
+        }
+      ]
+    },
+    {
+      "path": "app/backend/aicademiya/services.py",
+      "module_report": "02-course-authoring-versions.md",
+      "read_evidence": [
+        {
+          "method": "full_file_static_read",
+          "ranges": [
+            [
+              1,
+              188
+            ]
+          ]
+        },
+        {
+          "method": "selected-line-read",
+          "ranges": [
+            [
+              97,
+              188
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "path": "app/backend/aicademiya/session_lifecycle.py",
+      "module_report": "02-course-authoring-versions.md",
+      "read_evidence": [
+        {
+          "method": "full_file_static_read",
+          "ranges": [
+            [
+              1,
+              45
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "path": "app/backend/aicademiya/source_review.py",
+      "module_report": "02-course-authoring-versions.md",
+      "read_evidence": [
+        {
+          "method": "full_file_static_read",
+          "ranges": [
+            [
+              1,
+              115
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "path": "app/backend/aicademiya/teacher_preview.py",
+      "module_report": "02-course-authoring-versions.md",
+      "read_evidence": [
+        {
+          "method": "full_file_static_read",
+          "ranges": [
+            [
+              1,
+              111
+            ]
+          ]
+        },
+        {
+          "method": "full-text-read",
+          "ranges": [
+            [
+              1,
+              111
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "path": "app/backend/aicademiya/teacher_workbench_routes.py",
+      "module_report": "02-course-authoring-versions.md",
+      "read_evidence": [
+        {
+          "method": "full_file_static_read",
+          "ranges": [
+            [
+              1,
+              61
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "path": "app/backend/aicademiya/teaching.py",
+      "module_report": "02-course-authoring-versions.md",
+      "read_evidence": [
+        {
+          "method": "full_file_static_read",
+          "ranges": [
+            [
+              1,
+              34
+            ]
+          ]
+        },
+        {
+          "method": "full-text-read",
+          "ranges": [
+            [
+              1,
+              34
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "path": "app/backend/aicademiya/version_context.py",
+      "module_report": "02-course-authoring-versions.md",
+      "read_evidence": [
+        {
+          "method": "full_file_static_read",
+          "ranges": [
+            [
+              1,
+              165
+            ]
+          ]
+        },
+        {
+          "method": "selected-line-read",
+          "ranges": [
+            [
+              11,
+              130
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "path": "app/backend/aicademiya/versions.py",
+      "module_report": "02-course-authoring-versions.md",
+      "read_evidence": [
+        {
+          "method": "full_file_static_read",
+          "ranges": [
+            [
+              1,
+              132
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "path": "app/backend/aicademiya/visual_context.py",
+      "module_report": "03-learning-tutor.md",
+      "read_evidence": [
+        {
+          "method": "full-text-read",
+          "ranges": [
+            [
+              1,
+              126
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "path": "app/backend/aicademiya/web_search.py",
+      "module_report": "06-ai-search-services.md",
+      "read_evidence": [
+        {
+          "method": "父模块接口/结构与选段阅读",
+          "ranges": []
+        }
+      ]
+    },
+    {
+      "path": "app/backend/aicademiya/worksheet_import.py",
+      "module_report": "05-materials-documents.md",
+      "read_evidence": [
+        {
+          "method": "父模块接口/结构与选段阅读",
+          "ranges": []
+        }
+      ]
+    },
+    {
+      "path": "app/backend/aicademiya/worksheet_materials.py",
+      "module_report": "05-materials-documents.md",
+      "read_evidence": [
+        {
+          "method": "父模块接口/结构与选段阅读",
+          "ranges": []
+        }
+      ]
+    },
+    {
+      "path": "app/frontend/src/AccessSettings.tsx",
+      "module_report": "04-frontend-experience.md",
+      "read_evidence": [
+        {
+          "method": "full-text-read",
+          "ranges": [
+            [
+              1,
+              52
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "path": "app/frontend/src/account-avatar.css",
+      "module_report": "04-frontend-experience.md",
+      "read_evidence": [
+        {
+          "method": "静态依赖可达；模块正文报告未逐文件通读",
+          "ranges": []
+        }
+      ]
+    },
+    {
+      "path": "app/frontend/src/account-management-api.ts",
+      "module_report": "04-frontend-experience.md",
+      "read_evidence": [
+        {
+          "method": "full-text-read",
+          "ranges": [
+            [
+              1,
+              63
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "path": "app/frontend/src/account-management-state.ts",
+      "module_report": "04-frontend-experience.md",
+      "read_evidence": [
+        {
+          "method": "full-text-read",
+          "ranges": [
+            [
+              1,
+              150
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "path": "app/frontend/src/account-management-types.ts",
+      "module_report": "04-frontend-experience.md",
+      "read_evidence": [
+        {
+          "method": "静态依赖可达；模块正文报告未逐文件通读",
+          "ranges": []
+        }
+      ]
+    },
+    {
+      "path": "app/frontend/src/account-management-ui.tsx",
+      "module_report": "04-frontend-experience.md",
+      "read_evidence": [
+        {
+          "method": "静态依赖可达；模块正文报告未逐文件通读",
+          "ranges": []
+        }
+      ]
+    },
+    {
+      "path": "app/frontend/src/account-management.css",
+      "module_report": "04-frontend-experience.md",
+      "read_evidence": [
+        {
+          "method": "静态依赖可达；模块正文报告未逐文件通读",
+          "ranges": []
+        }
+      ]
+    },
+    {
+      "path": "app/frontend/src/AdminAccounts.tsx",
+      "module_report": "04-frontend-experience.md",
+      "read_evidence": [
+        {
+          "method": "full-text-read",
+          "ranges": [
+            [
+              1,
+              25
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "path": "app/frontend/src/api.ts",
+      "module_report": "04-frontend-experience.md",
+      "read_evidence": [
+        {
+          "method": "selected-line-read",
+          "ranges": [
+            [
+              1,
+              125
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "path": "app/frontend/src/App.tsx",
+      "module_report": "04-frontend-experience.md",
+      "read_evidence": [
+        {
+          "method": "full-text-read",
+          "ranges": [
+            [
+              1,
+              438
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "path": "app/frontend/src/Authoring.tsx",
+      "module_report": "04-frontend-experience.md",
+      "read_evidence": [
+        {
+          "method": "selected-line-read",
+          "ranges": [
+            [
+              1,
+              8
+            ],
+            [
+              12,
+              14
+            ],
+            [
+              25,
+              27
+            ],
+            [
+              507,
+              509
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "path": "app/frontend/src/availability.css",
+      "module_report": "04-frontend-experience.md",
+      "read_evidence": [
+        {
+          "method": "静态依赖可达；模块正文报告未逐文件通读",
+          "ranges": []
+        }
+      ]
+    },
+    {
+      "path": "app/frontend/src/Availability.tsx",
+      "module_report": "04-frontend-experience.md",
+      "read_evidence": [
+        {
+          "method": "静态依赖可达；模块正文报告未逐文件通读",
+          "ranges": []
+        }
+      ]
+    },
+    {
+      "path": "app/frontend/src/Avatar.tsx",
+      "module_report": "04-frontend-experience.md",
+      "read_evidence": [
+        {
+          "method": "静态依赖可达；模块正文报告未逐文件通读",
+          "ranges": []
+        }
+      ]
+    },
+    {
+      "path": "app/frontend/src/brand.css",
+      "module_report": "04-frontend-experience.md",
+      "read_evidence": [
+        {
+          "method": "静态依赖可达；模块正文报告未逐文件通读",
+          "ranges": []
+        }
+      ]
+    },
+    {
+      "path": "app/frontend/src/ChangePassword.tsx",
+      "module_report": "04-frontend-experience.md",
+      "read_evidence": [
+        {
+          "method": "静态依赖可达；模块正文报告未逐文件通读",
+          "ranges": []
+        }
+      ]
+    },
+    {
+      "path": "app/frontend/src/contrast.css",
+      "module_report": "04-frontend-experience.md",
+      "read_evidence": [
+        {
+          "method": "静态依赖可达；模块正文报告未逐文件通读",
+          "ranges": []
+        }
+      ]
+    },
+    {
+      "path": "app/frontend/src/course-actions.css",
+      "module_report": "04-frontend-experience.md",
+      "read_evidence": [
+        {
+          "method": "静态依赖可达；模块正文报告未逐文件通读",
+          "ranges": []
+        }
+      ]
+    },
+    {
+      "path": "app/frontend/src/course-home.css",
+      "module_report": "04-frontend-experience.md",
+      "read_evidence": [
+        {
+          "method": "静态依赖可达；模块正文报告未逐文件通读",
+          "ranges": []
+        }
+      ]
+    },
+    {
+      "path": "app/frontend/src/course-library.css",
+      "module_report": "04-frontend-experience.md",
+      "read_evidence": [
+        {
+          "method": "静态依赖可达；模块正文报告未逐文件通读",
+          "ranges": []
+        }
+      ]
+    },
+    {
+      "path": "app/frontend/src/course-presentation.ts",
+      "module_report": "04-frontend-experience.md",
+      "read_evidence": [
+        {
+          "method": "静态依赖可达；模块正文报告未逐文件通读",
+          "ranges": []
+        }
+      ]
+    },
+    {
+      "path": "app/frontend/src/CourseActions.tsx",
+      "module_report": "04-frontend-experience.md",
+      "read_evidence": [
+        {
+          "method": "静态依赖可达；模块正文报告未逐文件通读",
+          "ranges": []
+        }
+      ]
+    },
+    {
+      "path": "app/frontend/src/CourseLibrary.tsx",
+      "module_report": "04-frontend-experience.md",
+      "read_evidence": [
+        {
+          "method": "selected-line-read",
+          "ranges": [
+            [
+              1,
+              11
+            ],
+            [
+              31,
+              33
+            ],
+            [
+              56,
+              58
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "path": "app/frontend/src/CourseStaff.tsx",
+      "module_report": "04-frontend-experience.md",
+      "read_evidence": [
+        {
+          "method": "selected-line-read",
+          "ranges": [
+            [
+              1,
+              4
+            ],
+            [
+              7,
+              10
+            ],
+            [
+              15,
+              23
+            ],
+            [
+              26,
+              28
+            ],
+            [
+              34,
+              36
+            ],
+            [
+              41,
+              43
+            ],
+            [
+              46,
+              48
+            ],
+            [
+              61,
+              63
+            ],
+            [
+              116,
+              118
+            ],
+            [
+              143,
+              145
+            ],
+            [
+              414,
+              416
+            ],
+            [
+              418,
+              420
+            ],
+            [
+              424,
+              426
+            ],
+            [
+              481,
+              483
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "path": "app/frontend/src/CourseStudents.tsx",
+      "module_report": "04-frontend-experience.md",
+      "read_evidence": [
+        {
+          "method": "full-text-read",
+          "ranges": [
+            [
+              1,
+              91
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "path": "app/frontend/src/CourseTrash.tsx",
+      "module_report": "04-frontend-experience.md",
+      "read_evidence": [
+        {
+          "method": "静态依赖可达；模块正文报告未逐文件通读",
+          "ranges": []
+        }
+      ]
+    },
+    {
+      "path": "app/frontend/src/design-tokens.css",
+      "module_report": "04-frontend-experience.md",
+      "read_evidence": [
+        {
+          "method": "静态依赖可达；模块正文报告未逐文件通读",
+          "ranges": []
+        }
+      ]
+    },
+    {
+      "path": "app/frontend/src/document-api.ts",
+      "module_report": "04-frontend-experience.md",
+      "read_evidence": [
+        {
+          "method": "full-text-read",
+          "ranges": [
+            [
+              1,
+              58
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "path": "app/frontend/src/document-reader.css",
+      "module_report": "04-frontend-experience.md",
+      "read_evidence": [
+        {
+          "method": "selected-line-read",
+          "ranges": [
+            [
+              169,
+              173
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "path": "app/frontend/src/document-state.ts",
+      "module_report": "04-frontend-experience.md",
+      "read_evidence": [
+        {
+          "method": "full-text-read",
+          "ranges": [
+            [
+              1,
+              89
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "path": "app/frontend/src/document-types.ts",
+      "module_report": "04-frontend-experience.md",
+      "read_evidence": [
+        {
+          "method": "静态依赖可达；模块正文报告未逐文件通读",
+          "ranges": []
+        }
+      ]
+    },
+    {
+      "path": "app/frontend/src/DocumentBlockContent.tsx",
+      "module_report": "04-frontend-experience.md",
+      "read_evidence": [
+        {
+          "method": "静态依赖可达；模块正文报告未逐文件通读",
+          "ranges": []
+        }
+      ]
+    },
+    {
+      "path": "app/frontend/src/DocumentReader.tsx",
+      "module_report": "04-frontend-experience.md",
+      "read_evidence": [
+        {
+          "method": "selected-line-read",
+          "ranges": [
+            [
+              29,
+              387
+            ],
+            [
+              461,
+              475
+            ],
+            [
+              481,
+              486
+            ],
+            [
+              553,
+              555
+            ],
+            [
+              690,
+              693
+            ],
+            [
+              712,
+              714
+            ],
+            [
+              748,
+              750
+            ],
+            [
+              752,
+              754
+            ],
+            [
+              776,
+              778
+            ],
+            [
+              783,
+              785
+            ],
+            [
+              821,
+              823
+            ],
+            [
+              849,
+              851
+            ],
+            [
+              853,
+              855
+            ],
+            [
+              883,
+              885
+            ],
+            [
+              907,
+              909
+            ],
+            [
+              913,
+              915
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "path": "app/frontend/src/drafts.ts",
+      "module_report": "04-frontend-experience.md",
+      "read_evidence": [
+        {
+          "method": "full-text-read",
+          "ranges": [
+            [
+              1,
+              44
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "path": "app/frontend/src/feedback.css",
+      "module_report": "04-frontend-experience.md",
+      "read_evidence": [
+        {
+          "method": "静态依赖可达；模块正文报告未逐文件通读",
+          "ranges": []
+        }
+      ]
+    },
+    {
+      "path": "app/frontend/src/Feedback.tsx",
+      "module_report": "04-frontend-experience.md",
+      "read_evidence": [
+        {
+          "method": "selected-line-read",
+          "ranges": [
+            [
+              1,
+              7
+            ],
+            [
+              46,
+              52
+            ],
+            [
+              56,
+              69
+            ],
+            [
+              78,
+              84
+            ],
+            [
+              96,
+              102
+            ],
+            [
+              151,
+              157
+            ],
+            [
+              160,
+              173
+            ],
+            [
+              195,
+              203
+            ],
+            [
+              337,
+              343
+            ],
+            [
+              358,
+              364
+            ],
+            [
+              373,
+              379
+            ],
+            [
+              421,
+              427
+            ],
+            [
+              436,
+              446
+            ],
+            [
+              475,
+              481
+            ],
+            [
+              485,
+              491
+            ],
+            [
+              500,
+              506
+            ],
+            [
+              512,
+              518
+            ],
+            [
+              534,
+              543
+            ],
+            [
+              886,
+              892
+            ],
+            [
+              920,
+              927
+            ],
+            [
+              960,
+              966
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "path": "app/frontend/src/GlobalAccountForms.tsx",
+      "module_report": "04-frontend-experience.md",
+      "read_evidence": [
+        {
+          "method": "selected-line-read",
+          "ranges": [
+            [
+              282,
+              453
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "path": "app/frontend/src/GlobalAccounts.tsx",
+      "module_report": "04-frontend-experience.md",
+      "read_evidence": [
+        {
+          "method": "selected-line-read",
+          "ranges": [
+            [
+              337,
+              421
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "path": "app/frontend/src/guided-study.ts",
+      "module_report": "04-frontend-experience.md",
+      "read_evidence": [
+        {
+          "method": "full-text-read",
+          "ranges": [
+            [
+              1,
+              247
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "path": "app/frontend/src/guided-workspace.css",
+      "module_report": "04-frontend-experience.md",
+      "read_evidence": [
+        {
+          "method": "selected-line-read",
+          "ranges": [
+            [
+              963,
+              967
+            ],
+            [
+              975,
+              979
+            ],
+            [
+              1004,
+              1008
+            ],
+            [
+              1165,
+              1169
+            ],
+            [
+              1212,
+              1216
+            ],
+            [
+              1262,
+              1266
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "path": "app/frontend/src/GuidedLearningWorkspace.tsx",
+      "module_report": "04-frontend-experience.md",
+      "read_evidence": [
+        {
+          "method": "selected-line-read",
+          "ranges": [
+            [
+              44,
+              53
+            ],
+            [
+              58,
+              64
+            ],
+            [
+              67,
+              558
+            ],
+            [
+              715,
+              721
+            ],
+            [
+              1026,
+              1039
+            ],
+            [
+              1146,
+              1152
+            ],
+            [
+              1183,
+              1189
+            ],
+            [
+              1214,
+              1220
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "path": "app/frontend/src/help-popover.css",
+      "module_report": "04-frontend-experience.md",
+      "read_evidence": [
+        {
+          "method": "静态依赖可达；模块正文报告未逐文件通读",
+          "ranges": []
+        }
+      ]
+    },
+    {
+      "path": "app/frontend/src/HelpPopover.tsx",
+      "module_report": "04-frontend-experience.md",
+      "read_evidence": [
+        {
+          "method": "静态依赖可达；模块正文报告未逐文件通读",
+          "ranges": []
+        }
+      ]
+    },
+    {
+      "path": "app/frontend/src/Home.tsx",
+      "module_report": "04-frontend-experience.md",
+      "read_evidence": [
+        {
+          "method": "selected-line-read",
+          "ranges": [
+            [
+              1,
+              3
+            ],
+            [
+              13,
+              26
+            ],
+            [
+              74,
+              76
+            ],
+            [
+              89,
+              94
+            ],
+            [
+              321,
+              323
+            ],
+            [
+              425,
+              427
+            ],
+            [
+              429,
+              431
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "path": "app/frontend/src/ids.ts",
+      "module_report": "04-frontend-experience.md",
+      "read_evidence": [
+        {
+          "method": "full-text-read",
+          "ranges": [
+            [
+              1,
+              8
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "path": "app/frontend/src/InstructionImport.tsx",
+      "module_report": "04-frontend-experience.md",
+      "read_evidence": [
+        {
+          "method": "selected-line-read",
+          "ranges": [
+            [
+              1,
+              208
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "path": "app/frontend/src/LearningHistory.tsx",
+      "module_report": "04-frontend-experience.md",
+      "read_evidence": [
+        {
+          "method": "full-text-read",
+          "ranges": [
+            [
+              1,
+              81
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "path": "app/frontend/src/LearningWorkspace.tsx",
+      "module_report": "04-frontend-experience.md",
+      "read_evidence": [
+        {
+          "method": "structure-only",
+          "ranges": []
+        }
+      ]
+    },
+    {
+      "path": "app/frontend/src/live-connection.tsx",
+      "module_report": "04-frontend-experience.md",
+      "read_evidence": [
+        {
+          "method": "full-text-read",
+          "ranges": [
+            [
+              1,
+              30
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "path": "app/frontend/src/Login.tsx",
+      "module_report": "04-frontend-experience.md",
+      "read_evidence": [
+        {
+          "method": "静态依赖可达；模块正文报告未逐文件通读",
+          "ranges": []
+        }
+      ]
+    },
+    {
+      "path": "app/frontend/src/main.tsx",
+      "module_report": "04-frontend-experience.md",
+      "read_evidence": [
+        {
+          "method": "full-text-read",
+          "ranges": [
+            [
+              1,
+              12
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "path": "app/frontend/src/material-manager.css",
+      "module_report": "04-frontend-experience.md",
+      "read_evidence": [
+        {
+          "method": "静态依赖可达；模块正文报告未逐文件通读",
+          "ranges": []
+        }
+      ]
+    },
+    {
+      "path": "app/frontend/src/material-upload.ts",
+      "module_report": "04-frontend-experience.md",
+      "read_evidence": [
+        {
+          "method": "full-text-read",
+          "ranges": [
+            [
+              1,
+              128
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "path": "app/frontend/src/MaterialManager.tsx",
+      "module_report": "04-frontend-experience.md",
+      "read_evidence": [
+        {
+          "method": "selected-line-read",
+          "ranges": [
+            [
+              37,
+              241
+            ],
+            [
+              245,
+              249
+            ],
+            [
+              258,
+              264
+            ],
+            [
+              334,
+              344
+            ],
+            [
+              352,
+              368
+            ],
+            [
+              377,
+              381
+            ],
+            [
+              385,
+              409
+            ],
+            [
+              548,
+              552
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "path": "app/frontend/src/Materials.tsx",
+      "module_report": "04-frontend-experience.md",
+      "read_evidence": [
+        {
+          "method": "selected-line-read",
+          "ranges": [
+            [
+              1,
+              230
+            ],
+            [
+              300,
+              375
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "path": "app/frontend/src/ModelSettings.tsx",
+      "module_report": "04-frontend-experience.md",
+      "read_evidence": [
+        {
+          "method": "selected-line-read",
+          "ranges": [
+            [
+              11,
+              23
+            ],
+            [
+              67,
+              82
+            ],
+            [
+              89,
+              102
+            ],
+            [
+              107,
+              141
+            ],
+            [
+              147,
+              158
+            ],
+            [
+              168,
+              175
+            ],
+            [
+              182,
+              195
+            ],
+            [
+              198,
+              204
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "path": "app/frontend/src/navigation-guard.tsx",
+      "module_report": "04-frontend-experience.md",
+      "read_evidence": [
+        {
+          "method": "full-text-read",
+          "ranges": [
+            [
+              1,
+              23
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "path": "app/frontend/src/process-overview.css",
+      "module_report": "04-frontend-experience.md",
+      "read_evidence": [
+        {
+          "method": "静态依赖可达；模块正文报告未逐文件通读",
+          "ranges": []
+        }
+      ]
+    },
+    {
+      "path": "app/frontend/src/process-overview.ts",
+      "module_report": "04-frontend-experience.md",
+      "read_evidence": [
+        {
+          "method": "静态依赖可达；模块正文报告未逐文件通读",
+          "ranges": []
+        }
+      ]
+    },
+    {
+      "path": "app/frontend/src/Profile.tsx",
+      "module_report": "04-frontend-experience.md",
+      "read_evidence": [
+        {
+          "method": "selected-line-read",
+          "ranges": [
+            [
+              1,
+              211
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "path": "app/frontend/src/ProvisionStudent.tsx",
+      "module_report": "04-frontend-experience.md",
+      "read_evidence": [
+        {
+          "method": "静态依赖可达；模块正文报告未逐文件通读",
+          "ranges": []
+        }
+      ]
+    },
+    {
+      "path": "app/frontend/src/Roster.tsx",
+      "module_report": "04-frontend-experience.md",
+      "read_evidence": [
+        {
+          "method": "selected-line-read",
+          "ranges": [
+            [
+              57,
+              316
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "path": "app/frontend/src/routes.ts",
+      "module_report": "04-frontend-experience.md",
+      "read_evidence": [
+        {
+          "method": "full-text-read",
+          "ranges": [
+            [
+              1,
+              64
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "path": "app/frontend/src/SavedResponses.tsx",
+      "module_report": "04-frontend-experience.md",
+      "read_evidence": [
+        {
+          "method": "selected-line-read",
+          "ranges": [
+            [
+              1,
+              210
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "path": "app/frontend/src/SearchSettings.tsx",
+      "module_report": "04-frontend-experience.md",
+      "read_evidence": [
+        {
+          "method": "selected-line-read",
+          "ranges": [
+            [
+              4,
+              8
+            ],
+            [
+              16,
+              27
+            ],
+            [
+              36,
+              45
+            ],
+            [
+              74,
+              118
+            ],
+            [
+              136,
+              145
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "path": "app/frontend/src/SearchToggle.tsx",
+      "module_report": "04-frontend-experience.md",
+      "read_evidence": [
+        {
+          "method": "静态依赖可达；模块正文报告未逐文件通读",
+          "ranges": []
+        }
+      ]
+    },
+    {
+      "path": "app/frontend/src/SessionActions.tsx",
+      "module_report": "04-frontend-experience.md",
+      "read_evidence": [
+        {
+          "method": "selected-line-read",
+          "ranges": [
+            [
+              1,
+              7
+            ],
+            [
+              9,
+              11
+            ],
+            [
+              13,
+              15
+            ],
+            [
+              19,
+              21
+            ],
+            [
+              26,
+              34
+            ],
+            [
+              53,
+              59
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "path": "app/frontend/src/settings-workspace.css",
+      "module_report": "04-frontend-experience.md",
+      "read_evidence": [
+        {
+          "method": "静态依赖可达；模块正文报告未逐文件通读",
+          "ranges": []
+        }
+      ]
+    },
+    {
+      "path": "app/frontend/src/SettingsWorkspace.tsx",
+      "module_report": "04-frontend-experience.md",
+      "read_evidence": [
+        {
+          "method": "full-text-read",
+          "ranges": [
+            [
+              1,
+              77
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "path": "app/frontend/src/SourceCitations.tsx",
+      "module_report": "04-frontend-experience.md",
+      "read_evidence": [
+        {
+          "method": "full-text-read",
+          "ranges": [
+            [
+              1,
+              119
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "path": "app/frontend/src/stage2.css",
+      "module_report": "04-frontend-experience.md",
+      "read_evidence": [
+        {
+          "method": "静态依赖可达；模块正文报告未逐文件通读",
+          "ranges": []
+        }
+      ]
+    },
+    {
+      "path": "app/frontend/src/stage2.ts",
+      "module_report": "04-frontend-experience.md",
+      "read_evidence": [
+        {
+          "method": "静态依赖可达；模块正文报告未逐文件通读",
+          "ranges": []
+        }
+      ]
+    },
+    {
+      "path": "app/frontend/src/stage7-settings.ts",
+      "module_report": "04-frontend-experience.md",
+      "read_evidence": [
+        {
+          "method": "full-text-read",
+          "ranges": [
+            [
+              1,
+              325
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "path": "app/frontend/src/study.ts",
+      "module_report": "04-frontend-experience.md",
+      "read_evidence": [
+        {
+          "method": "full-text-read",
+          "ranges": [
+            [
+              1,
+              70
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "path": "app/frontend/src/styles.css",
+      "module_report": "04-frontend-experience.md",
+      "read_evidence": [
+        {
+          "method": "selected-line-read",
+          "ranges": [
+            [
+              47,
+              56
+            ],
+            [
+              2509,
+              2513
+            ],
+            [
+              2539,
+              2543
+            ],
+            [
+              2622,
+              2626
+            ],
+            [
+              2750,
+              2754
+            ],
+            [
+              2987,
+              2991
+            ],
+            [
+              3290,
+              3294
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "path": "app/frontend/src/teacher-framework.css",
+      "module_report": "04-frontend-experience.md",
+      "read_evidence": [
+        {
+          "method": "静态依赖可达；模块正文报告未逐文件通读",
+          "ranges": []
+        }
+      ]
+    },
+    {
+      "path": "app/frontend/src/teacher-workbench-import.ts",
+      "module_report": "04-frontend-experience.md",
+      "read_evidence": [
+        {
+          "method": "静态依赖可达；模块正文报告未逐文件通读",
+          "ranges": []
+        }
+      ]
+    },
+    {
+      "path": "app/frontend/src/teacher-workbench.css",
+      "module_report": "04-frontend-experience.md",
+      "read_evidence": [
+        {
+          "method": "selected-line-read",
+          "ranges": [
+            [
+              15,
+              19
+            ],
+            [
+              409,
+              413
+            ],
+            [
+              418,
+              422
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "path": "app/frontend/src/TeacherExtractionReport.tsx",
+      "module_report": "04-frontend-experience.md",
+      "read_evidence": [
+        {
+          "method": "静态依赖可达；模块正文报告未逐文件通读",
+          "ranges": []
+        }
+      ]
+    },
+    {
+      "path": "app/frontend/src/TeacherPreviewPane.tsx",
+      "module_report": "04-frontend-experience.md",
+      "read_evidence": [
+        {
+          "method": "selected-line-read",
+          "ranges": [
+            [
+              55,
+              342
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "path": "app/frontend/src/TeacherProcessOverview.tsx",
+      "module_report": "04-frontend-experience.md",
+      "read_evidence": [
+        {
+          "method": "静态依赖可达；模块正文报告未逐文件通读",
+          "ranges": []
+        }
+      ]
+    },
+    {
+      "path": "app/frontend/src/TeacherSession.tsx",
+      "module_report": "04-frontend-experience.md",
+      "read_evidence": [
+        {
+          "method": "selected-line-read",
+          "ranges": [
+            [
+              49,
+              268
+            ],
+            [
+              278,
+              287
+            ],
+            [
+              303,
+              307
+            ],
+            [
+              371,
+              391
+            ],
+            [
+              410,
+              457
+            ],
+            [
+              541,
+              548
+            ],
+            [
+              554,
+              558
+            ],
+            [
+              565,
+              586
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "path": "app/frontend/src/teaching-profile.ts",
+      "module_report": "04-frontend-experience.md",
+      "read_evidence": [
+        {
+          "method": "full-text-read",
+          "ranges": [
+            [
+              1,
+              205
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "path": "app/frontend/src/TeachingFramework.tsx",
+      "module_report": "04-frontend-experience.md",
+      "read_evidence": [
+        {
+          "method": "静态依赖可达；模块正文报告未逐文件通读",
+          "ranges": []
+        }
+      ]
+    },
+    {
+      "path": "app/frontend/src/TeachingSourceReview.tsx",
+      "module_report": "04-frontend-experience.md",
+      "read_evidence": [
+        {
+          "method": "selected-line-read",
+          "ranges": [
+            [
+              1,
+              190
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "path": "app/frontend/src/TeachingText.tsx",
+      "module_report": "04-frontend-experience.md",
+      "read_evidence": [
+        {
+          "method": "full-text-read",
+          "ranges": [
+            [
+              1,
+              40
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "path": "app/frontend/src/TutorMessage.tsx",
+      "module_report": "04-frontend-experience.md",
+      "read_evidence": [
+        {
+          "method": "full-text-read",
+          "ranges": [
+            [
+              1,
+              293
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "path": "app/frontend/src/types.ts",
+      "module_report": "04-frontend-experience.md",
+      "read_evidence": [
+        {
+          "method": "静态依赖可达；模块正文报告未逐文件通读",
+          "ranges": []
+        }
+      ]
+    },
+    {
+      "path": "app/frontend/src/ui.tsx",
+      "module_report": "04-frontend-experience.md",
+      "read_evidence": [
+        {
+          "method": "静态依赖可达；模块正文报告未逐文件通读",
+          "ranges": []
+        }
+      ]
+    },
+    {
+      "path": "app/frontend/src/uiText.ts",
+      "module_report": "04-frontend-experience.md",
+      "read_evidence": [
+        {
+          "method": "静态依赖可达；模块正文报告未逐文件通读",
+          "ranges": []
+        }
+      ]
+    },
+    {
+      "path": "app/frontend/src/Versions.tsx",
+      "module_report": "04-frontend-experience.md",
+      "read_evidence": [
+        {
+          "method": "selected-line-read",
+          "ranges": [
+            [
+              1,
+              3
+            ],
+            [
+              7,
+              14
+            ],
+            [
+              52,
+              54
+            ],
+            [
+              83,
+              88
+            ],
+            [
+              91,
+              93
+            ],
+            [
+              105,
+              107
+            ],
+            [
+              118,
+              121
+            ],
+            [
+              137,
+              141
+            ],
+            [
+              154,
+              156
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "path": "app/frontend/src/web-search.css",
+      "module_report": "04-frontend-experience.md",
+      "read_evidence": [
+        {
+          "method": "静态依赖可达；模块正文报告未逐文件通读",
+          "ranges": []
+        }
+      ]
+    },
+    {
+      "path": "app/frontend/src/WorksheetImport.tsx",
+      "module_report": "04-frontend-experience.md",
+      "read_evidence": [
+        {
+          "method": "selected-line-read",
+          "ranges": [
+            [
+              1,
+              225
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "path": "app/runtime_v2/aicademiya-model-proxy.service",
+      "module_report": "07-deployment-data-tools.md",
+      "read_evidence": [
+        {
+          "method": "当前发布allowlist/调用链；父模块按关键入口选读",
+          "ranges": []
+        }
+      ]
+    },
+    {
+      "path": "app/runtime_v2/aicademiya-model-proxy.socket",
+      "module_report": "07-deployment-data-tools.md",
+      "read_evidence": [
+        {
+          "method": "当前发布allowlist/调用链；父模块按关键入口选读",
+          "ranges": []
+        }
+      ]
+    },
+    {
+      "path": "app/runtime_v2/aicademiya.conf.example",
+      "module_report": "07-deployment-data-tools.md",
+      "read_evidence": [
+        {
+          "method": "当前发布allowlist/调用链；父模块按关键入口选读",
+          "ranges": []
+        }
+      ]
+    },
+    {
+      "path": "app/runtime_v2/aicademiya.service",
+      "module_report": "07-deployment-data-tools.md",
+      "read_evidence": [
+        {
+          "method": "当前发布allowlist/调用链；父模块按关键入口选读",
+          "ranges": []
+        }
+      ]
+    },
+    {
+      "path": "app/runtime_v2/start-linux.sh",
+      "module_report": "07-deployment-data-tools.md",
+      "read_evidence": [
+        {
+          "method": "当前发布allowlist/调用链；父模块按关键入口选读",
+          "ranges": []
+        }
+      ]
+    },
+    {
+      "path": "app/tools/backup_data.py",
+      "module_report": "07-deployment-data-tools.md",
+      "read_evidence": [
+        {
+          "method": "当前发布allowlist/调用链；父模块按关键入口选读",
+          "ranges": []
+        }
+      ]
+    },
+    {
+      "path": "app/tools/build_v2_release.py",
+      "module_report": "07-deployment-data-tools.md",
+      "read_evidence": [
+        {
+          "method": "当前发布allowlist/调用链；父模块按关键入口选读",
+          "ranges": []
+        }
+      ]
+    },
+    {
+      "path": "app/tools/document_stage12/document_ssh_bridge.py",
+      "module_report": "05-materials-documents.md",
+      "read_evidence": [
+        {
+          "method": "当前发布allowlist/调用链；父模块按关键入口选读",
+          "ranges": []
+        }
+      ]
+    },
+    {
+      "path": "app/tools/document_stage12/document_worker_service.py",
+      "module_report": "05-materials-documents.md",
+      "read_evidence": [
+        {
+          "method": "当前发布allowlist/调用链；父模块按关键入口选读",
+          "ranges": []
+        }
+      ]
+    },
+    {
+      "path": "app/tools/document_stage12/gpu_lease.py",
+      "module_report": "05-materials-documents.md",
+      "read_evidence": [
+        {
+          "method": "当前发布allowlist/调用链；父模块按关键入口选读",
+          "ranges": []
+        }
+      ]
+    },
+    {
+      "path": "app/tools/document_stage12/page_vision_runtime.py",
+      "module_report": "05-materials-documents.md",
+      "read_evidence": [
+        {
+          "method": "当前发布allowlist/调用链；父模块按关键入口选读",
+          "ranges": []
+        }
+      ]
+    },
+    {
+      "path": "app/tools/document_stage12/parser_helpers.py",
+      "module_report": "05-materials-documents.md",
+      "read_evidence": [
+        {
+          "method": "当前发布allowlist/调用链；父模块按关键入口选读",
+          "ranges": []
+        }
+      ]
+    },
+    {
+      "path": "app/tools/document_stage12/parser_worker.py",
+      "module_report": "05-materials-documents.md",
+      "read_evidence": [
+        {
+          "method": "当前发布allowlist/调用链；父模块按关键入口选读",
+          "ranges": []
+        }
+      ]
+    },
+    {
+      "path": "app/tools/material_stage13/archive_guard.py",
+      "module_report": "05-materials-documents.md",
+      "read_evidence": [
+        {
+          "method": "当前发布allowlist/调用链；父模块按关键入口选读",
+          "ranges": []
+        }
+      ]
+    },
+    {
+      "path": "app/tools/material_stage13/ocr_verification.py",
+      "module_report": "05-materials-documents.md",
+      "read_evidence": [
+        {
+          "method": "当前发布allowlist/调用链；父模块按关键入口选读",
+          "ranges": []
+        }
+      ]
+    },
+    {
+      "path": "app/tools/material_stage13/office_inventory.py",
+      "module_report": "05-materials-documents.md",
+      "read_evidence": [
+        {
+          "method": "当前发布allowlist/调用链；父模块按关键入口选读",
+          "ranges": []
+        }
+      ]
+    },
+    {
+      "path": "app/tools/material_stage13/parse_material.py",
+      "module_report": "05-materials-documents.md",
+      "read_evidence": [
+        {
+          "method": "当前发布allowlist/调用链；父模块按关键入口选读",
+          "ranges": []
+        }
+      ]
+    },
+    {
+      "path": "app/tools/material_stage13/prepared_material.py",
+      "module_report": "05-materials-documents.md",
+      "read_evidence": [
+        {
+          "method": "当前发布allowlist/调用链；父模块按关键入口选读",
+          "ranges": []
+        }
+      ]
+    },
+    {
+      "path": "app/tools/material_stage13/simple_material.py",
+      "module_report": "05-materials-documents.md",
+      "read_evidence": [
+        {
+          "method": "当前发布allowlist/调用链；父模块按关键入口选读",
+          "ranges": []
+        }
+      ]
+    },
+    {
+      "path": "app/tools/material_stage13/source_text.py",
+      "module_report": "05-materials-documents.md",
+      "read_evidence": [
+        {
+          "method": "当前发布allowlist/调用链；父模块按关键入口选读",
+          "ranges": []
+        }
+      ]
+    },
+    {
+      "path": "app/tools/material_stage15/__init__.py",
+      "module_report": "05-materials-documents.md",
+      "read_evidence": [
+        {
+          "method": "当前发布allowlist/调用链；父模块按关键入口选读",
+          "ranges": []
+        }
+      ]
+    },
+    {
+      "path": "app/tools/material_stage15/adapter.py",
+      "module_report": "05-materials-documents.md",
+      "read_evidence": [
+        {
+          "method": "当前发布allowlist/调用链；父模块按关键入口选读",
+          "ranges": []
+        }
+      ]
+    },
+    {
+      "path": "app/tools/material_stage15/page_worker.py",
+      "module_report": "05-materials-documents.md",
+      "read_evidence": [
+        {
+          "method": "当前发布allowlist/调用链；父模块按关键入口选读",
+          "ranges": []
+        }
+      ]
+    },
+    {
+      "path": "app/tools/material_stage15/prepared.py",
+      "module_report": "05-materials-documents.md",
+      "read_evidence": [
+        {
+          "method": "当前发布allowlist/调用链；父模块按关键入口选读",
+          "ranges": []
+        }
+      ]
+    },
+    {
+      "path": "app/tools/material_stage15/provenance.py",
+      "module_report": "05-materials-documents.md",
+      "read_evidence": [
+        {
+          "method": "当前发布allowlist/调用链；父模块按关键入口选读",
+          "ranges": []
+        }
+      ]
+    },
+    {
+      "path": "app/tools/material_stage16/legacy_office.py",
+      "module_report": "05-materials-documents.md",
+      "read_evidence": [
+        {
+          "method": "当前发布allowlist/调用链；父模块按关键入口选读",
+          "ranges": []
+        }
+      ]
+    },
+    {
+      "path": "app/tools/material_stage16/workbook_inventory.py",
+      "module_report": "05-materials-documents.md",
+      "read_evidence": [
+        {
+          "method": "当前发布allowlist/调用链；父模块按关键入口选读",
+          "ranges": []
+        }
+      ]
+    },
+    {
+      "path": "app/tools/material_stage16/workbook_material.py",
+      "module_report": "05-materials-documents.md",
+      "read_evidence": [
+        {
+          "method": "当前发布allowlist/调用链；父模块按关键入口选读",
+          "ranges": []
+        }
+      ]
+    },
+    {
+      "path": "app/tools/material_stage16/workbook_supplements.py",
+      "module_report": "05-materials-documents.md",
+      "read_evidence": [
+        {
+          "method": "当前发布allowlist/调用链；父模块按关键入口选读",
+          "ranges": []
+        }
+      ]
+    },
+    {
+      "path": "app/tools/start-linux.sh",
+      "module_report": "07-deployment-data-tools.md",
+      "read_evidence": [
+        {
+          "method": "当前发布allowlist/调用链；父模块按关键入口选读",
+          "ranges": []
+        }
+      ]
+    },
+    {
+      "path": "app/tools/warm_aicademiya_prefix.py",
+      "module_report": "07-deployment-data-tools.md",
+      "read_evidence": [
+        {
+          "method": "当前发布allowlist/调用链；父模块按关键入口选读",
+          "ranges": []
+        }
+      ]
+    }
+  ]
+}

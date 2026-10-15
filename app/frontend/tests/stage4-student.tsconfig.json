@@ -1,0 +1,10 @@
+{
+  "extends": "../tsconfig.json",
+  "include": [
+    "../src/GuidedLearningWorkspace.tsx",
+    "../src/TutorMessage.tsx",
+    "../src/guided-study.ts",
+    "stage4-student-harness.tsx",
+    "stage4-student.test.tsx"
+  ]
+}

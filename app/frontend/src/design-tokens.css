@@ -1,0 +1,22 @@
+/* One shared vocabulary for controls, content and semantic states. */
+:root {
+  --font-ui: "Segoe UI", Arial, "PingFang SC", "Microsoft YaHei", sans-serif;
+  --font-display: Georgia, "Noto Serif SC", serif;
+  --ink: #23352e;
+  --muted: #52645b;
+  --teal: #1f5d50;
+  --teal-dark: #16483e;
+  --blue: #355c98;
+  --blue-soft: #eef3fc;
+  --warning: #80570d;
+  --warning-soft: #fff5dc;
+  --danger: #ad3636;
+  --danger-soft: #fff2f2;
+  --canvas: #f6f7f3;
+  --paper: #ffffff;
+  --soft: #edf3ee;
+  --sand: #efebdf;
+  --line: #dce4df;
+  --control: #87978d;
+  --radius: 12px;
+}

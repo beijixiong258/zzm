@@ -1,0 +1,160 @@
+/* Reading text uses ink rather than the decorative sage palette. */
+.markdown-content {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.markdown-content p {
+  margin: 0 0 12px;
+}
+.markdown-content p:last-child {
+  margin-bottom: 0;
+}
+.markdown-content ul,
+.markdown-content ol {
+  padding-left: 22px;
+  margin: 8px 0 14px;
+}
+.markdown-content li {
+  margin: 5px 0;
+}
+.markdown-content strong {
+  font-weight: 650;
+  color: var(--ink);
+}
+.markdown-content h1,
+.markdown-content h2,
+.markdown-content h3 {
+  font-size: 17px;
+  margin: 14px 0 8px;
+  color: var(--ink);
+}
+.markdown-content a {
+  color: var(--teal);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.markdown-content code {
+  font-family: Consolas, monospace;
+  font-size: 0.9em;
+  background: var(--soft);
+  padding: 2px 4px;
+  border-radius: 4px;
+}
+.markdown-content pre {
+  overflow-x: auto;
+  padding: 12px;
+  background: var(--soft);
+  border-radius: 8px;
+}
+.markdown-content table {
+  display: block;
+  overflow-x: auto;
+  border-collapse: collapse;
+  margin: 10px 0;
+  font-size: 13px;
+}
+.markdown-content th,
+.markdown-content td {
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  text-align: left;
+}
+.markdown-content blockquote {
+  margin: 12px 0;
+  padding-left: 14px;
+  border-left: 2px solid var(--line);
+  color: var(--muted);
+}
+.password-setup-page {
+  display: flex;
+  justify-content: center;
+  padding: 48px 20px 80px;
+}
+.password-setup-card {
+  width: min(100%, 520px);
+  padding: 36px;
+}
+.password-setup-icon {
+  display: inline-flex;
+  color: var(--teal);
+  background: var(--soft);
+  border-radius: 14px;
+  padding: 13px;
+  margin-bottom: 22px;
+}
+.password-setup-card h1 {
+  font-family: var(--font-display);
+  color: var(--ink);
+  font-size: 34px;
+  line-height: 1.2;
+  margin: 12px 0;
+}
+.password-setup-intro {
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--muted);
+}
+.password-account {
+  font-size: 13px;
+  color: var(--muted);
+  margin: 16px 0 24px;
+}
+.password-setup-card form {
+  display: grid;
+  gap: 17px;
+}
+.password-setup-card label {
+  display: grid;
+  gap: 7px;
+  font-size: 13px;
+}
+.password-setup-card small {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--muted);
+}
+.password-signout {
+  margin-top: 22px;
+}
+.password-validation,
+.password-pending {
+  color: var(--danger);
+  font-size: 13px;
+}
+.provision-student {
+  margin: 16px 0;
+}
+.provision-form {
+  padding: 22px;
+  margin-top: 14px;
+}
+.provision-form > p {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.7;
+  margin: 10px 0 18px;
+  max-width: 720px;
+}
+.provision-form .button-row {
+  margin-top: 18px;
+}
+@media (max-width: 540px) {
+  .password-setup-page {
+    padding: 24px 16px;
+  }
+  .password-setup-card {
+    padding: 24px;
+  }
+  .password-setup-card h1 {
+    font-size: 29px;
+  }
+}
+.group-context {
+  margin: 0 0 14px;
+  padding: 11px 12px;
+  border-left: 2px solid var(--line);
+  background: var(--soft);
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.65;
+}

@@ -1,0 +1,34 @@
+# Copy to /etc/aicademiya/aicademiya.conf; edit locally, never commit secrets.
+# Shell-compatible assignments and systemd EnvironmentFile-compatible syntax.
+# This is a private CT255 HTTP example, NOT deployment evidence.
+AICADEMIYA_DATA_DIR=/var/lib/aicademiya
+AICADEMIYA_HOST=192.168.32.55
+AICADEMIYA_PORT=18773
+AICADEMIYA_DEMO_ENABLED=false
+AICADEMIYA_COOKIE_SECURE=false
+AICADEMIYA_ALLOWED_ORIGINS=http://192.168.32.55:18773
+AICADEMIYA_FORWARDED_ALLOW_IPS=127.0.0.1
+# Initially unconfigured: no inference. Configure only after authorization.
+AICADEMIYA_AI_MODE=openai
+AICADEMIYA_AI_PROVIDER=
+AICADEMIYA_AI_BASE_URL=
+AICADEMIYA_AI_MODEL=
+AICADEMIYA_AI_API_KEY=
+AICADEMIYA_WEB_SEARCH_ENABLED=false
+TAVILY_API_KEY=
+# For the conditional guest-loopback proxy, set these three locally:
+# AICADEMIYA_AI_PROVIDER=aicademiya-router
+# AICADEMIYA_AI_BASE_URL=http://127.0.0.1:18280/v1
+# AICADEMIYA_AI_MODEL=AIcademiya-64kx3-Qwen3.8-27B
+# HTTPS ingress: COOKIE_SECURE=true, exact HTTPS ALLOWED_ORIGINS and the
+# verified reverse-proxy source IP in FORWARDED_ALLOW_IPS. Never use '*'.
+# Hostnames in ALLOWED_ORIGINS are trusted automatically. Additional exact names:
+# AICADEMIYA_ALLOWED_HOSTS=learning.example.org
+# Keep one worker for in-process auth rate limits; add edge rate/body/time limits.
+# Restrict direct app/model/SSH/PVE access; this example does not open ingress.
+# Optional leased complete-material worker; keep unset until exact user/SSH tests pass.
+# JSON argv array, not a shell command. No credentials in this example.
+# The server forced command, not client --remote-service, binds the immutable worker.
+# AICADEMIYA_DOCUMENT_WORKER_COMMAND='["/opt/aicademiya/current/.venv/bin/python","/opt/aicademiya/current/tools/document_stage12/document_ssh_bridge.py","--ssh-host","aicademiya-docs@192.168.32.5","--ssh-key","/var/lib/aicademiya/worker-ssh-stage14/id_ed25519","--known-hosts","/var/lib/aicademiya/worker-ssh-stage14/known_hosts"]'
+# AICADEMIYA_DOCUMENT_FORMATS=pdf,pptx,docx,doc,txt,md,png,jpg,jpeg,webp
+# AICADEMIYA_DOCUMENT_WORKER_TIMEOUT=3600

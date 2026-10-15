@@ -1,0 +1,293 @@
+.settings-workspace {
+  color: var(--ink);
+  font-family: var(--font-ui);
+}
+.settings-page-heading {
+  margin-bottom: 24px;
+}
+.settings-page-heading h1 {
+  font: 32px/1.2 var(--font-display);
+  margin: 6px 0 0;
+}
+.settings-workspace-layout {
+  display: grid;
+  grid-template-columns: 180px minmax(0, 760px);
+  gap: 28px;
+  align-items: start;
+}
+.settings-local-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.settings-local-nav button {
+  text-align: left;
+  padding: 12px 14px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink);
+  font: 600 14px/1.4 var(--font-ui);
+  min-height: 44px;
+  justify-content: flex-start;
+}
+.settings-local-nav button:hover {
+  background: var(--soft);
+}
+.settings-local-nav button.selected {
+  background: var(--soft);
+  color: var(--teal-dark);
+  border-color: var(--line);
+}
+.settings-content {
+  min-width: 0;
+}
+.settings-service {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--paper);
+  padding: 28px;
+  color: var(--ink);
+}
+.settings-service h2,
+.settings-content h2 {
+  font: 600 20px/1.35 var(--font-ui);
+  margin: 0 0 24px;
+}
+.settings-service form {
+  display: block;
+}
+.settings-fields {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+.settings-fields > input {
+  margin-bottom: 14px;
+}
+.settings-service input:not([type="checkbox"]) {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--control);
+  border-radius: 8px;
+  background: var(--paper);
+  padding: 11px 12px;
+  color: var(--ink);
+  font: 15px/1.5 var(--font-ui);
+}
+.settings-service input:disabled {
+  background: var(--canvas);
+  color: var(--muted);
+  opacity: 1;
+}
+.settings-service label {
+  color: var(--ink);
+  font: 600 14px/1.4 var(--font-ui);
+  margin-bottom: 0;
+}
+.settings-field-title,
+.settings-section-heading,
+.settings-connection-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.settings-field-title {
+  justify-content: flex-start;
+}
+.settings-checkbox {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  min-height: 36px;
+  cursor: pointer;
+}
+.settings-checkbox input {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: var(--teal);
+  flex-shrink: 0;
+}
+.settings-helper {
+  color: var(--muted);
+  font: 13px/1.6 var(--font-ui);
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.settings-fields input + .settings-helper {
+  margin-top: -14px;
+  margin-bottom: 10px;
+}
+.settings-fields > .settings-checkbox + .settings-helper {
+  margin-bottom: 18px;
+}
+.settings-clear-note {
+  margin: 0;
+  background: var(--warning-soft);
+  color: var(--warning);
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+}
+.settings-connection {
+  border-top: 1px solid var(--line);
+  margin-top: 24px;
+  padding-top: 20px;
+}
+.settings-connection-heading strong {
+  font-size: 15px;
+  font-weight: 600;
+}
+.settings-connection .settings-helper {
+  margin-top: 8px;
+}
+.settings-check,
+.settings-provider {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border-radius: 20px;
+  padding: 5px 10px;
+  background: var(--blue-soft);
+  color: var(--blue);
+  font: 600 13px/1.4 var(--font-ui);
+}
+.settings-check svg {
+  flex-shrink: 0;
+}
+.settings-check-connected {
+  background: var(--soft);
+  color: var(--teal-dark);
+}
+.settings-check-error {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+.settings-check-not_configured {
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+.settings-section-heading h2 {
+  margin-bottom: 0;
+}
+.settings-section-heading {
+  margin-bottom: 24px;
+}
+.settings-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 24px;
+}
+.settings-actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 10px 15px;
+  font: 600 14px/1.4 var(--font-ui);
+  border-radius: 8px;
+}
+.settings-unsaved {
+  color: var(--warning);
+  font-size: 13px;
+}
+.settings-notice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--teal-dark);
+  background: var(--soft);
+  font-size: 14px;
+  padding: 12px;
+  border-radius: 8px;
+}
+.settings-test-help {
+  margin-top: 14px;
+}
+.settings-service .error-banner {
+  margin-bottom: 20px;
+}
+.settings-content > .page {
+  padding: 0;
+  max-width: none;
+}
+.settings-content .profile-page .page-heading {
+  border: 1px solid var(--line);
+  padding: 22px 24px;
+  border-radius: 12px;
+  background: var(--paper);
+  margin-bottom: 20px;
+}
+.settings-content .profile-page h1 {
+  font: 600 20px/1.35 var(--font-ui);
+}
+.settings-content .profile-page .teacher-editor-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 20px;
+}
+.settings-content .profile-page .card {
+  padding: 24px;
+}
+.settings-content .profile-page form {
+  display: grid;
+  gap: 14px;
+}
+.settings-content .profile-page label {
+  font: 600 14px/1.4 var(--font-ui);
+  color: var(--ink);
+  margin-bottom: 0;
+}
+.settings-content .profile-page input {
+  font: 15px/1.5 var(--font-ui);
+  border-color: var(--control);
+  background: var(--paper);
+}
+.settings-content .profile-page button {
+  justify-self: start;
+  font-size: 14px;
+}
+.settings-content .profile-page small {
+  font: 13px/1.6 var(--font-ui);
+  color: var(--muted);
+}
+.settings-workspace :focus-visible,
+.settings-service :focus-visible {
+  outline: 3px solid var(--blue);
+  outline-offset: 3px;
+}
+@media (max-width: 760px) {
+  .settings-workspace-layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 20px;
+  }
+  .settings-local-nav {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+  .settings-local-nav button {
+    padding: 11px 10px;
+  }
+  .settings-service {
+    padding: 22px 18px;
+  }
+  .settings-page-heading h1 {
+    font-size: 28px;
+  }
+  .settings-connection-heading {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+  .settings-content .profile-page .card {
+    padding: 20px;
+  }
+}

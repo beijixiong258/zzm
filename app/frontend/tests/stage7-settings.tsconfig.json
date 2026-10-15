@@ -1,0 +1,12 @@
+{
+  "extends": "../tsconfig.json",
+  "include": [
+    "../src/SettingsWorkspace.tsx",
+    "../src/ModelSettings.tsx",
+    "../src/SearchSettings.tsx",
+    "../src/Profile.tsx",
+    "../src/stage7-settings.ts",
+    "stage7-settings.test.tsx",
+    "stage7-settings-harness.tsx"
+  ]
+}

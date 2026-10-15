@@ -1,0 +1,22 @@
+services:
+  aicademiya:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:18773:8000"
+    environment:
+      AICADEMIYA_DEMO_ENABLED: "false"
+      AICADEMIYA_COOKIE_SECURE: "true"
+      AICADEMIYA_DATA_DIR: /data
+      AICADEMIYA_AI_MODE: openai
+      AICADEMIYA_AI_PROVIDER: ${AICADEMIYA_AI_PROVIDER:-}
+      AICADEMIYA_AI_BASE_URL: ${AICADEMIYA_AI_BASE_URL:-}
+      AICADEMIYA_AI_MODEL: ${AICADEMIYA_AI_MODEL:-}
+      AICADEMIYA_AI_API_KEY: ${AICADEMIYA_AI_API_KEY:-}
+      AICADEMIYA_WEB_SEARCH_ENABLED: ${AICADEMIYA_WEB_SEARCH_ENABLED:-false}
+      TAVILY_API_KEY: ${TAVILY_API_KEY:-}
+      AICADEMIYA_ALLOWED_ORIGINS: ${AICADEMIYA_ALLOWED_ORIGINS:-}
+    volumes:
+      - aicademiya-data:/data
+volumes:
+  aicademiya-data:

@@ -1,0 +1,5 @@
+{
+  "extends": "../tsconfig.json",
+  "include": ["../src/Login.tsx", "../src/ui.tsx", "stage9-brand-harness.tsx"],
+  "exclude": []
+}

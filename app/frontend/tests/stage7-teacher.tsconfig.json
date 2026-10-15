@@ -1,0 +1,14 @@
+{
+  "extends": "../tsconfig.json",
+  "include": [
+    "../src/TeacherSession.tsx",
+    "../src/TeachingFramework.tsx",
+    "../src/TeacherPreviewPane.tsx",
+    "../src/TeachingSourceReview.tsx",
+    "../src/InstructionImport.tsx",
+    "../src/TeacherExtractionReport.tsx",
+    "../src/Availability.tsx",
+    "stage7-teacher.test.tsx",
+    "stage7-teacher-harness.tsx"
+  ]
+}

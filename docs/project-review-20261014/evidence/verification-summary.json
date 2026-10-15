@@ -1,0 +1,32 @@
+{
+  "tests": {
+    "backend-full-r2.xml": {
+      "cases": 1365,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 1,
+      "passed": 1364
+    },
+    "frontend-tests.xml": {
+      "cases": 400,
+      "failures": 2,
+      "errors": 0,
+      "skipped": 0,
+      "passed": 398
+    },
+    "frontend-webstorage-r2.xml": {
+      "cases": 400,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "passed": 400
+    }
+  },
+  "backend_exit_code": 0,
+  "build": true,
+  "remote_release_match": 134,
+  "remote_public_match": 27,
+  "synthetic_retention_reproduced": true,
+  "synthetic_ui_conditions_reproduced": true,
+  "production_writes": false
+}

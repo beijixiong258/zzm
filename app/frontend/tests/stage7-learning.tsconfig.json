@@ -1,0 +1,8 @@
+{
+  "extends": "../tsconfig.json",
+  "include": [
+    "../src",
+    "stage7-learning-harness.tsx",
+    "stage7-learning.test.tsx"
+  ]
+}

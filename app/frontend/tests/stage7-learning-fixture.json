@@ -1,0 +1,747 @@
+{
+  "label": "Synthetic HTTP fixture only. No real backend, SQLite, model or Tavily calls.",
+  "course": {
+    "id": "fixture-course",
+    "code": "QA7703",
+    "title": "Language Assessment",
+    "description": "An explicitly synthetic course for local browser verification.",
+    "student_count": 12,
+    "join_code": "FIXTURE-ONLY",
+    "published_version_id": "fixture-edition",
+    "published_version_number": 3,
+    "has_unpublished_changes": true
+  },
+  "sessions": [
+    {
+      "id": "fixture-session",
+      "course_id": "fixture-course",
+      "number": 1,
+      "title": "Evidence for assessment decisions",
+      "subtitle": "Purpose, evidence and responsible use",
+      "status": "published",
+      "active": true,
+      "effective_active": true,
+      "availability_reason": "manual_active",
+      "question_count": 1,
+      "estimated_minutes": 25,
+      "learning_objectives": [
+        "Connect evidence to the intended use of an assessment.",
+        "Explain why a score alone is not enough."
+      ],
+      "instructions": "Synthetic fixture instructions only.",
+      "reference_policy": "after_submit",
+      "teaching_language": "en",
+      "groups": [
+        {
+          "id": "fixture-core",
+          "title": "Core questions",
+          "kind": "core",
+          "description": ""
+        }
+      ],
+      "questions": [
+        {
+          "id": "fixture-question",
+          "group_id": "fixture-core",
+          "ordinal": 1,
+          "type": "open_response",
+          "prompt": "How would you judge whether an assessment is suitable for its intended use? Explain the evidence you would seek.",
+          "options": [],
+          "answer_slots": 1,
+          "images": [],
+          "source_label": "Synthetic assessment reading",
+          "source_material_ids": ["fixture-reading"],
+          "source_links": []
+        }
+      ],
+      "materials": [
+        {
+          "id": "fixture-reading",
+          "title": "Assessment reading",
+          "visibility": "student",
+          "kind": "reading",
+          "status": "ready",
+          "session_ids": ["fixture-session", "fixture-session-two"],
+          "source_label": "Synthetic HTTP fixture",
+          "excerpt": "Synthetic reading: decisions depend on the evidence and intended use.",
+          "download_url": "/api/materials/fixture-reading/download",
+          "preview_url": "/api/materials/fixture-reading/preview",
+          "preview_kind": "text"
+        },
+        {
+          "id": "fixture-private",
+          "title": "Instructor notes · private",
+          "visibility": "teacher",
+          "kind": "answer_key",
+          "status": "needs_review",
+          "session_ids": ["fixture-session"],
+          "source_label": "Synthetic HTTP fixture",
+          "excerpt": "Synthetic reading: decisions depend on the evidence and intended use.",
+          "download_url": "/api/materials/fixture-private/download",
+          "preview_url": "/api/materials/fixture-private/preview",
+          "preview_kind": "text",
+          "warning": "OCR needs visual review before publishing.",
+          "extraction_report": {
+            "schema_version": 1,
+            "method": "local OCR",
+            "units_total": 8,
+            "units_processed": 7,
+            "ocr_units": 4,
+            "images_detected": 3,
+            "chars_extracted": 1400,
+            "excerpt_chars": 1400,
+            "truncated": false,
+            "visual_review_required": true,
+            "failed_units": ["Page 8 could not be read"],
+            "notes": ["Synthetic fixture, not a real extraction."]
+          }
+        }
+      ],
+      "reference_answers": {
+        "fixture-question": "Private instructor example from labelled fixture."
+      }
+    },
+    {
+      "id": "fixture-session-two",
+      "course_id": "fixture-course",
+      "number": 2,
+      "title": "Planning an assessment",
+      "subtitle": "Purpose, evidence and responsible use",
+      "status": "draft",
+      "active": false,
+      "effective_active": false,
+      "availability_reason": "manual_inactive",
+      "question_count": 0,
+      "estimated_minutes": 25,
+      "learning_objectives": ["Design an evidence-led plan."],
+      "instructions": "Synthetic fixture instructions only.",
+      "reference_policy": "after_submit",
+      "teaching_language": "en",
+      "groups": [
+        {
+          "id": "fixture-core",
+          "title": "Core questions",
+          "kind": "core",
+          "description": ""
+        }
+      ],
+      "questions": [],
+      "materials": [
+        {
+          "id": "fixture-reading",
+          "title": "Assessment reading",
+          "visibility": "student",
+          "kind": "reading",
+          "status": "ready",
+          "session_ids": ["fixture-session", "fixture-session-two"],
+          "source_label": "Synthetic HTTP fixture",
+          "excerpt": "Synthetic reading: decisions depend on the evidence and intended use.",
+          "download_url": "/api/materials/fixture-reading/download",
+          "preview_url": "/api/materials/fixture-reading/preview",
+          "preview_kind": "text"
+        }
+      ],
+      "reference_answers": {
+        "fixture-question": "Private instructor example from labelled fixture."
+      }
+    }
+  ],
+  "materials": [
+    {
+      "id": "fixture-reading",
+      "title": "Assessment reading",
+      "visibility": "student",
+      "kind": "reading",
+      "status": "ready",
+      "session_ids": ["fixture-session", "fixture-session-two"],
+      "source_label": "Synthetic HTTP fixture",
+      "excerpt": "Synthetic reading: decisions depend on the evidence and intended use.",
+      "download_url": "/api/materials/fixture-reading/download",
+      "preview_url": "/api/materials/fixture-reading/preview",
+      "preview_kind": "text"
+    },
+    {
+      "id": "fixture-private",
+      "title": "Instructor notes · private",
+      "visibility": "teacher",
+      "kind": "answer_key",
+      "status": "needs_review",
+      "session_ids": ["fixture-session"],
+      "source_label": "Synthetic HTTP fixture",
+      "excerpt": "Synthetic reading: decisions depend on the evidence and intended use.",
+      "download_url": "/api/materials/fixture-private/download",
+      "preview_url": "/api/materials/fixture-private/preview",
+      "preview_kind": "text",
+      "warning": "OCR needs visual review before publishing.",
+      "extraction_report": {
+        "schema_version": 1,
+        "method": "local OCR",
+        "units_total": 8,
+        "units_processed": 7,
+        "ocr_units": 4,
+        "images_detected": 3,
+        "chars_extracted": 1400,
+        "excerpt_chars": 1400,
+        "truncated": false,
+        "visual_review_required": true,
+        "failed_units": ["Page 8 could not be read"],
+        "notes": ["Synthetic fixture, not a real extraction."]
+      }
+    },
+    {
+      "id": "fixture-unlinked",
+      "title": "Unlinked presentation",
+      "visibility": "student",
+      "kind": "slides",
+      "status": "error",
+      "session_ids": [],
+      "source_label": "Synthetic HTTP fixture",
+      "excerpt": "Synthetic reading: decisions depend on the evidence and intended use.",
+      "download_url": "/api/materials/fixture-unlinked/download",
+      "preview_url": "/api/materials/fixture-unlinked/preview",
+      "preview_kind": "text",
+      "warning": "No text was extracted. Open a linked session to re-extract."
+    }
+  ],
+  "workspace": {
+    "session": {
+      "id": "fixture-session",
+      "course_id": "fixture-course",
+      "number": 1,
+      "title": "Evidence for assessment decisions",
+      "subtitle": "Purpose, evidence and responsible use",
+      "status": "published",
+      "active": true,
+      "effective_active": true,
+      "availability_reason": "manual_active",
+      "question_count": 1,
+      "estimated_minutes": 25,
+      "learning_objectives": [
+        "Connect evidence to the intended use of an assessment.",
+        "Explain why a score alone is not enough."
+      ],
+      "instructions": "Synthetic fixture instructions only.",
+      "reference_policy": "after_submit",
+      "teaching_language": "en",
+      "groups": [
+        {
+          "id": "fixture-core",
+          "title": "Core questions",
+          "kind": "core",
+          "description": ""
+        }
+      ],
+      "questions": [
+        {
+          "id": "fixture-question",
+          "group_id": "fixture-core",
+          "ordinal": 1,
+          "type": "open_response",
+          "prompt": "How would you judge whether an assessment is suitable for its intended use? Explain the evidence you would seek.",
+          "options": [],
+          "answer_slots": 1,
+          "images": [],
+          "source_label": "Synthetic assessment reading",
+          "source_material_ids": ["fixture-reading"],
+          "source_links": []
+        }
+      ],
+      "materials": [
+        {
+          "id": "fixture-reading",
+          "title": "Assessment reading",
+          "visibility": "student",
+          "kind": "reading",
+          "status": "ready",
+          "session_ids": ["fixture-session", "fixture-session-two"],
+          "source_label": "Synthetic HTTP fixture",
+          "excerpt": "Synthetic reading: decisions depend on the evidence and intended use.",
+          "download_url": "/api/materials/fixture-reading/download",
+          "preview_url": "/api/materials/fixture-reading/preview",
+          "preview_kind": "text"
+        }
+      ],
+      "reference_answers": {}
+    },
+    "user": {
+      "id": "fixture-student",
+      "name": "Jamie Fixture",
+      "email": "jamie@example.invalid",
+      "role": "student"
+    },
+    "selected_reading": null,
+    "attempts": {
+      "fixture-question": {
+        "question_id": "fixture-question",
+        "answer": "I would begin with the purpose and compare the evidence against it.",
+        "updated_at": "2026-10-07T12:00:00Z",
+        "reference_revealed": false,
+        "revision_count": 1,
+        "revisions": [
+          {
+            "answer": "I would check the score.",
+            "created_at": "2026-10-07T12:00:00Z"
+          },
+          {
+            "answer": "I would begin with the purpose and compare the evidence against it.",
+            "created_at": "2026-10-07T12:00:00Z"
+          }
+        ]
+      }
+    },
+    "messages": [
+      {
+        "id": "fixture-original",
+        "role": "user",
+        "content": "I would check the score.\nThen ask what it represents.",
+        "question_id": "fixture-question",
+        "created_at": "2026-10-07T12:00:00Z",
+        "mode": "openai",
+        "intent": "answer"
+      },
+      {
+        "id": "fixture-tutor",
+        "role": "assistant",
+        "content": "Start with the decision the assessment will support. A score is only part of the evidence.\n\nWhat would you need to know about the task, the learners and the consequences?",
+        "presented_question_id": "fixture-question",
+        "question_id": "fixture-question",
+        "created_at": "2026-10-07T12:00:00Z",
+        "mode": "openai",
+        "metadata": {
+          "phase": "worksheet",
+          "presented_question": {
+            "id": "fixture-question",
+            "group_id": "fixture-core",
+            "ordinal": 1,
+            "type": "open_response",
+            "prompt": "How would you judge whether an assessment is suitable for its intended use? Explain the evidence you would seek.",
+            "options": [],
+            "answer_slots": 1,
+            "images": [],
+            "source_label": "Synthetic assessment reading",
+            "source_material_ids": ["fixture-reading"],
+            "source_links": []
+          }
+        }
+      }
+    ],
+    "progress": {
+      "answered": 1,
+      "total": 1,
+      "active_question_ids": ["fixture-question"],
+      "current_question_id": "fixture-question"
+    },
+    "submission": {
+      "status": "in_progress",
+      "submitted_at": null,
+      "reviewed_at": null,
+      "teacher_note": ""
+    },
+    "ai": {
+      "mode": "openai",
+      "configured": true,
+      "base_url": "http://fixture.invalid/v1",
+      "model": "Fixture model · no requests",
+      "connection": {
+        "status": "not_checked",
+        "checked_at": null,
+        "message": null
+      },
+      "web_search": {
+        "enabled": false,
+        "configured": false,
+        "provider": "tavily"
+      }
+    },
+    "version": {
+      "id": "fixture-edition",
+      "number": 3,
+      "label": "Current fixture edition",
+      "is_current": true,
+      "is_draft": false
+    },
+    "available_versions": [
+      {
+        "id": "fixture-edition",
+        "number": 3,
+        "label": "Current fixture edition"
+      },
+      {
+        "id": "fixture-old-edition",
+        "number": 2,
+        "label": "Earlier fixture edition"
+      }
+    ],
+    "tutor": {
+      "phase": "worksheet",
+      "started_at": "2026-10-07T12:00:00Z",
+      "updated_at": "2026-10-07T12:00:00Z",
+      "elapsed_seconds": 0,
+      "current_question_id": "fixture-question",
+      "completed_question_ids": [],
+      "question_states": {
+        "fixture-question": {
+          "status": "in_progress",
+          "answer_count": 1,
+          "hint_count": 0,
+          "last_outcome": "unknown"
+        }
+      },
+      "quiz": {
+        "status": "not_started",
+        "answered": 0,
+        "total": 0,
+        "correct": null
+      },
+      "reading": {
+        "answered": 0,
+        "total": 0
+      },
+      "presentation": "full",
+      "idle_hint_seconds": 0
+    }
+  },
+  "record": {
+    "session": {
+      "id": "fixture-session",
+      "course_id": "fixture-course",
+      "number": 1,
+      "title": "Evidence for assessment decisions",
+      "subtitle": "Purpose, evidence and responsible use",
+      "status": "published",
+      "active": true,
+      "effective_active": true,
+      "availability_reason": "manual_active",
+      "question_count": 1,
+      "estimated_minutes": 25,
+      "learning_objectives": [
+        "Connect evidence to the intended use of an assessment.",
+        "Explain why a score alone is not enough."
+      ],
+      "instructions": "Synthetic fixture instructions only.",
+      "reference_policy": "after_submit",
+      "teaching_language": "en",
+      "groups": [
+        {
+          "id": "fixture-core",
+          "title": "Core questions",
+          "kind": "core",
+          "description": ""
+        }
+      ],
+      "questions": [
+        {
+          "id": "fixture-question",
+          "group_id": "fixture-core",
+          "ordinal": 1,
+          "type": "open_response",
+          "prompt": "How would you judge whether an assessment is suitable for its intended use? Explain the evidence you would seek.",
+          "options": [],
+          "answer_slots": 1,
+          "images": [],
+          "source_label": "Synthetic assessment reading",
+          "source_material_ids": ["fixture-reading"],
+          "source_links": []
+        }
+      ],
+      "materials": [
+        {
+          "id": "fixture-reading",
+          "title": "Assessment reading",
+          "visibility": "student",
+          "kind": "reading",
+          "status": "ready",
+          "session_ids": ["fixture-session", "fixture-session-two"],
+          "source_label": "Synthetic HTTP fixture",
+          "excerpt": "Synthetic reading: decisions depend on the evidence and intended use.",
+          "download_url": "/api/materials/fixture-reading/download",
+          "preview_url": "/api/materials/fixture-reading/preview",
+          "preview_kind": "text"
+        },
+        {
+          "id": "fixture-private",
+          "title": "Instructor notes · private",
+          "visibility": "teacher",
+          "kind": "answer_key",
+          "status": "needs_review",
+          "session_ids": ["fixture-session"],
+          "source_label": "Synthetic HTTP fixture",
+          "excerpt": "Synthetic reading: decisions depend on the evidence and intended use.",
+          "download_url": "/api/materials/fixture-private/download",
+          "preview_url": "/api/materials/fixture-private/preview",
+          "preview_kind": "text",
+          "warning": "OCR needs visual review before publishing.",
+          "extraction_report": {
+            "schema_version": 1,
+            "method": "local OCR",
+            "units_total": 8,
+            "units_processed": 7,
+            "ocr_units": 4,
+            "images_detected": 3,
+            "chars_extracted": 1400,
+            "excerpt_chars": 1400,
+            "truncated": false,
+            "visual_review_required": true,
+            "failed_units": ["Page 8 could not be read"],
+            "notes": ["Synthetic fixture, not a real extraction."]
+          }
+        }
+      ],
+      "reference_answers": {
+        "fixture-question": "Private instructor example from labelled fixture."
+      }
+    },
+    "user": {
+      "id": "fixture-student",
+      "name": "Jamie Fixture",
+      "email": "jamie@example.invalid",
+      "role": "student"
+    },
+    "selected_reading": null,
+    "attempts": {
+      "fixture-question": {
+        "question_id": "fixture-question",
+        "answer": "I would begin with the purpose and compare the evidence against it.",
+        "updated_at": "2026-10-07T12:00:00Z",
+        "reference_revealed": false,
+        "revision_count": 1,
+        "revisions": [
+          {
+            "answer": "I would check the score.",
+            "created_at": "2026-10-07T12:00:00Z"
+          },
+          {
+            "answer": "I would begin with the purpose and compare the evidence against it.",
+            "created_at": "2026-10-07T12:00:00Z"
+          }
+        ]
+      }
+    },
+    "messages": [
+      {
+        "id": "fixture-original",
+        "role": "user",
+        "content": "I would check the score.\nThen ask what it represents.",
+        "question_id": "fixture-question",
+        "created_at": "2026-10-07T12:00:00Z",
+        "mode": "openai",
+        "intent": "answer"
+      },
+      {
+        "id": "fixture-tutor",
+        "role": "assistant",
+        "content": "Start with the decision the assessment will support. A score is only part of the evidence.\n\nWhat would you need to know about the task, the learners and the consequences?",
+        "presented_question_id": "fixture-question",
+        "question_id": "fixture-question",
+        "created_at": "2026-10-07T12:00:00Z",
+        "mode": "openai",
+        "metadata": {
+          "phase": "worksheet",
+          "presented_question": {
+            "id": "fixture-question",
+            "group_id": "fixture-core",
+            "ordinal": 1,
+            "type": "open_response",
+            "prompt": "How would you judge whether an assessment is suitable for its intended use? Explain the evidence you would seek.",
+            "options": [],
+            "answer_slots": 1,
+            "images": [],
+            "source_label": "Synthetic assessment reading",
+            "source_material_ids": ["fixture-reading"],
+            "source_links": []
+          }
+        }
+      }
+    ],
+    "progress": {
+      "answered": 1,
+      "total": 1,
+      "active_question_ids": ["fixture-question"],
+      "current_question_id": "fixture-question"
+    },
+    "submission": {
+      "status": "submitted",
+      "submitted_at": "2026-10-07T12:00:00Z",
+      "reviewed_at": null,
+      "teacher_note": ""
+    },
+    "ai": {
+      "mode": "openai",
+      "configured": true,
+      "base_url": "http://fixture.invalid/v1",
+      "model": "Fixture model · no requests",
+      "connection": {
+        "status": "not_checked",
+        "checked_at": null,
+        "message": null
+      },
+      "web_search": {
+        "enabled": false,
+        "configured": false,
+        "provider": "tavily"
+      }
+    },
+    "version": {
+      "id": "fixture-edition",
+      "number": 3,
+      "label": "Current fixture edition",
+      "is_current": true,
+      "is_draft": false
+    },
+    "available_versions": [
+      {
+        "id": "fixture-edition",
+        "number": 3,
+        "label": "Current fixture edition"
+      },
+      {
+        "id": "fixture-old-edition",
+        "number": 2,
+        "label": "Earlier fixture edition"
+      }
+    ],
+    "tutor": {
+      "phase": "worksheet",
+      "started_at": "2026-10-07T12:00:00Z",
+      "updated_at": "2026-10-07T12:00:00Z",
+      "elapsed_seconds": 0,
+      "current_question_id": "fixture-question",
+      "completed_question_ids": ["fixture-question"],
+      "question_states": {
+        "fixture-question": {
+          "status": "discussed",
+          "answer_count": 1,
+          "hint_count": 0,
+          "last_outcome": "unknown"
+        }
+      },
+      "quiz": {
+        "status": "not_started",
+        "answered": 0,
+        "total": 0,
+        "correct": null
+      },
+      "reading": {
+        "answered": 0,
+        "total": 0
+      },
+      "presentation": "full",
+      "idle_hint_seconds": 0
+    }
+  },
+  "history": [
+    {
+      "session": {
+        "id": "fixture-session",
+        "course_id": "fixture-course",
+        "number": 1,
+        "title": "Evidence for assessment decisions",
+        "subtitle": "Purpose, evidence and responsible use",
+        "status": "published",
+        "active": true,
+        "effective_active": true,
+        "availability_reason": "manual_active",
+        "question_count": 1,
+        "estimated_minutes": 25,
+        "learning_objectives": [
+          "Connect evidence to the intended use of an assessment.",
+          "Explain why a score alone is not enough."
+        ],
+        "instructions": "Synthetic fixture instructions only.",
+        "reference_policy": "after_submit",
+        "teaching_language": "en",
+        "groups": [
+          {
+            "id": "fixture-core",
+            "title": "Core questions",
+            "kind": "core",
+            "description": ""
+          }
+        ],
+        "questions": [
+          {
+            "id": "fixture-question",
+            "group_id": "fixture-core",
+            "ordinal": 1,
+            "type": "open_response",
+            "prompt": "How would you judge whether an assessment is suitable for its intended use? Explain the evidence you would seek.",
+            "options": [],
+            "answer_slots": 1,
+            "images": [],
+            "source_label": "Synthetic assessment reading",
+            "source_material_ids": ["fixture-reading"],
+            "source_links": []
+          }
+        ],
+        "materials": [
+          {
+            "id": "fixture-reading",
+            "title": "Assessment reading",
+            "visibility": "student",
+            "kind": "reading",
+            "status": "ready",
+            "session_ids": ["fixture-session", "fixture-session-two"],
+            "source_label": "Synthetic HTTP fixture",
+            "excerpt": "Synthetic reading: decisions depend on the evidence and intended use.",
+            "download_url": "/api/materials/fixture-reading/download",
+            "preview_url": "/api/materials/fixture-reading/preview",
+            "preview_kind": "text"
+          },
+          {
+            "id": "fixture-private",
+            "title": "Instructor notes · private",
+            "visibility": "teacher",
+            "kind": "answer_key",
+            "status": "needs_review",
+            "session_ids": ["fixture-session"],
+            "source_label": "Synthetic HTTP fixture",
+            "excerpt": "Synthetic reading: decisions depend on the evidence and intended use.",
+            "download_url": "/api/materials/fixture-private/download",
+            "preview_url": "/api/materials/fixture-private/preview",
+            "preview_kind": "text",
+            "warning": "OCR needs visual review before publishing.",
+            "extraction_report": {
+              "schema_version": 1,
+              "method": "local OCR",
+              "units_total": 8,
+              "units_processed": 7,
+              "ocr_units": 4,
+              "images_detected": 3,
+              "chars_extracted": 1400,
+              "excerpt_chars": 1400,
+              "truncated": false,
+              "visual_review_required": true,
+              "failed_units": ["Page 8 could not be read"],
+              "notes": ["Synthetic fixture, not a real extraction."]
+            }
+          }
+        ],
+        "reference_answers": {
+          "fixture-question": "Private instructor example from labelled fixture."
+        }
+      },
+      "course": {
+        "id": "fixture-course",
+        "code": "QA7703",
+        "title": "Language Assessment",
+        "description": "An explicitly synthetic course for local browser verification.",
+        "student_count": 12,
+        "join_code": "FIXTURE-ONLY",
+        "published_version_id": "fixture-edition",
+        "published_version_number": 3,
+        "has_unpublished_changes": true
+      },
+      "version": {
+        "id": "fixture-edition",
+        "number": 3,
+        "label": "Current fixture edition",
+        "is_current": true,
+        "is_draft": false
+      },
+      "answered": 1,
+      "total": 1,
+      "status": "submitted",
+      "last_active": "2026-10-07T12:00:00Z"
+    }
+  ]
+}

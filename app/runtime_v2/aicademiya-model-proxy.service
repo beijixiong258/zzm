@@ -1,0 +1,13 @@
+# Check this executable path on the target Linux distribution before enabling.
+[Unit]
+Description=AIcademiya_V2 socket proxy to the private teaching router
+Requires=aicademiya-model-proxy.socket
+After=network-online.target aicademiya-model-proxy.socket
+
+[Service]
+ExecStart=/usr/lib/systemd/systemd-socket-proxyd 192.168.32.5:18280
+DynamicUser=true
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true

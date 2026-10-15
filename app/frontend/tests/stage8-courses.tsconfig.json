@@ -1,0 +1,1 @@
+{"extends":"../tsconfig.json","include":["../src/CourseActions.tsx","../src/CourseTrash.tsx","../src/Home.tsx","stage8-courses.test.tsx","stage8-courses-harness.tsx"]}

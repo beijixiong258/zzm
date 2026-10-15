@@ -1,0 +1,10 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": { "noEmit": true, "incremental": false },
+  "include": [
+    "../src/Profile.tsx",
+    "../src/Avatar.tsx",
+    "../src/Feedback.tsx",
+    "stage9-account-feedback-harness.tsx"
+  ]
+}

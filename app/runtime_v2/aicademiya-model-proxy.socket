@@ -1,0 +1,10 @@
+# Optional: install/enable ONLY when the authorized remote teaching router is used.
+[Unit]
+Description=AIcademiya_V2 guest-local aicademiya-router socket
+
+[Socket]
+ListenStream=127.0.0.1:18280
+NoDelay=true
+
+[Install]
+WantedBy=sockets.target

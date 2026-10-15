@@ -1,0 +1,71 @@
+.availability-editor {
+  padding: 20px 24px;
+  color: var(--ink);
+  font: 15px/1.6 var(--font-ui);
+}
+.availability-editor .section-heading {
+  margin-bottom: 0;
+  align-items: center;
+}
+.availability-editor h2 {
+  margin: 0;
+  font: 600 18px/1.4 var(--font-ui);
+}
+.availability-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font: 600 13px/1.5 var(--font-ui);
+  padding: 5px 9px;
+  border-radius: 6px;
+  color: var(--teal);
+  background: var(--soft);
+}
+.availability-badge.closed {
+  color: var(--muted);
+  background: var(--canvas);
+}
+.availability-badge.scheduled {
+  color: var(--blue);
+  background: var(--blue-soft);
+}
+.availability-editor summary {
+  padding: 14px 0;
+  cursor: pointer;
+  color: var(--blue);
+  font-size: 14px;
+  font-weight: 600;
+}
+.availability-editor label {
+  font: 600 14px/1.6 var(--font-ui);
+}
+.availability-editor :is(input, select) {
+  font: 14px/1.6 var(--font-ui);
+  border-color: var(--control);
+}
+.availability-editor small {
+  display: block;
+  color: var(--muted);
+  font-size: 13px;
+  margin: 12px 0;
+}
+.availability-editor .av-dirty {
+  color: var(--warning);
+  font-size: 13px;
+}
+.availability-editor :focus-visible {
+  outline: 3px solid var(--blue);
+  outline-offset: 3px;
+}
+@media (max-width: 600px) {
+  .availability-editor {
+    padding: 16px;
+  }
+  .availability-editor .section-heading {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .availability-editor .form-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

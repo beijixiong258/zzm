@@ -1,0 +1,6 @@
+/* Contextual help is reachable by pointer, keyboard and touch. */
+.help-trigger-wrap { display: inline-flex; vertical-align: middle; }
+.help-trigger { display: inline-flex; align-items: center; justify-content: center; padding: 4px; min-width: 28px; min-height: 28px; background: transparent; border: 0; border-radius: 50%; color: var(--blue); cursor: pointer; }
+.help-trigger:hover { background: var(--blue-soft); }
+.help-tooltip { position: fixed; z-index: 1100; width: max-content; max-width: min(290px, calc(100vw - 32px)); padding: 12px 14px; background: #223d35; color: #fff; border: 1px solid #223d35; border-radius: 8px; font: 400 13px/1.6 var(--font-ui); box-shadow: 0 8px 24px #23352e24; white-space: normal; overflow-wrap: anywhere; }
+.help-tooltip p:last-child { margin-bottom: 0; }
