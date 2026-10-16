@@ -5,22 +5,9 @@ import os
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-DEFAULTS = {
-    "server": {"host": "127.0.0.1", "port": 18773, "open_browser": True},
-    "frontend": {"host": "127.0.0.1", "port": 18774},
-    "storage": {"data_dir": "./data-local", "catalog_path": "./local-demo/catalog.json", "upload_dir": "./data-local/uploads", "frontend_dir": "./frontend/dist"},
-    "auth": {"demo_enabled": True, "registration_enabled": False, "cookie_secure": False, "allowed_origins": [], "allowed_hosts": []},
-    "ai": {
-        "provider": "siliconflow", "mode": "openai",
-        "base_url": "https://api.siliconflow.cn/v1", "model": "Qwen/Qwen3.8-27B",
-        "api_key": "", "use_environment_proxy": False,
-        "timeout_seconds": 120, "temperature": 0.3,
-        "enable_thinking": False, "thinking_budget": 4096,
-    },
-    "search": {"enabled": False, "api_key": ""},
-    "documents": {"worker_command": [], "formats": ["pdf"], "worker_timeout_seconds": 3600},
-}
+DEFAULTS = json.loads((ROOT / "config.defaults.json").read_text(encoding="utf-8-sig"))
 ENV_FIELDS = {
+    "frontend.locale": "AICADEMIYA_UI_LOCALE",
     "storage.data_dir": "AICADEMIYA_DATA_DIR", "storage.catalog_path": "AICADEMIYA_CATALOG_PATH",
     "storage.upload_dir": "AICADEMIYA_UPLOAD_DIR", "storage.frontend_dir": "AICADEMIYA_FRONTEND_DIR",
     "auth.demo_enabled": "AICADEMIYA_DEMO_ENABLED", "auth.registration_enabled": "AICADEMIYA_REGISTRATION_ENABLED",
@@ -55,6 +42,8 @@ def load_config(path=None):
             raise ValueError(f"Invalid host or port in {section}.")
     if config["auth"]["demo_enabled"] and config["server"]["host"] not in {"127.0.0.1", "localhost", "::1"}:
         raise ValueError("Demo sign-in requires a loopback server host.")
+    if config["frontend"]["locale"] not in {"en", "zh-CN"}:
+        raise ValueError("frontend.locale must be en or zh-CN.")
     if config["ai"]["mode"] not in {"openai", "demo"}:
         raise ValueError("ai.mode must be openai or demo.")
     if not 1 <= config["ai"]["timeout_seconds"] <= 600:

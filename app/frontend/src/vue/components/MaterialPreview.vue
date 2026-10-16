@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { t, systemText } from "../../i18n";
+
 import { computed, ref, onMounted, watch } from "vue";
 import type { Material } from "../../types";
 import type {
@@ -22,7 +24,7 @@ import {
 } from "../../document-state";
 import { withVersion } from "../../stage2";
 import { clientId } from "../../ids";
-import { useTask, user } from "../state";
+import { useTask, user, label } from "../state";
 import FeedbackNotice from "./FeedbackNotice.vue";
 import RichText from "./RichText.vue";
 const props = defineProps<{
@@ -100,8 +102,9 @@ watch(
         );
       else sessionStorage.removeItem(recoveryKey);
     } catch {
-      error.value =
-        "Browser recovery storage is unavailable. Keep this window open until the request is confirmed.";
+      error.value = t(
+        "Browser recovery storage is unavailable. Keep this window open until the request is confirmed.",
+      );
     }
   },
   { deep: true },
@@ -145,7 +148,7 @@ onMounted(async () => {
         number.value = saved.number || 1;
       }
     } catch {
-      error.value = "The previous source review could not be restored.";
+      error.value = t("The previous source review could not be restored.");
     }
   }
   if (props.material.kind !== "link")
@@ -170,7 +173,7 @@ async function verify(request: Pending) {
       request.payload.request_id,
     );
     if (!job.id || job.material_id !== props.material.id)
-      throw Error("The processing request could not be verified.");
+      throw Error(t("The processing request could not be verified."));
     await read();
   } else {
     const receipt = await documentApi.reviewByRequest(
@@ -178,7 +181,8 @@ async function verify(request: Pending) {
       request.payload.request_id,
     );
     const current = await documentApi.summary(props.material.id, props.version);
-    if (!current.document) throw Error("The updated document is unavailable.");
+    if (!current.document)
+      throw Error(t("The updated document is unavailable."));
     if (request.kind === "review") {
       const updatedPage = await documentApi.page(
         props.material.id,
@@ -196,7 +200,9 @@ async function verify(request: Pending) {
         )
       )
         throw Error(
-          "The saved source correction could not be verified. Keep this request for inspection.",
+          t(
+            "The saved source correction could not be verified. Keep this request for inspection.",
+          ),
         );
       page.value = updatedPage;
       draft.value = null;
@@ -214,7 +220,7 @@ async function verify(request: Pending) {
             request.ids.includes(item.id) && item.visibility === expected,
         )
       )
-        throw Error("Source-note sharing could not be verified.");
+        throw Error(t("Source-note sharing could not be verified."));
     }
     summary.value = current;
   }
@@ -247,8 +253,10 @@ async function mutate(request?: Pending) {
       await verify(target);
     },
     target.kind === "job"
-      ? "Processing request verified. Use Refresh to check its progress."
-      : "Draft source updated. Publish a new version to share it with students.",
+      ? t("Processing request verified. Use Refresh to check its progress.")
+      : t(
+          "Draft source updated. Publish a new version to share it with students.",
+        ),
   );
 }
 async function saveReview() {
@@ -259,8 +267,9 @@ async function saveReview() {
     return;
   }
   if (draft.value.revision !== revision.value) {
-    error.value =
-      "This source has changed. Refresh, then check the current block before saving.";
+    error.value = t(
+      "This source has changed. Refresh, then check the current block before saving.",
+    );
     return;
   }
   await mutate({
@@ -295,8 +304,8 @@ async function shareNotes() {
       expected_revision: revision.value!,
       visible_to_students: share,
       reason: share
-        ? "Teacher selected source notes for sharing on publication."
-        : "Teacher restricted source notes to staff.",
+        ? t("Teacher selected source notes for sharing on publication.")
+        : t("Teacher restricted source notes to staff."),
     },
   });
 }
@@ -305,39 +314,45 @@ async function shareNotes() {
   <FeedbackNotice :error="error" :success="success" :busy="busy" />
   <div v-if="summary?.latest_job" class="notice">
     <p>{{ processingLabel(summary.latest_job) }}</p>
-    <p v-if="summary.latest_job.error">{{ summary.latest_job.error }}</p>
+    <p v-if="summary.latest_job.error">
+      {{ systemText(summary.latest_job.error) }}
+    </p>
     <button
       class="secondary"
       :disabled="busy || !!draft || !!pending"
       @click="refresh"
     >
-      Refresh status
+      {{ t("Refresh status") }}
     </button>
   </div>
   <p v-if="pending" class="notice warning">
-    The last request has not been confirmed. Check its saved result before
-    making another change.
+    {{
+      t(
+        "The last request has not been confirmed. Check its saved result before making another change.",
+      )
+    }}
     <button class="secondary" :disabled="busy" @click="mutate()">
-      Check request result
+      {{ t("Check request result") }}
     </button>
   </p>
   <template v-if="summary?.document">
     <div class="section-header">
       <label
-        >Page<select
+        >{{ t("Page")
+        }}<select
           v-model.number="number"
           :disabled="busy || !!draft || !!pending"
           @change="loadPage"
         >
           <option v-for="p in summary.pages" :key="p.number" :value="p.number">
-            Page {{ p.number }}
+            {{ t("Page") }} {{ p.number }}
             {{ p.printed_label ? `· ${p.printed_label}` : "" }}
           </option>
         </select></label
-      ><span>{{ summary.document.page_count }} pages</span>
+      ><span>{{ summary.document.page_count }} {{ t("pages") }}</span>
     </div>
     <div v-if="page" class="document-page">
-      <img v-if="image" :src="image" :alt="`Page ${number}`" />
+      <img v-if="image" :src="image" :alt="t('Page {0}', [number])" />
       <div>
         <section v-for="b in page.blocks" :key="b.id" class="document-block">
           <RichText v-if="b.text_format === 'markdown'" :text="b.text" />
@@ -354,13 +369,13 @@ async function shareNotes() {
               :src="
                 authorizedDocumentAsset(asset, material.id, revision!, version)!
               "
-              alt="Source illustration" /></template
-          ><small v-if="teacher">{{ b.quality.replaceAll("_", " ") }}</small>
+              :alt="t('Source illustration')" /></template
+          ><small v-if="teacher">{{ label(b.quality) }}</small>
           <details
             v-if="teacher && (b.raw_text || b.review)"
             class="form-section"
           >
-            <summary>Original text & review</summary>
+            <summary>{{ t("Original text & review") }}</summary>
             <p v-if="b.raw_text" class="preserve-text">{{ b.raw_text }}</p>
             <p v-if="b.review">
               {{ b.review.reason }} · {{ b.review.by }} · {{ b.review.at }}
@@ -372,26 +387,29 @@ async function shareNotes() {
             :disabled="busy || active || !!draft || !!pending"
             @click="edit(b)"
           >
-            Review source block
+            {{ t("Review source block") }}
           </button>
         </section>
       </div>
     </div>
     <form v-if="draft" class="panel form-stack" @submit.prevent="saveReview">
-      <h3>Review against the original</h3>
+      <h3>{{ t("Review against the original") }}</h3>
       <label
-        >Checked source text<textarea
+        >{{ t("Checked source text")
+        }}<textarea
           v-model="draft.text"
           rows="7"
           :disabled="busy || !!pending"
         /></label
       ><label
-        >Quality<select v-model="draft.quality" :disabled="busy || !!pending">
-          <option value="approved">Checked and approved</option>
-          <option value="excluded">Exclude from teaching</option>
+        >{{ t("Quality")
+        }}<select v-model="draft.quality" :disabled="busy || !!pending">
+          <option value="approved">{{ t("Checked and approved") }}</option>
+          <option value="excluded">{{ t("Exclude from teaching") }}</option>
         </select></label
       ><label
-        >Reason<textarea
+        >{{ t("Reason")
+        }}<textarea
           v-model="draft.reason"
           rows="2"
           required
@@ -401,19 +419,21 @@ async function shareNotes() {
       </label>
       <div class="actions">
         <button class="primary" :disabled="busy || !!pending">
-          Save source correction</button
+          {{ t("Save source correction") }}</button
         ><button
           type="button"
           class="secondary"
           :disabled="busy || !!pending"
           @click="draft = null"
         >
-          Discard correction
+          {{ t("Discard correction") }}
         </button>
       </div>
     </form>
     <details v-if="summary.supplements?.length" class="form-section">
-      <summary>Source notes · {{ summary.supplements.length }}</summary>
+      <summary>
+        {{ t("Source notes ·") }} {{ summary.supplements.length }}
+      </summary>
       <section
         v-for="item in summary.supplements"
         :key="item.id"
@@ -421,7 +441,9 @@ async function shareNotes() {
       >
         <strong>{{ item.kind.replaceAll("_", " ") }}</strong
         ><span class="badge">{{
-          item.visibility === "teacher" ? "Teachers only" : "Student context"
+          item.visibility === "teacher"
+            ? t("Teachers only")
+            : t("Student context")
         }}</span>
         <p class="preserve-text">{{ item.preview }}</p>
         <a
@@ -430,7 +452,7 @@ async function shareNotes() {
           "
           target="_blank"
           rel="noopener"
-          >Open full note</a
+          >{{ t("Open full note") }}</a
         >
       </section>
       <button
@@ -441,8 +463,8 @@ async function shareNotes() {
       >
         {{
           summary.supplements.every((item) => item.visibility === "student")
-            ? "Restrict notes to teachers"
-            : "Share notes on next publication"
+            ? t("Restrict notes to teachers")
+            : t("Share notes on next publication")
         }}
       </button>
     </details>
@@ -463,23 +485,25 @@ async function shareNotes() {
     v-else
     :text="
       material.excerpt ||
-      'No text preview is available. Open or download the original material.'
+      t('No text preview is available. Open or download the original material.')
     "
   />
   <details v-if="teacher" class="form-section">
-    <summary>Document processing</summary>
+    <summary>{{ t("Document processing") }}</summary>
     <template v-if="material.extraction_report"
       ><p>
         {{ material.extraction_report.units_processed }} /
-        {{ material.extraction_report.units_total }} parts processed ·
-        {{ material.extraction_report.chars_extracted }} characters extracted.
+        {{ material.extraction_report.units_total }}
+        {{ t("parts processed ·") }}
+        {{ material.extraction_report.chars_extracted }}
+        {{ t("characters extracted.") }}
       </p>
       <p v-for="note in material.extraction_report.notes" :key="note">
         {{ note }}
       </p></template
     >
     <p v-if="!canProcess" class="muted">
-      Complete processing is not configured for this file format.
+      {{ t("Complete processing is not configured for this file format.") }}
     </p>
     <button
       v-if="canReview && canProcess"
@@ -495,7 +519,7 @@ async function shareNotes() {
         })
       "
     >
-      {{ revision ? "Reprocess original" : "Process complete document" }}
+      {{ revision ? t("Reprocess original") : t("Process complete document") }}
     </button>
   </details>
 </template>

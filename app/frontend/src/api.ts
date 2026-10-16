@@ -1,3 +1,4 @@
+import { t } from "./i18n";
 import type {
   Bootstrap,
   AccessSettings,
@@ -65,7 +66,7 @@ export async function request<T>(
     credentials: "include",
   });
   if (!response.ok) {
-    let detail = `Request failed (${response.status})`;
+    let detail = t("Request failed ({0})", [response.status]);
     try {
       const b = await response.json();
       detail =
@@ -122,7 +123,7 @@ export function uploadRequest<T>(
               ? detail
               : detail
                 ? JSON.stringify(detail)
-                : `Upload failed (${xhr.status})`,
+                : t("Upload failed ({0})", [xhr.status]),
             xhr.status,
           ),
         );
@@ -131,14 +132,18 @@ export function uploadRequest<T>(
     xhr.onerror = () =>
       reject(
         new ApiError(
-          "Upload connection lost. Check the course library before retrying this file.",
+          t(
+            "Upload connection lost. Check the course library before retrying this file.",
+          ),
           0,
         ),
       );
     xhr.onabort = () =>
       reject(
         new ApiError(
-          "Upload interrupted. Check the course library before retrying this file.",
+          t(
+            "Upload interrupted. Check the course library before retrying this file.",
+          ),
           0,
         ),
       );

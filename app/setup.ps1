@@ -5,7 +5,7 @@ if (-not (Test-Path -LiteralPath '.venv\Scripts\python.exe')) {
     if ($LASTEXITCODE -ne 0) { throw 'Python environment creation failed.' }
 }
 if (-not (Test-Path -LiteralPath 'config.json')) {
-    & '.venv\Scripts\python.exe' -c "import json; from pathlib import Path; from backend.aicademiya.deployment_config import DEFAULTS; Path('config.json').write_text(json.dumps(DEFAULTS, ensure_ascii=False, indent=2), encoding='utf-8')"
+    & '.venv\Scripts\python.exe' -c "import json; from pathlib import Path; from backend.aicademiya.deployment_config import DEFAULTS; from copy import deepcopy; local = deepcopy(DEFAULTS); local['frontend'].pop('locale'); Path('config.json').write_text(json.dumps(local, ensure_ascii=False, indent=2), encoding='utf-8')"
     if ($LASTEXITCODE -ne 0) { throw 'Configuration file creation failed.' }
 }
 & '.venv\Scripts\python.exe' -m pip install -r 'backend\requirements.txt'

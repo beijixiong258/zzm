@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { t } from "../../i18n";
+
 import { computed, ref } from "vue";
 import { Eye, Save } from "lucide-vue-next";
 import { api } from "../../api";
@@ -91,7 +93,7 @@ async function save() {
   await run(async () => {
     fill(await saveTeachingDraft(props.sid, draft.value!));
     await refreshCourses();
-  }, "Draft saved. Publish when ready to share with students.");
+  }, t("Draft saved. Publish when ready to share with students."));
 }
 async function saveQuestions(value: WorksheetDraft) {
   const next = {
@@ -106,7 +108,7 @@ async function saveQuestions(value: WorksheetDraft) {
     JSON.stringify(verified.groups) !== JSON.stringify(next.groups)
   )
     throw Error(
-      "Saved questions could not be verified. Refresh before retrying.",
+      t("Saved questions could not be verified. Refresh before retrying."),
     );
   fill(verified);
   await refreshCourses();
@@ -127,13 +129,15 @@ async function availability() {
     };
     Object.assign(session.value!, patch);
     Object.assign(draft.value!, patch);
-  }, "Availability updated.");
+  }, t("Availability updated."));
 }
 async function changeTab(value: string) {
   if (importing.value && value !== "questions") {
     if (
       !(await askConfirm(
-        "Leave the question import? Unsaved import changes will be discarded.",
+        t(
+          "Leave the question import? Unsaved import changes will be discarded.",
+        ),
       ))
     )
       return;
@@ -158,14 +162,14 @@ async function importInstructions(e: Event) {
   await run(async () => {
     const result = await api.instructionPreview(props.sid, file);
     draft.value!.instructions = result.text;
-  }, "Instructions extracted. Review and save the draft.");
+  }, t("Instructions extracted. Review and save the draft."));
 }
 function materialsChanged(s: SessionDetail) {
   session.value!.materials = s.materials;
   draft.value!.materials = s.materials;
 }
 async function discard() {
-  if (await askConfirm("Discard your unsaved teaching changes?"))
+  if (await askConfirm(t("Discard your unsaved teaching changes?")))
     fill(session.value!);
 }
 async function inspect() {
@@ -187,32 +191,34 @@ async function inspect() {
       class="session-header"
       :class="{ compact: tab !== 'setup' }"
       :title="session.title"
-      :eyebrow="`SESSION ${session.number} · TEACHING`"
+      :eyebrow="t('SESSION {0} · TEACHING', [session.number])"
       :description="tab === 'setup' ? session.subtitle : undefined"
       ><button class="secondary" :disabled="busy" @click="inspect">
-        <Eye :size="16" /> Preview session</button
+        <Eye :size="16" /> {{ t("Preview session") }}</button
       ><button
         v-if="tab === 'setup' || dirty"
         class="primary"
         :disabled="busy || !dirty"
         @click="save"
       >
-        <Save :size="16" /> Save draft
+        <Save :size="16" /> {{ t("Save draft") }}
       </button></PageHeader
     >
     <div class="status-strip">
-      <span>{{ dirty ? "Unsaved draft" : "Draft saved" }}</span
+      <span>{{ dirty ? t("Unsaved draft") : t("Draft saved") }}</span
       ><span
         class="badge"
         :class="session.effective_active ? 'positive' : 'neutral'"
         >{{
-          session.effective_active ? "Open to students" : "Closed to students"
+          session.effective_active
+            ? t("Open to students")
+            : t("Closed to students")
         }}</span
       ><button
         class="link-button"
         @click="navigate({ page: 'versions', sid: session.course_id })"
       >
-        Publish & history →
+        {{ t("Publish & history →") }}
       </button>
     </div>
     <FeedbackNotice
@@ -220,13 +226,13 @@ async function inspect() {
       :success="success"
       :busy="busy && !preview"
     />
-    <nav class="tabs session-tabs" aria-label="Session sections">
+    <nav class="tabs session-tabs" :aria-label="t('Session sections')">
       <button
         v-for="[id, name] in [
-          ['setup', 'Teaching setup'],
-          ['questions', 'Questions'],
-          ['materials', 'Materials'],
-          ['records', 'Student work'],
+          ['setup', t('Teaching setup')],
+          ['questions', t('Questions')],
+          ['materials', t('Materials')],
+          ['records', t('Student work')],
         ]"
         :key="id"
         :class="{ active: tab === id }"
@@ -245,23 +251,28 @@ async function inspect() {
         <section class="panel">
           <div class="section-header">
             <div>
-              <h2>Learning goals</h2>
-              <p>Define what students should understand by the end.</p>
+              <h2>{{ t("Learning goals") }}</h2>
+              <p>
+                {{ t("Define what students should understand by the end.") }}
+              </p>
             </div>
           </div>
           <label
-            >Objectives · one per line<textarea v-model="objectives" rows="4" />
+            >{{ t("Objectives · one per line")
+            }}<textarea v-model="objectives" rows="4" />
           </label>
           <div class="form-grid">
             <label
-              >Teaching language<select v-model="draft.teaching_language">
-                <option value="en">English</option>
-                <option value="zh">Chinese</option>
+              >{{ t("Teaching language")
+              }}<select v-model="draft.teaching_language">
+                <option value="en">{{ t("English") }}</option>
+                <option value="zh">{{ t("Chinese") }}</option>
               </select></label
             ><label
-              >Include in next publication<select v-model="draft.status">
-                <option value="published">Included</option>
-                <option value="draft">Draft only</option>
+              >{{ t("Include in next publication")
+              }}<select v-model="draft.status">
+                <option value="published">{{ t("Included") }}</option>
+                <option value="draft">{{ t("Draft only") }}</option>
               </select></label
             >
           </div>
@@ -269,41 +280,47 @@ async function inspect() {
         <section class="panel">
           <div class="section-header">
             <div>
-              <h2>Teaching approach</h2>
-              <p>Set the context and guidance for your teaching.</p>
+              <h2>{{ t("Teaching approach") }}</h2>
+              <p>{{ t("Set the context and guidance for your teaching.") }}</p>
             </div>
           </div>
           <label
-            >Background<textarea
+            >{{ t("Background")
+            }}<textarea
               v-model="profile.background"
               rows="3"
               maxlength="8000"
             /></label
           ><label
-            >Student profile<textarea
+            >{{ t("Student profile")
+            }}<textarea
               v-model="profile.student_profile"
               rows="2"
               maxlength="8000"
             /></label
           ><label
-            >Response strategies<textarea
+            >{{ t("Response strategies")
+            }}<textarea
               v-model="profile.response_strategies"
               rows="3"
               maxlength="8000"
             />
           </label>
           <div class="form-grid">
-            <label>Tone<input v-model="profile.tone" maxlength="1000" /></label
+            <label
+              >{{ t("Tone")
+              }}<input v-model="profile.tone" maxlength="1000" /></label
             ><label
-              >Response detail<select v-model="profile.response_detail">
-                <option value="concise">Concise</option>
-                <option value="balanced">Balanced</option>
-                <option value="detailed">Detailed</option>
+              >{{ t("Response detail")
+              }}<select v-model="profile.response_detail">
+                <option value="concise">{{ t("Concise") }}</option>
+                <option value="balanced">{{ t("Balanced") }}</option>
+                <option value="detailed">{{ t("Detailed") }}</option>
               </select></label
             >
           </div>
           <details class="form-section">
-            <summary>Teaching sequence & reference rules</summary>
+            <summary>{{ t("Teaching sequence & reference rules") }}</summary>
             <div class="checkbox-list">
               <label
                 v-for="phase in [
@@ -325,64 +342,73 @@ async function inspect() {
                       phase as 'warmup' | 'quiz' | 'reading',
                     )
                   "
-                />{{ teachingPhaseLabels[phase] }}</label
+                />{{ t(teachingPhaseLabels[phase]) }}</label
               >
             </div>
             <label
-              >Reading focus<textarea
-                v-model="profile.reading_focus"
-                rows="2"
-              />
+              >{{ t("Reading focus")
+              }}<textarea v-model="profile.reading_focus" rows="2" />
             </label>
             <div class="form-grid">
               <label
-                >Reading questions<input
+                >{{ t("Reading questions")
+                }}<input
                   v-model.number="profile.reading_question_count"
                   type="number"
                   min="1"
                   max="5" /></label
               ><label
-                >Question presentation<select v-model="profile.presentation">
-                  <option value="full">All questions</option>
-                  <option value="paced">One at a time</option>
+                >{{ t("Question presentation")
+                }}<select v-model="profile.presentation">
+                  <option value="full">{{ t("All questions") }}</option>
+                  <option value="paced">{{ t("One at a time") }}</option>
                 </select></label
               ><label
-                >References become available<select
-                  v-model="draft.reference_policy"
-                >
-                  <option value="after_attempt">After an attempt</option>
-                  <option value="after_feedback">After feedback</option>
-                  <option value="after_submit">After submission</option>
-                </select></label
-              ><label
-                >Reference delivery<select v-model="profile.reference_delivery">
-                  <option value="on_request">On request</option>
-                  <option value="after_sufficient_answer">
-                    After a sufficient answer
+                >{{ t("References become available")
+                }}<select v-model="draft.reference_policy">
+                  <option value="after_attempt">
+                    {{ t("After an attempt") }}
+                  </option>
+                  <option value="after_feedback">
+                    {{ t("After feedback") }}
+                  </option>
+                  <option value="after_submit">
+                    {{ t("After submission") }}
                   </option>
                 </select></label
               ><label
-                >Idle hint delay · seconds<input
+                >{{ t("Reference delivery")
+                }}<select v-model="profile.reference_delivery">
+                  <option value="on_request">{{ t("On request") }}</option>
+                  <option value="after_sufficient_answer">
+                    {{ t("After a sufficient answer") }}
+                  </option>
+                </select></label
+              ><label
+                >{{ t("Idle hint delay · seconds")
+                }}<input
                   v-model.number="profile.idle_hint_seconds"
                   type="number"
                   min="0"
                   max="300"
-                /><small
-                  >0 disables idle hints; otherwise use 10–300 seconds.</small
-                ></label
+                /><small>{{
+                  t("0 disables idle hints; otherwise use 10–300 seconds.")
+                }}</small></label
               >
             </div>
           </details>
           <details class="form-section">
-            <summary>Additional instructions</summary>
+            <summary>{{ t("Additional instructions") }}</summary>
             <label
-              >Instructions<textarea
+              >{{ t("Instructions")
+              }}<textarea
                 v-model="draft.instructions"
                 rows="6"
                 maxlength="30000"
               /></label
             ><label
-              >Import instructions<input
+              >{{ t("Import instructions")
+              }}<input
                 type="file"
                 accept=".txt,.md,.docx,.pdf"
                 @change="importInstructions"
@@ -392,36 +418,43 @@ async function inspect() {
       </div>
       <aside class="form-stack">
         <section class="panel">
-          <h2>Availability</h2>
+          <h2>{{ t("Availability") }}</h2>
           <p class="muted">
-            Controls when students can enter the published session.
+            {{ t("Controls when students can enter the published session.") }}
           </p>
           <label class="check"
-            ><input v-model="active" type="checkbox" />Open without a
-            schedule</label
+            ><input v-model="active" type="checkbox" />{{
+              t("Open without a schedule")
+            }}</label
           ><label
-            >Starts at<input v-model="starts" type="datetime-local" /></label
-          ><label>Ends at<input v-model="ends" type="datetime-local" /></label
-          ><small>A schedule takes precedence over the switch.</small
+            >{{ t("Starts at")
+            }}<input v-model="starts" type="datetime-local" /></label
+          ><label
+            >{{ t("Ends at")
+            }}<input v-model="ends" type="datetime-local" /></label
+          ><small>{{ t("A schedule takes precedence over the switch.") }}</small
           ><button
             class="secondary full"
             :disabled="busy || !scheduleDirty"
             @click="availability"
           >
-            Apply availability
+            {{ t("Apply availability") }}
           </button>
         </section>
         <section class="panel quiet-panel">
-          <h3>Prepare → save → publish</h3>
+          <h3>{{ t("Prepare → save → publish") }}</h3>
           <p>
-            Saving keeps your draft. Publishing updates the course students can
-            see.
+            {{
+              t(
+                "Saving keeps your draft. Publishing updates the course students can see.",
+              )
+            }}
           </p>
           <button
             class="secondary full"
             @click="navigate({ page: 'versions', sid: session.course_id })"
           >
-            Publish & history
+            {{ t("Publish & history") }}
           </button>
         </section>
       </aside>
@@ -438,7 +471,9 @@ async function inspect() {
           }
         " /><template v-else
         ><p v-if="dirty" class="notice warning">
-          Saving a question will also save your current teaching changes.
+          {{
+            t("Saving a question will also save your current teaching changes.")
+          }}
         </p>
         <QuestionManager
           :value="worksheet"
@@ -448,7 +483,7 @@ async function inspect() {
           @import="
             () => {
               if (dirty) {
-                error = 'Save or discard teaching changes before importing.';
+                error = t('Save or discard teaching changes before importing.');
               } else importing = true;
             }
           " /></template
@@ -462,28 +497,28 @@ async function inspect() {
     <section v-else>
       <div class="section-header">
         <div>
-          <h2>Student work</h2>
-          <p>Review submissions from the selected course version.</p>
+          <h2>{{ t("Student work") }}</h2>
+          <p>{{ t("Review submissions from the selected course version.") }}</p>
         </div>
         <button
           class="secondary"
           :disabled="busy"
           @click="changeTab('records')"
         >
-          Refresh
+          {{ t("Refresh") }}
         </button>
       </div>
       <div class="filter-bar">
         <label
-          >Course version
+          >{{ t("Course version") }}
           <select
             v-model="recordVersion"
             :disabled="busy"
             @change="loadRecords"
           >
-            <option value="">Current published version</option>
+            <option value="">{{ t("Current published version") }}</option>
             <option v-for="v in versions?.versions" :key="v.id" :value="v.id">
-              Version {{ v.number }} · {{ v.label }}
+              {{ t("Version") }} {{ v.number }} · {{ v.label }}
             </option>
           </select>
         </label>
@@ -495,7 +530,8 @@ async function inspect() {
           :title="row.user.name"
           :description="row.user.email"
           ><template #meta
-            ><span>{{ row.answered }} / {{ row.total }} answered</span
+            ><span
+              >{{ row.answered }} / {{ row.total }} {{ t("answered") }}</span
             ><span class="badge">{{ label(row.status) }}</span
             ><span>{{ dateText(row.last_active) }}</span></template
           ><template #actions
@@ -510,34 +546,36 @@ async function inspect() {
                 })
               "
             >
-              Review work
+              {{ t("Review work") }}
             </button></template
           ></ItemRow
         >
         <div v-if="!students.length && !busy" class="empty-state">
-          No student work yet.
+          {{ t("No student work yet.") }}
         </div>
       </div>
     </section>
     <div v-if="tab === 'setup' && dirty" class="save-bar">
-      <span>Unsaved teaching changes</span>
+      <span>{{ t("Unsaved teaching changes") }}</span>
       <div class="actions">
         <button class="secondary" :disabled="busy" @click="discard">
-          Discard</button
+          {{ t("Discard") }}</button
         ><button class="primary" :disabled="busy" @click="save">
-          Save draft
+          {{ t("Save draft") }}
         </button>
       </div>
     </div>
     <EditorDialog
       v-if="preview"
-      title="Draft preview"
+      :title="t('Draft preview')"
       wide
       :busy="busy"
       @close="preview = false"
       ><FeedbackNotice :error="error" :busy="busy" />
       <p class="notice">
-        Previewing your current teaching setup. No AI request is made.
+        {{
+          t("Previewing your current teaching setup. No AI request is made.")
+        }}
       </p>
       <h3>{{ draft.title }}</h3>
       <ul>
@@ -545,7 +583,7 @@ async function inspect() {
           {{ goal }}
         </li>
       </ul>
-      <h3>Questions</h3>
+      <h3>{{ t("Questions") }}</h3>
       <ItemRow
         v-for="q in draft.questions"
         :key="q.id"
@@ -554,7 +592,7 @@ async function inspect() {
         ><template #meta>{{ label(q.type) }}</template></ItemRow
       >
       <details v-if="compiled" class="form-section">
-        <summary>Compiled teaching instructions</summary>
+        <summary>{{ t("Compiled teaching instructions") }}</summary>
         <RichText :text="compiled.text" />
       </details>
       <template #actions
@@ -566,7 +604,7 @@ async function inspect() {
             tab = 'setup';
           "
         >
-          Back to teaching setup
+          {{ t("Back to teaching setup") }}
         </button></template
       ></EditorDialog
     > </template

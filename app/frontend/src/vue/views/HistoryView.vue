@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { t } from "../../i18n";
+
 import { ref } from "vue";
 import { api } from "../../api";
 import type { LearningRun } from "../../types";
@@ -14,8 +16,8 @@ void run(async () => {
 </script>
 <template>
   <PageHeader
-    title="Learning history"
-    description="Return to your work in its original course version."
+    :title="t('Learning history')"
+    :description="t('Return to your work in its original course version.')"
   /><FeedbackNotice :error="error" :busy="busy" />
   <div class="item-list">
     <ItemRow
@@ -26,7 +28,7 @@ void run(async () => {
       :number="r.session.number"
       ><template #meta
         ><span class="badge">{{ label(r.status) }}</span
-        ><span>Version {{ r.version.number }}</span
+        ><span>{{ t("Version") }} {{ r.version.number }}</span
         ><span>{{ dateText(r.last_active) }}</span></template
       ><template #actions
         ><button
@@ -39,12 +41,12 @@ void run(async () => {
             })
           "
         >
-          Open saved work
+          {{ t("Open saved work") }}
         </button></template
       ></ItemRow
     >
     <div v-if="!rows.length && !busy" class="empty-state">
-      Your learning history will appear here.
+      {{ t("Your learning history will appear here.") }}
     </div>
   </div>
 </template>

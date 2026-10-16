@@ -1,3 +1,4 @@
+import { t, locale, setLocale } from "../i18n";
 import { computed, onBeforeUnmount, ref, watch, type Ref } from "vue";
 import { api, ApiError } from "../api";
 import { readRoute, routeHash, type Route } from "../routes";
@@ -48,7 +49,9 @@ export async function confirmLeave() {
   return (
     ![...guards.values()].some((check) => check()) ||
     (await askConfirm(
-      "Leave this page with unsaved changes? Changes have not been saved to the server.",
+      t(
+        "Leave this page with unsaved changes? Changes have not been saved to the server.",
+      ),
     ))
   );
 }
@@ -74,6 +77,7 @@ export async function refreshCourses() {
 }
 export async function initialize() {
   bootstrap.value = await api.bootstrap();
+  setLocale(bootstrap.value.default_locale);
   try {
     user.value = (await api.me()).user;
   } catch (e) {
@@ -109,6 +113,10 @@ export function useDialogDraft<T>(value: Ref<T>) {
   const dirty = computed(() => JSON.stringify(value.value) !== original);
   return dirty;
 }
-watch(route, () => {
-  document.title = `AIcademiya · ${route.value.page === "home" ? "Courses" : label(route.value.page)}`;
-});
+watch(
+  [route, locale],
+  () => {
+    document.title = `AIcademiya · ${label(route.value.page)}`;
+  },
+  { immediate: true },
+);

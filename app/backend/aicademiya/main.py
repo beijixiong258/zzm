@@ -21,6 +21,7 @@ from .auth import PasswordVerifier, RateLimiter, session_user
 from .course_staff import AuthenticatedUser, live_actor, establish_assignment, register_staff_routes
 from .global_accounts import change_role, register_global_account_routes
 from .config import SecurityConfig
+from .deployment_config import DEFAULTS
 from .http_security import HttpSecurityMiddleware
 from .version_context import is_staff, published_detail
 from .roster import maintenance, register_roster_routes
@@ -203,7 +204,7 @@ def create_app(*, data_dir=None, db_path=None, catalog_path=None, upload_dir=Non
     @application.get("/api/bootstrap")
     def bootstrap():
         with database.connect() as conn:
-            return {"app_name": "AIcademiya", "demo_enabled": demo, "default_locale": "en", "ai": tutor.status(conn),
+            return {"app_name": "AIcademiya", "demo_enabled": demo, "default_locale": os.getenv("AICADEMIYA_UI_LOCALE", DEFAULTS["frontend"]["locale"]), "ai": tutor.status(conn),
                     "registration_enabled": registration_enabled(conn)}
 
     @application.post("/api/auth/demo")

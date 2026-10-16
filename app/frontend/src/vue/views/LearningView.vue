@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { t } from "../../i18n";
+
 import { askConfirm } from "../state";
 import { computed, ref, watch } from "vue";
 import { Send, FileText, BookmarkCheck, CheckCheck } from "lucide-vue-next";
@@ -110,8 +112,8 @@ async function saveAnswer() {
     );
     const saved = workspace.value.attempts[question.value!.id];
     if (!saved || saved.answer !== answer.value.trim())
-      throw Error("The saved answer could not be verified.");
-  }, "Answer saved.");
+      throw Error(t("The saved answer could not be verified."));
+  }, t("Answer saved."));
   if (ok) closeAnswer();
 }
 async function start() {
@@ -155,14 +157,14 @@ async function send(action: "message" | "hint" | "skip_quiz" = "message") {
   });
 }
 async function submit() {
-  if (!(await askConfirm("Submit your saved work to the teacher?"))) return;
+  if (!(await askConfirm(t("Submit your saved work to the teacher?")))) return;
   await run(async () => {
     workspace.value = await api.submit(
       props.sid,
       props.version,
       previewId.value,
     );
-  }, "Work submitted.");
+  }, t("Work submitted."));
 }
 function composerKey(event: KeyboardEvent) {
   if (event.key === "Enter" && !event.shiftKey && !event.isComposing) {
@@ -180,7 +182,7 @@ async function review(status: "confirmed" | "needs_revision") {
       note.value,
       props.version,
     );
-  }, "Review saved.");
+  }, t("Review saved."));
 }
 async function chooseReading(id: string) {
   await run(async () => {
@@ -210,20 +212,25 @@ async function example() {
   <template v-if="workspace"
     ><PageHeader
       :title="workspace.session.title"
-      :eyebrow="`SESSION ${workspace.session.number} · ${uid ? 'STUDENT WORK' : 'LEARNING'}`"
+      :eyebrow="
+        t('SESSION {0} · {1}', [
+          workspace.session.number,
+          uid ? t('STUDENT WORK') : t('LEARNING'),
+        ])
+      "
       ><a
         class="secondary"
         :href="api.exportUrl(sid, uid, version)"
         target="_blank"
         rel="noopener"
-        >Export work</a
+        >{{ t("Export work") }}</a
       ><button
         v-if="!readonly"
         class="primary"
         :disabled="busy || !canSubmit(workspace)"
         @click="submit"
       >
-        <CheckCheck :size="17" /> Submit work
+        <CheckCheck :size="17" /> {{ t("Submit work") }}
       </button></PageHeader
     >
     <div class="status-strip">
@@ -231,10 +238,10 @@ async function example() {
         label(workspace.submission.status)
       }}</span
       ><span
-        >{{ workspace.progress.answered }} /
-        {{ workspace.progress.total }} answered</span
+        >{{ workspace.progress.answered }} / {{ workspace.progress.total }}
+        {{ t("answered") }}</span
       ><span v-if="workspace.version?.number"
-        >Course version {{ workspace.version.number }}</span
+        >{{ t("Course version") }} {{ workspace.version.number }}</span
       ><span v-if="uid">{{ workspace.user.name }}</span>
     </div>
     <p v-if="workspace.read_only_reason" class="notice warning">
@@ -245,43 +252,48 @@ async function example() {
       :success="success"
       :busy="busy && !question"
     />
-    <nav class="tabs learning-tabs" aria-label="Learning sections">
+    <nav class="tabs learning-tabs" :aria-label="t('Learning sections')">
       <button
         :class="{ active: panel === 'conversation' }"
         @click="panel = 'conversation'"
       >
-        <Send :size="15" /> Conversation</button
+        <Send :size="15" /> {{ t("Conversation") }}</button
       ><button
         :class="{ active: panel === 'answers' }"
         @click="panel = 'answers'"
       >
-        <BookmarkCheck :size="16" /> Questions & answers</button
+        <BookmarkCheck :size="16" /> {{ t("Questions & answers") }}</button
       ><button
         :class="{ active: panel === 'materials' }"
         @click="panel = 'materials'"
       >
-        <FileText :size="16" /> Materials
+        <FileText :size="16" /> {{ t("Materials") }}
       </button>
     </nav>
     <section v-if="panel === 'conversation'" class="learning-conversation">
       <div v-if="!readonly && !workspace.ai.configured" class="notice warning">
-        The AI tutor has not been configured. You can still browse materials and
-        save your answers.
+        {{
+          t(
+            "The AI tutor has not been configured. You can still browse materials and save your answers.",
+          )
+        }}
       </div>
       <div v-if="!workspace.messages.length" class="conversation-empty">
         <span class="learning-symbol">“</span>
-        <h2>A place to work through your thinking.</h2>
-        <p>Start with the materials and questions for this session.</p>
+        <h2>{{ t("A place to work through your thinking.") }}</h2>
+        <p>
+          {{ t("Start with the materials and questions for this session.") }}
+        </p>
         <div class="actions">
           <button class="secondary" @click="panel = 'answers'">
-            View questions</button
+            {{ t("View questions") }}</button
           ><button
             v-if="!readonly"
             class="primary"
             :disabled="busy || !workspace.ai.configured"
             @click="start"
           >
-            Start conversation
+            {{ t("Start conversation") }}
           </button>
         </div>
       </div>
@@ -293,7 +305,9 @@ async function example() {
           :class="m.role"
         >
           <div class="message-heading">
-            <strong>{{ m.role === "user" ? "You" : "Learning tutor" }}</strong
+            <strong>{{
+              m.role === "user" ? t("You") : t("Learning tutor")
+            }}</strong
             ><time>{{ dateText(m.created_at) }}</time>
           </div>
           <RichText :text="m.content" />
@@ -338,15 +352,16 @@ async function example() {
         </article>
       </div>
       <form v-if="!readonly" class="composer" @submit.prevent="send()">
-        <label class="sr-only" for="learning-message"
-          >Message to the tutor</label
+        <label class="sr-only" for="learning-message">{{
+          t("Message to the tutor")
+        }}</label
         ><textarea
           id="learning-message"
           @keydown="composerKey"
           v-model="message"
           rows="2"
           :disabled="busy || !workspace.ai.configured"
-          placeholder="Explain your thinking, or ask a question…"
+          :placeholder="t('Explain your thinking, or ask a question…')"
         />
         <div class="composer-actions">
           <div class="actions">
@@ -358,7 +373,7 @@ async function example() {
               "
               @click="send('hint')"
             >
-              Ask for a hint</button
+              {{ t("Ask for a hint") }}</button
             ><button
               v-if="
                 workspace.tutor?.phase === 'quiz_offer' ||
@@ -369,14 +384,14 @@ async function example() {
               :disabled="busy"
               @click="send('skip_quiz')"
             >
-              Skip optional quiz
+              {{ t("Skip optional quiz") }}
             </button>
           </div>
           <button
             class="primary"
             :disabled="busy || !workspace.ai.configured || !message.trim()"
           >
-            <Send :size="16" /> Send
+            <Send :size="16" /> {{ t("Send") }}
           </button>
         </div>
       </form>
@@ -384,12 +399,12 @@ async function example() {
     <section v-else-if="panel === 'answers'">
       <div class="section-header">
         <div>
-          <h2>Questions & saved answers</h2>
+          <h2>{{ t("Questions & saved answers") }}</h2>
           <p>
             {{
               readonly
-                ? "Your retained answers for this course version."
-                : "Save your answers as you work. Submit when ready."
+                ? t("Your retained answers for this course version.")
+                : t("Save your answers as you work. Submit when ready.")
             }}
           </p>
         </div>
@@ -401,7 +416,7 @@ async function example() {
         "
         class="panel"
       >
-        <h3>Reading choice</h3>
+        <h3>{{ t("Reading choice") }}</h3>
         <div class="actions">
           <button
             v-for="g in workspace.session.groups.filter(
@@ -430,7 +445,7 @@ async function example() {
               class="badge"
               :class="workspace.attempts[q.id] ? 'positive' : 'neutral'"
               >{{
-                workspace.attempts[q.id] ? "Answer saved" : "Not answered"
+                workspace.attempts[q.id] ? t("Answer saved") : t("Not answered")
               }}</span
             ></template
           ><RichText
@@ -440,16 +455,16 @@ async function example() {
             ><button class="secondary" @click="edit(q)">
               {{
                 readonly
-                  ? "View answer"
+                  ? t("View answer")
                   : workspace.attempts[q.id]
-                    ? "Edit answer"
-                    : "Write answer"
+                    ? t("Edit answer")
+                    : t("Write answer")
               }}
             </button></template
           ></ItemRow
         >
         <div v-if="!questions.length" class="empty-state">
-          No active questions in this session.
+          {{ t("No active questions in this session.") }}
         </div>
       </div>
     </section>
@@ -461,26 +476,28 @@ async function example() {
       :version="version"
     />
     <section v-if="uid" class="panel review-panel">
-      <h2>Teacher review</h2>
-      <label>Feedback to the student<textarea v-model="note" rows="3" /></label>
+      <h2>{{ t("Teacher review") }}</h2>
+      <label
+        >{{ t("Feedback to the student") }}<textarea v-model="note" rows="3" />
+      </label>
       <div class="actions">
         <button class="primary" :disabled="busy" @click="review('confirmed')">
-          Confirm completion</button
+          {{ t("Confirm completion") }}</button
         ><button
           class="secondary"
           :disabled="busy"
           @click="review('needs_revision')"
         >
-          Request revision
+          {{ t("Request revision") }}
         </button>
       </div>
     </section>
     <p v-else-if="workspace.submission.teacher_note" class="notice">
-      Teacher feedback: {{ workspace.submission.teacher_note }}
+      {{ t("Teacher feedback:") }} {{ workspace.submission.teacher_note }}
     </p>
     <EditorDialog
       v-if="question"
-      :title="`Question ${question.ordinal}`"
+      :title="t('Question {0}', [question.ordinal])"
       :busy="busy"
       :dirty="answer !== answerInitial"
       @close="closeAnswer"
@@ -499,22 +516,20 @@ async function example() {
             />{{ option }}</label
           ></template
         ><label v-else
-          >Your answer<textarea
-            v-model="answer"
-            rows="6"
-            :readonly="readonly"
-            required
-          />
+          >{{ t("Your answer")
+          }}<textarea v-model="answer" rows="6" :readonly="readonly" required />
         </label>
       </form>
-      <p v-if="question.hint" class="muted">Hint: {{ question.hint }}</p>
+      <p v-if="question.hint" class="muted">
+        {{ t("Hint:") }} {{ question.hint }}
+      </p>
       <button
         v-if="!uid"
         class="secondary"
         :disabled="busy || !canReveal(workspace, question.id)"
         @click="example"
       >
-        Request example</button
+        {{ t("Request example") }}</button
       ><RichText v-if="reference" :text="reference" /><template
         v-if="!readonly"
         #actions
@@ -523,7 +538,7 @@ async function example() {
           class="primary"
           :disabled="busy || !answer.trim()"
         >
-          Save answer
+          {{ t("Save answer") }}
         </button></template
       ></EditorDialog
     > </template

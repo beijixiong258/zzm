@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { t } from "../../i18n";
+
 import { askConfirm } from "../state";
 import { computed, ref, watch } from "vue";
 import { Plus } from "lucide-vue-next";
@@ -10,7 +12,7 @@ import type {
   GlobalAccount,
   StaffResponse,
 } from "../../account-management-types";
-import { courses, user, useTask } from "../state";
+import { courses, user, useTask, label } from "../state";
 import PageHeader from "../components/PageHeader.vue";
 import ItemRow from "../components/ItemRow.vue";
 import EditorDialog from "../components/EditorDialog.vue";
@@ -109,7 +111,7 @@ async function save() {
       await accountApi.role(detail.value.user.id, role.value);
       const got = await accountApi.get(detail.value.user.id);
       if (got.user.role !== role.value)
-        throw Error("The role change could not be verified.");
+        throw Error(t("The role change could not be verified."));
     } else if (modal.value === "staff") {
       await accountApi.addStaff(props.courseId!, staffId.value);
       staff.value = await accountApi.staff(props.courseId!);
@@ -118,7 +120,7 @@ async function save() {
         (!props.courseId || password.value) &&
         (!/[A-Za-z]/.test(password.value) || !/[0-9]/.test(password.value))
       )
-        throw Error("Use a temporary password with letters and numbers.");
+        throw Error(t("Use a temporary password with letters and numbers."));
       if (props.courseId) {
         await api.provisionStudent(props.courseId, {
           name: name.value,
@@ -136,7 +138,7 @@ async function save() {
         await accountApi.get(created.user.id);
       }
     }
-  }, "Saved.");
+  }, t("Saved."));
   if (ok) {
     modal.value = null;
     password.value = "";
@@ -146,7 +148,12 @@ async function save() {
 async function enrollment(r: RosterEntry) {
   if (
     !(await askConfirm(
-      `${archived.value ? "Restore" : "Remove"} ${r.user.name} ${archived.value ? "to" : "from"} this course?`,
+      t(
+        archived.value
+          ? "Restore {0} to this course?"
+          : "Remove {0} from this course?",
+        [r.user.name],
+      ),
     ))
   )
     return;
@@ -160,14 +167,17 @@ async function enrollment(r: RosterEntry) {
       roster.value = await api.roster(props.courseId, archived.value);
     },
     archived.value
-      ? "Enrollment restored."
-      : "Student removed from this course.",
+      ? t("Enrollment restored.")
+      : t("Student removed from this course."),
   );
 }
 async function status(a: GlobalAccount) {
   if (
     !(await askConfirm(
-      `${a.active ? "Disable" : "Enable"} the account for ${a.user.name}?`,
+      t("{0} the account for {1}?", [
+        a.active ? t("Disable") : t("Enable"),
+        a.user.name,
+      ]),
     ))
   )
     return;
@@ -175,18 +185,18 @@ async function status(a: GlobalAccount) {
     await accountApi.status(a.user.id, !a.active);
     const updated = await accountApi.get(a.user.id);
     if (updated.active === a.active)
-      throw Error("Account status could not be verified.");
+      throw Error(t("Account status could not be verified."));
     accounts.value = accounts.value.map((x) =>
       x.user.id === a.user.id ? updated : x,
     );
-  }, "Account status updated.");
+  }, t("Account status updated."));
 }
 async function removeStaff(uid: string, primary = false) {
   if (
     !(await askConfirm(
       primary
-        ? "Transfer primary responsibility to this person?"
-        : "Remove this teaching assignment?",
+        ? t("Transfer primary responsibility to this person?")
+        : t("Remove this teaching assignment?"),
     ))
   )
     return;
@@ -194,24 +204,24 @@ async function removeStaff(uid: string, primary = false) {
     if (primary) await accountApi.primary(props.courseId!, uid);
     else await accountApi.removeStaff(props.courseId!, uid);
     staff.value = await accountApi.staff(props.courseId!);
-  }, "Teaching assignment updated.");
+  }, t("Teaching assignment updated."));
 }
 </script>
 <template>
   <PageHeader
     :level="embedded ? 2 : 1"
-    :title="courseId ? 'Course people' : 'User accounts'"
+    :title="courseId ? t('Course people') : t('User accounts')"
     :eyebrow="
       embedded
         ? undefined
         : courseId
           ? courses.find((c) => c.id === courseId)?.code
-          : 'ADMINISTRATION'
+          : t('ADMINISTRATION')
     "
     :description="
       courseId
-        ? 'Manage students and teaching assignments.'
-        : 'Manage platform accounts and their roles.'
+        ? t('Manage students and teaching assignments.')
+        : t('Manage platform accounts and their roles.')
     "
     ><button
       v-if="tab !== 'staff'"
@@ -219,30 +229,31 @@ async function removeStaff(uid: string, primary = false) {
       :disabled="busy"
       @click="open('new')"
     >
-      <Plus :size="16" /> {{ courseId ? "Add student" : "New account" }}</button
+      <Plus :size="16" />
+      {{ courseId ? t("Add student") : t("New account") }}</button
     ><button v-if="tab !== 'staff'" class="secondary" @click="open('import')">
-      Import accounts</button
+      {{ t("Import accounts") }}</button
     ><button
       v-if="tab === 'staff' && user?.role === 'admin'"
       class="primary"
       @click="open('staff')"
     >
-      Add teaching staff
+      {{ t("Add teaching staff") }}
     </button></PageHeader
   >
-  <nav v-if="courseId" class="tabs" aria-label="Course people">
+  <nav v-if="courseId" class="tabs" :aria-label="t('Course people')">
     <button
       :disabled="busy"
       :class="{ active: tab === 'students' }"
       @click="tab = 'students'"
     >
-      Students</button
+      {{ t("Students") }}</button
     ><button
       :disabled="busy"
       :class="{ active: tab === 'staff' }"
       @click="tab = 'staff'"
     >
-      Teaching staff
+      {{ t("Teaching staff") }}
     </button>
   </nav>
   <FeedbackNotice
@@ -259,27 +270,29 @@ async function removeStaff(uid: string, primary = false) {
       "
     >
       <label class="grow"
-        >Search {{ courseId ? "students" : "accounts"
-        }}<input v-model="query" placeholder="Name or email" /></label
+        >{{ t(courseId ? "Search students" : "Search accounts")
+        }}<input v-model="query" :placeholder="t('Name or email')" /></label
       ><label v-if="!courseId"
-        >Role<select
+        >{{ t("Role")
+        }}<select
           v-model="roleFilter"
           @change="
             offset = 0;
             load();
           "
         >
-          <option value="">All roles</option>
-          <option value="student">Student</option>
-          <option value="teacher">Teacher</option>
-          <option value="admin">Administrator</option>
+          <option value="">{{ t("All roles") }}</option>
+          <option value="student">{{ t("Student") }}</option>
+          <option value="teacher">{{ t("Teacher") }}</option>
+          <option value="admin">{{ t("Administrator") }}</option>
         </select></label
       ><label v-else
-        >Status<select v-model="archived" :disabled="busy">
-          <option :value="false">Enrolled</option>
-          <option :value="true">Removed</option>
+        >{{ t("Status")
+        }}<select v-model="archived" :disabled="busy">
+          <option :value="false">{{ t("Enrolled") }}</option>
+          <option :value="true">{{ t("Removed") }}</option>
         </select></label
-      ><button class="secondary" :disabled="busy">Search</button>
+      ><button class="secondary" :disabled="busy">{{ t("Search") }}</button>
     </form>
     <div class="item-list">
       <template v-if="courseId"
@@ -289,8 +302,12 @@ async function removeStaff(uid: string, primary = false) {
           :title="r.user.name"
           :description="r.user.email"
           ><template #meta
-            ><span class="badge">{{ archived ? "Removed" : "Enrolled" }}</span
-            ><span v-if="r.has_work">Learning records retained</span></template
+            ><span class="badge">{{
+              archived ? t("Removed") : t("Enrolled")
+            }}</span
+            ><span v-if="r.has_work">{{
+              t("Learning records retained")
+            }}</span></template
           ><template #actions
             ><button
               class="secondary"
@@ -298,45 +315,47 @@ async function removeStaff(uid: string, primary = false) {
               :disabled="busy"
               @click="enrollment(r)"
             >
-              {{ archived ? "Restore" : "Remove" }}
+              {{ archived ? t("Restore") : t("Remove") }}
             </button></template
           ></ItemRow
         >
         <div v-if="!filtered.length && !busy" class="empty-state">
-          No matching students.
+          {{ t("No matching students.") }}
         </div></template
       ><template v-else
-        ><p class="list-caption">{{ total }} accounts</p>
+        ><p class="list-caption">{{ t("{0} accounts", [total]) }}</p>
         <ItemRow
           v-for="a in accounts"
           :key="a.user.id"
           :title="a.user.name"
           :description="a.user.email"
           ><template #meta
-            ><span class="badge">{{ a.user.role }}</span
+            ><span class="badge">{{ label(a.user.role) }}</span
             ><span class="badge" :class="a.active ? 'positive' : 'neutral'">{{
-              a.active ? "Active" : "Disabled"
+              a.active ? t("Active") : t("Disabled")
             }}</span
-            ><span v-if="a.user.is_demo">Demo account</span></template
+            ><span v-if="a.user.is_demo">{{
+              t("Demo account")
+            }}</span></template
           ><template #actions
             ><button
               class="secondary"
               :disabled="busy || a.user.is_demo"
               @click="open('edit', a.user.id)"
             >
-              Edit role</button
+              {{ t("Edit role") }}</button
             ><button
               class="secondary"
               :class="{ danger: a.active }"
               :disabled="busy || a.user.is_demo || a.user.id === user?.id"
               @click="status(a)"
             >
-              {{ a.active ? "Disable" : "Enable" }}
+              {{ a.active ? t("Disable") : t("Enable") }}
             </button></template
           ></ItemRow
         >
         <div v-if="!accounts.length && !busy" class="empty-state">
-          No matching accounts.
+          {{ t("No matching accounts.") }}
         </div>
         <div class="pagination">
           <button
@@ -347,10 +366,10 @@ async function removeStaff(uid: string, primary = false) {
               load();
             "
           >
-            Previous</button
+            {{ t("Previous") }}</button
           ><span
-            >{{ total ? offset + 1 : 0 }}–{{ Math.min(offset + 20, total) }} of
-            {{ total }}</span
+            >{{ total ? offset + 1 : 0 }}–{{ Math.min(offset + 20, total) }}
+            {{ t("of") }} {{ total }}</span
           ><button
             class="secondary"
             :disabled="busy || offset + 20 >= total"
@@ -359,7 +378,7 @@ async function removeStaff(uid: string, primary = false) {
               load();
             "
           >
-            Next
+            {{ t("Next") }}
           </button>
         </div></template
       >
@@ -372,23 +391,23 @@ async function removeStaff(uid: string, primary = false) {
       :title="member.user.name"
       :description="member.user.email"
       ><template #meta
-        ><span class="badge">{{ member.user.role }}</span
-        ><span v-if="member.is_primary" class="badge positive"
-          >Primary responsibility</span
-        ></template
+        ><span class="badge">{{ label(member.user.role) }}</span
+        ><span v-if="member.is_primary" class="badge positive">{{
+          t("Primary responsibility")
+        }}</span></template
       ><template v-if="user?.role === 'admin' && !member.is_primary" #actions
         ><button
           class="secondary"
           :disabled="busy"
           @click="removeStaff(member.user.id, true)"
         >
-          Make primary</button
+          {{ t("Make primary") }}</button
         ><button
           class="secondary danger"
           :disabled="busy"
           @click="removeStaff(member.user.id)"
         >
-          Remove
+          {{ t("Remove") }}
         </button></template
       ></ItemRow
     >
@@ -397,14 +416,14 @@ async function removeStaff(uid: string, primary = false) {
     v-if="modal"
     :title="
       modal === 'import'
-        ? 'Import accounts'
+        ? t('Import accounts')
         : modal === 'staff'
-          ? 'Add teaching staff'
+          ? t('Add teaching staff')
           : modal === 'edit'
-            ? 'Edit account role'
+            ? t('Edit account role')
             : courseId
-              ? 'Add student'
-              : 'New account'
+              ? t('Add student')
+              : t('New account')
     "
     :busy="busy || importHeld"
     :dirty="dirty || importDirty"
@@ -419,8 +438,11 @@ async function removeStaff(uid: string, primary = false) {
     <form v-else id="person-editor" class="form-stack" @submit.prevent="save">
       <template v-if="modal === 'staff'"
         ><label
-          >Staff member<select v-model="staffId" required>
-            <option value="">Select a teacher or administrator</option>
+          >{{ t("Staff member")
+          }}<select v-model="staffId" required>
+            <option value="">
+              {{ t("Select a teacher or administrator") }}
+            </option>
             <option v-for="u in candidates" :key="u.id" :value="u.id">
               {{ u.name }} · {{ u.email }}
             </option>
@@ -430,36 +452,46 @@ async function removeStaff(uid: string, primary = false) {
         ><template v-if="modal === 'edit'"
           ><p>{{ detail?.user.name }} · {{ detail?.user.email }}</p>
           <p class="notice warning">
-            Changing a global role may affect course responsibilities and
-            access.
+            {{
+              t(
+                "Changing a global role may affect course responsibilities and access.",
+              )
+            }}
           </p></template
         ><template v-else
-          ><label>Name<input v-model="name" required maxlength="120" /></label
-          ><label>Email<input v-model="email" type="email" required /></label
           ><label
-            >Temporary password<input
+            >{{ t("Name")
+            }}<input v-model="name" required maxlength="120" /></label
+          ><label
+            >{{ t("Email")
+            }}<input v-model="email" type="email" required /></label
+          ><label
+            >{{ t("Temporary password")
+            }}<input
               v-model="password"
               type="password"
               autocomplete="new-password"
               minlength="8"
               :required="!courseId"
-            /><small
-              >At least 8 characters with letters and numbers. The user changes
-              it on first sign-in.</small
-            ></label
+            /><small>{{
+              t(
+                "At least 8 characters with letters and numbers. The user changes it on first sign-in.",
+              )
+            }}</small></label
           ></template
         ><label v-if="!courseId"
-          >Role<select v-model="role">
-            <option value="student">Student</option>
-            <option value="teacher">Teacher</option>
-            <option value="admin">Administrator</option>
+          >{{ t("Role")
+          }}<select v-model="role">
+            <option value="student">{{ t("Student") }}</option>
+            <option value="teacher">{{ t("Teacher") }}</option>
+            <option value="admin">{{ t("Administrator") }}</option>
           </select></label
         ></template
       >
     </form>
     <template v-if="modal !== 'import'" #actions
       ><button class="primary" form="person-editor" :disabled="busy">
-        Save
+        {{ t("Save") }}
       </button></template
     ></EditorDialog
   >

@@ -9,7 +9,7 @@ Windows使用项目 `.venv/Scripts/python.exe`和frontend本地npm依赖；模�
 Stage2的授权和分工记录保留供历史对照。当前任务范围、预算与并发按最新用户请求确定；远端变更、真实服务调用和账号操作另核当前授权。
 
 - Product name: **AIcademiya**; EDUC7703 remains the course code.
-- Current website UI is English; the teaching language follows the saved profile.
+- `vue-java-cys` is the English delivery branch; `vue-java-cys-chinese` is the Chinese demonstration branch. Both use the same Vue components and `frontend/src/locales` resources. Their sole intended file difference is `frontend.locale` in `config.defaults.json`. Keep functional changes shared; after user-authorized commits, merge the English branch into the Chinese branch and verify this difference. Never merge the Chinese default into the English delivery branch. Local `config.json` may explicitly override the default. UI language does not change course content or the saved teaching language.
 - Reference eligibility and delivery follow the selected immutable edition/teaching profile.
 - Teacher confirms completion; no automatic formal grade.
 - Existing teaching-router/cache integration must remain compatible; never restart or modify model services/shared environment for this work.

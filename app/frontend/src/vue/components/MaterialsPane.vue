@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { t, systemText } from "../../i18n";
+
 import { askConfirm } from "../state";
 import { computed, onMounted, ref } from "vue";
 import { Upload, Link, Library, FileText } from "lucide-vue-next";
@@ -98,7 +100,7 @@ async function readback(expected?: Material) {
     )
   )
     throw Error(
-      "The material update could not be verified. Refresh before retrying.",
+      t("The material update could not be verified. Refresh before retrying."),
     );
   emit("changed", s);
   return s;
@@ -123,7 +125,7 @@ async function save() {
     else if (mode.value === "reuse")
       saved = await api.attachMaterial(props.session!.id, selected.value);
     await readback(saved);
-  }, "Material saved. Publish the course to share draft changes.");
+  }, t("Material saved. Publish the course to share draft changes."));
   if (ok) mode.value = null;
 }
 async function upload() {
@@ -141,11 +143,13 @@ async function upload() {
     await readback();
     if (queue.value.some((q) => q.status === "failed"))
       throw Error(
-        "Some files could not be uploaded. Review each result before retrying.",
+        t(
+          "Some files could not be uploaded. Review each result before retrying.",
+        ),
       );
-    if (!accepted.length) throw Error("No new files were uploaded.");
+    if (!accepted.length) throw Error(t("No new files were uploaded."));
     resultMessage = uploadSuccessMessage(accepted);
-  }, "Files saved. You can close this window.");
+  }, t("Files saved. You can close this window."));
   if (ok) success.value = resultMessage;
 }
 function selectFiles(e: Event) {
@@ -162,7 +166,10 @@ async function refreshMaterials() {
 async function remove(m: Material) {
   if (
     !(await askConfirm(
-      `Remove “${m.title}” from this session? The file remains in the course library.`,
+      t(
+        "Remove “{0}” from this session? The file remains in the course library.",
+        [m.title],
+      ),
     ))
   )
     return;
@@ -170,43 +177,43 @@ async function remove(m: Material) {
     await api.archiveMaterial(props.session!.id, m.id);
     const s = await readback();
     if (s.materials.some((x) => x.id === m.id))
-      throw Error("Removal could not be verified.");
-  }, "Material removed from this session.");
+      throw Error(t("Removal could not be verified."));
+  }, t("Material removed from this session."));
 }
 </script>
 <template>
   <div class="section-header">
     <div>
       <h2>
-        Materials <span class="count">{{ materials.length }}</span>
+        {{ t("Materials") }} <span class="count">{{ materials.length }}</span>
       </h2>
       <p>
         {{
           session
-            ? "Files and links attached to this session."
-            : "Read and revisit your course materials."
+            ? t("Files and links attached to this session.")
+            : t("Read and revisit your course materials.")
         }}
       </p>
     </div>
     <div v-if="session" class="actions">
       <button class="primary" :disabled="busy" @click="open('upload')">
-        <Upload :size="16" /> Upload files</button
+        <Upload :size="16" /> {{ t("Upload files") }}</button
       ><button class="secondary" :disabled="busy" @click="open('link')">
-        <Link :size="16" /> Add link</button
+        <Link :size="16" /> {{ t("Add link") }}</button
       ><button class="secondary" :disabled="busy" @click="open('reuse')">
-        <Library :size="16" /> Reuse material
+        <Library :size="16" /> {{ t("Reuse material") }}
       </button>
     </div>
   </div>
   <FeedbackNotice :error="mode ? '' : error" :success="success" />
   <div class="filter-bar">
     <label class="grow"
-      >Search materials<input
-        v-model="query"
-        placeholder="Search by title…" /></label
+      >{{ t("Search materials")
+      }}<input v-model="query" :placeholder="t('Search by title…')" /></label
     ><label
-      >Type<select v-model="kindFilter">
-        <option value="">All types</option>
+      >{{ t("Type")
+      }}<select v-model="kindFilter">
+        <option value="">{{ t("All types") }}</option>
         <option
           v-for="k in [
             'reading',
@@ -236,39 +243,46 @@ async function remove(m: Material) {
           class="badge"
           :class="m.visibility === 'teacher' ? 'private' : 'positive'"
           >{{
-            m.visibility === "teacher" ? "Teacher only" : "Student visible"
+            m.visibility === "teacher"
+              ? t("Teacher only")
+              : t("Student visible")
           }}</span
         ><span class="badge">{{ label(m.status) }}</span></template
       >
-      <p v-if="m.warning" class="field-warning">{{ m.warning }}</p>
+      <p v-if="m.warning" class="field-warning">{{ systemText(m.warning) }}</p>
       <template #actions
-        ><button class="secondary" @click="open('preview', m)">Preview</button
+        ><button class="secondary" @click="open('preview', m)">
+          {{ t("Preview") }}</button
         ><button
           v-if="session"
           class="secondary"
           :disabled="busy"
           @click="open('edit', m)"
         >
-          Edit</button
+          {{ t("Edit") }}</button
         ><button
           v-if="session"
           class="secondary danger"
           :disabled="busy"
           @click="remove(m)"
         >
-          Remove
+          {{ t("Remove") }}
         </button></template
       ></ItemRow
     >
     <div v-if="!visible.length" class="empty-state">
       <h3>
-        {{ materials.length ? "No matching materials" : "No materials yet" }}
+        {{
+          materials.length ? t("No matching materials") : t("No materials yet")
+        }}
       </h3>
       <p>
         {{
           session
-            ? "Upload files, add a link, or reuse materials from your course."
-            : "Your teacher’s materials will appear here."
+            ? t(
+                "Upload files, add a link, or reuse materials from your course.",
+              )
+            : t("Your teacher’s materials will appear here.")
         }}
       </p>
     </div>
@@ -279,12 +293,12 @@ async function remove(m: Material) {
       mode === 'preview'
         ? editing!.title
         : mode === 'edit'
-          ? 'Edit material'
+          ? t('Edit material')
           : mode === 'reuse'
-            ? 'Reuse course material'
+            ? t('Reuse course material')
             : mode === 'upload'
-              ? 'Upload files'
-              : 'Add a link'
+              ? t('Upload files')
+              : t('Add a link')
     "
     :busy="busy || previewHeld"
     :dirty="dirty"
@@ -307,50 +321,57 @@ async function remove(m: Material) {
     >
       <template v-if="mode === 'reuse'"
         ><label
-          >Course material<select
+          >{{ t("Course material")
+          }}<select
             v-model="selected"
             :disabled="busy || !available.length"
             required
           >
-            <option value="">Choose a material</option>
+            <option value="">{{ t("Choose a material") }}</option>
             <option v-for="m in available" :key="m.id" :value="m.id">
               {{ m.title }} · {{ label(m.kind) }}
             </option>
           </select></label
         >
         <p v-if="!available.length && !busy" class="muted">
-          All existing course materials are already attached to this session.
+          {{
+            t(
+              "All existing course materials are already attached to this session.",
+            )
+          }}
         </p></template
       ><template v-else
         ><label v-if="mode === 'upload'"
-          >Files<input
+          >{{ t("Files")
+          }}<input
             type="file"
             multiple
             :disabled="busy"
             @change="selectFiles"
-          /><small
-            >Files are stored in the course library and linked to this
-            session.</small
-          ></label
+          /><small>{{
+            t(
+              "Files are stored in the course library and linked to this session.",
+            )
+          }}</small></label
         ><label v-if="mode === 'upload'"
-          >Or choose a folder<input
+          >{{ t("Or choose a folder")
+          }}<input
             type="file"
             webkitdirectory
             multiple
             :disabled="busy"
             @change="selectFiles" /></label
         ><label v-if="mode !== 'upload'"
-          >Title<input v-model="title" :required="mode === 'edit'" /></label
+          >{{ t("Title")
+          }}<input v-model="title" :required="mode === 'edit'" /></label
         ><label v-if="mode === 'link' || editing?.kind === 'link'"
-          >Source URL<input
-            v-model="url"
-            type="url"
-            required
-            placeholder="https://…"
+          >{{ t("Source URL")
+          }}<input v-model="url" type="url" required placeholder="https://…"
         /></label>
         <div class="form-grid">
           <label v-if="mode !== 'link' && editing?.kind !== 'link'"
-            >Material type<select
+            >{{ t("Material type")
+            }}<select
               v-model="kind"
               @change="
                 () => {
@@ -373,19 +394,17 @@ async function remove(m: Material) {
               </option>
             </select></label
           ><label
-            >Visible to<select
-              v-model="visibility"
-              :disabled="kind === 'answer_key'"
-            >
-              <option value="student">Students and teachers</option>
-              <option value="teacher">Teachers only</option>
+            >{{ t("Visible to")
+            }}<select v-model="visibility" :disabled="kind === 'answer_key'">
+              <option value="student">{{ t("Students and teachers") }}</option>
+              <option value="teacher">{{ t("Teachers only") }}</option>
             </select></label
           >
         </div>
         <div v-for="q in queue" :key="q.key" class="upload-result">
           <strong>{{ q.relativePath || q.file.name }}</strong
           ><span
-            >{{ q.status }}
+            >{{ label(q.status) }}
             <template v-if="q.progress?.total"
               >·
               {{
@@ -393,14 +412,17 @@ async function remove(m: Material) {
               }}%</template
             ></span
           >
-          <p v-if="q.error" class="field-error">{{ q.error }}</p>
+          <p v-if="q.error" class="field-error">{{ systemText(q.error) }}</p>
           <div
             v-if="q.status === 'queued' || q.status === 'failed'"
             class="form-grid"
           >
             <label
-              >File type<select v-model="q.kind" :disabled="busy">
-                <option :value="undefined">Use {{ label(kind) }}</option>
+              >{{ t("File type")
+              }}<select v-model="q.kind" :disabled="busy">
+                <option :value="undefined">
+                  {{ t("Use") }} {{ label(kind) }}
+                </option>
                 <option
                   v-for="k in [
                     'reading',
@@ -417,13 +439,18 @@ async function remove(m: Material) {
               </select></label
             >
             <label
-              >File visibility<select
+              >{{ t("File visibility")
+              }}<select
                 v-model="q.visibility"
                 :disabled="busy || q.kind === 'answer_key'"
               >
-                <option :value="undefined">Use default visibility</option>
-                <option value="student">Students and teachers</option>
-                <option value="teacher">Teachers only</option>
+                <option :value="undefined">
+                  {{ t("Use default visibility") }}
+                </option>
+                <option value="student">
+                  {{ t("Students and teachers") }}
+                </option>
+                <option value="teacher">{{ t("Teachers only") }}</option>
               </select></label
             >
           </div>
@@ -443,10 +470,10 @@ async function remove(m: Material) {
       >
         {{
           mode === "upload"
-            ? "Upload selected files"
+            ? t("Upload selected files")
             : mode === "reuse"
-              ? "Attach material"
-              : "Save material"
+              ? t("Attach material")
+              : t("Save material")
         }}
       </button></template
     ><template v-else #actions
@@ -456,14 +483,14 @@ async function remove(m: Material) {
         :href="withVersion(editing.download_url, version)"
         target="_blank"
         rel="noopener"
-        >Download original</a
+        >{{ t("Download original") }}</a
       ><a
         v-if="editing?.kind === 'link' && safeExternal(editing.url)"
         class="primary"
         :href="safeExternal(editing.url)!"
         target="_blank"
         rel="noopener"
-        >Open source link</a
+        >{{ t("Open source link") }}</a
       ></template
     ></EditorDialog
   >

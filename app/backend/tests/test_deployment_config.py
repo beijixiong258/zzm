@@ -70,6 +70,31 @@ def test_model_options_accept_integer_temperature_and_reach_environment(tmp_path
     assert env["AICADEMIYA_AI_THINKING_BUDGET"] == "2048"
 
 
+@pytest.mark.parametrize("locale", ["en", "zh-CN"])
+def test_ui_locale_reaches_public_bootstrap(tmp_path, monkeypatch, app, locale):
+    config = load_config(write_config(tmp_path, lambda c: c["frontend"].update(locale=locale)))
+    env = config_environment(config, {})
+    assert env["AICADEMIYA_UI_LOCALE"] == locale
+    monkeypatch.setenv("AICADEMIYA_UI_LOCALE", locale)
+    with TestClient(app) as client:
+        response = client.get("/api/bootstrap")
+        assert response.status_code == 200
+        assert response.json()["default_locale"] == locale
+        assert "api_key" not in response.json()
+
+
+def test_omitted_locale_follows_branch_defaults(tmp_path):
+    path = tmp_path / "config.json"
+    path.write_text('{"frontend": {"host": "127.0.0.1", "port": 18774}}', encoding="utf-8")
+    assert load_config(path)["frontend"]["locale"] == DEFAULTS["frontend"]["locale"]
+
+
+@pytest.mark.parametrize("locale", ["zh", "fr", "", 3])
+def test_invalid_ui_locale_is_rejected(tmp_path, locale):
+    with pytest.raises(ValueError):
+        load_config(write_config(tmp_path, lambda c: c["frontend"].update(locale=locale)))
+
+
 def test_managed_model_and_search_ignore_old_database_settings(tmp_path, monkeypatch, app):
     config = load_config(write_config(tmp_path))
     for key, value in config_environment(config, {}).items():

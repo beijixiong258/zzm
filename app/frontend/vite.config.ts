@@ -13,6 +13,7 @@ const apiHost = config.server.host.includes(":")
   : config.server.host;
 export default defineConfig({
   plugins: [vue()],
+  optimizeDeps: { entries: ["index.html"] },
   server: {
     host: config.frontend.host,
     port: config.frontend.port,

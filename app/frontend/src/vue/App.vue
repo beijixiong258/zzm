@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { t } from "../i18n";
+
 import { computed, defineAsyncComponent, ref } from "vue";
 import {
   BookOpen,
@@ -25,6 +27,7 @@ import {
   confirmation,
   resolveConfirm,
 } from "./state";
+import LanguageSelect from "./components/LanguageSelect.vue";
 import EditorDialog from "./components/EditorDialog.vue";
 import FeedbackNotice from "./components/FeedbackNotice.vue";
 import LoginView from "./views/LoginView.vue";
@@ -78,7 +81,8 @@ async function logout() {
 <template>
   <div v-if="!ready" class="boot-screen">
     <img src="/aicademiya-mark.svg" alt="" />
-    <p>Opening your workspace…</p>
+    <p v-if="bootstrap">{{ t("Opening your workspace…") }}</p>
+    <span v-else class="spinner" />
   </div>
   <LoginView v-else-if="!user" :bootstrap="bootstrap" @authenticated="boot" />
   <div v-else class="app-shell">
@@ -91,20 +95,20 @@ async function logout() {
           mobile = false;
         "
         ><img src="/aicademiya-mark.svg" alt="" /><span
-          >AIcademiya<small>TEACHING & LEARNING</small></span
+          >AIcademiya<small>{{ t("TEACHING & LEARNING") }}</small></span
         ></a
       >
       <div class="nav-heading">
-        <p class="nav-label">WORKSPACE</p>
+        <p class="nav-label">{{ t("WORKSPACE") }}</p>
         <button
           class="icon-button mobile-toggle"
-          aria-label="Close menu"
+          :aria-label="t('Close menu')"
           @click="mobile = false"
         >
           <X :size="20" />
         </button>
       </div>
-      <nav aria-label="Main navigation">
+      <nav :aria-label="t('Main navigation')">
         <button
           :class="{ active: active === 'home' }"
           @click="
@@ -112,7 +116,7 @@ async function logout() {
             mobile = false;
           "
         >
-          <BookOpen :size="19" /> Courses</button
+          <BookOpen :size="19" /> {{ t("Courses") }}</button
         ><button
           v-if="!staff"
           :class="{ active: active === 'history' }"
@@ -121,7 +125,7 @@ async function logout() {
             mobile = false;
           "
         >
-          <History :size="19" /> Learning history</button
+          <History :size="19" /> {{ t("Learning history") }}</button
         ><button
           :class="{ active: active === 'settings' }"
           @click="
@@ -129,7 +133,7 @@ async function logout() {
             mobile = false;
           "
         >
-          <Settings2 :size="19" /> Settings
+          <Settings2 :size="19" /> {{ t("Settings") }}
         </button>
       </nav>
       <div class="sidebar-bottom">
@@ -145,39 +149,41 @@ async function logout() {
             <strong>{{ user.name }}</strong
             ><small>{{
               user.role === "admin"
-                ? "Administrator"
+                ? t("Administrator")
                 : staff
-                  ? "Teacher"
-                  : "Student"
+                  ? t("Teacher")
+                  : t("Student")
             }}</small>
           </div>
         </div>
         <button class="sidebar-logout" :disabled="busy" @click="logout">
-          <LogOut :size="16" /> Sign out
+          <LogOut :size="16" /> {{ t("Sign out") }}
         </button>
       </div>
     </aside>
     <button
       v-if="mobile"
       class="nav-overlay"
-      aria-label="Close navigation"
+      :aria-label="t('Close navigation')"
       @click="mobile = false"
     />
     <div class="app-main">
       <header class="topbar">
         <button
           class="icon-button mobile-toggle"
-          aria-label="Toggle navigation"
+          :aria-label="t('Toggle navigation')"
           :aria-expanded="mobile"
           @click="mobile = !mobile"
         >
           <X v-if="mobile" :size="21" /><Menu v-else :size="21" /></button
         ><span class="topbar-label"
           ><GraduationCap :size="18" />
-          {{ staff ? "Teaching workspace" : "Learning workspace" }}</span
-        ><span v-if="bootstrap?.demo_enabled" class="badge local"
-          >Local demo</span
-        ><span v-else class="badge">Local workspace</span>
+          {{ staff ? t("Teaching workspace") : t("Learning workspace") }}</span
+        ><span v-if="bootstrap?.demo_enabled" class="badge local">{{
+          t("Local demo")
+        }}</span
+        ><span v-else class="badge">{{ t("Local workspace") }}</span>
+        <LanguageSelect />
       </header>
       <main>
         <FeedbackNotice :error="error" /><button
@@ -185,7 +191,7 @@ async function logout() {
           class="back-button"
           @click="navigate({ page: 'home' })"
         >
-          <ArrowLeft :size="15" /> Back to courses
+          <ArrowLeft :size="15" /> {{ t("Back to courses") }}
         </button>
         <SettingsView
           v-if="user.must_change_password"
@@ -196,7 +202,7 @@ async function logout() {
           v-else-if="!canAccessRoute(user.role, route.page)"
           class="notice error"
         >
-          This page is not available to your role.
+          {{ t("This page is not available to your role.") }}
         </p>
         <HomeView
           v-else-if="route.page === 'home' || route.page === 'course-trash'"
@@ -233,20 +239,20 @@ async function logout() {
         <SettingsView v-else :key="`${route.section}:${route.page}`" />
       </main>
       <footer class="app-footer">
-        AIcademiya <span>A considered space for learning.</span>
+        AIcademiya <span>{{ t("A considered space for learning.") }}</span>
       </footer>
     </div>
   </div>
   <FeedbackNotice v-if="!user" :error="error" />
   <EditorDialog
     v-if="confirmation"
-    title="Confirm action"
+    :title="t('Confirm action')"
     compact
     @close="resolveConfirm(false)"
     ><p>{{ confirmation.message }}</p>
     <template #actions
       ><button class="primary" @click="resolveConfirm(true)">
-        Confirm
+        {{ t("Confirm") }}
       </button></template
     ></EditorDialog
   >

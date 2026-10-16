@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { t } from "../../i18n";
+
 import { computed, onMounted, onBeforeUnmount, ref, useId } from "vue";
 import { X } from "lucide-vue-next";
 import { useDirty } from "../state";
@@ -50,7 +52,7 @@ function close() {
         <h2 :id="titleId">{{ title }}</h2>
         <button
           class="icon-button"
-          aria-label="Close window"
+          :aria-label="t('Close window')"
           :disabled="busy"
           @click="close"
         >
@@ -60,16 +62,17 @@ function close() {
       <div class="dialog-body"><slot /></div>
       <footer class="dialog-footer">
         <template v-if="discarding"
-          ><span class="discard-message" role="alert"
-            >Discard unsaved changes?</span
+          ><span class="discard-message" role="alert">{{
+            t("Discard unsaved changes?")
+          }}</span
           ><button class="secondary" @click="discarding = false">
-            Keep editing</button
+            {{ t("Keep editing") }}</button
           ><button class="secondary danger" @click="emit('close')">
-            Discard changes
+            {{ t("Discard changes") }}
           </button></template
         ><template v-else
           ><button class="secondary" :disabled="busy" @click="close">
-            {{ $slots.actions ? "Cancel" : "Done" }}</button
+            {{ $slots.actions ? t("Cancel") : t("Done") }}</button
           ><slot name="actions"
         /></template>
       </footer></dialog

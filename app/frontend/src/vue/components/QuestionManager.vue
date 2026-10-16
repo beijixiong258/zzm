@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { t } from "../../i18n";
+
 import { askConfirm } from "../state";
 import { computed, ref } from "vue";
 import { Plus, Search } from "lucide-vue-next";
@@ -124,14 +126,14 @@ async function commit() {
     q.value?.type === "single_choice" &&
     q.value.options.filter((x) => x.trim()).length < 2
   ) {
-    error.value = "Add at least two answer options.";
+    error.value = t("Add at least two answer options.");
     return;
   }
   const ok = await run(
     () => props.save(next),
     props.local
-      ? "Changes applied."
-      : "Draft saved. Publish the course when it is ready for students.",
+      ? t("Changes applied.")
+      : t("Draft saved. Publish the course when it is ready for students."),
   );
   if (ok) editor.value = null;
 }
@@ -143,7 +145,10 @@ async function remove(kind: "question" | "group", id: string) {
   const count = props.value.questions.filter((q) => q.group_id === id).length;
   if (
     !(await askConfirm(
-      `Delete “${item?.slice(0, 100)}”${kind === "group" ? ` and its ${count} questions` : ""} from the draft? Published versions are unchanged.`,
+      t("Delete “{0}”{1} from the draft? Published versions are unchanged.", [
+        item?.slice(0, 100),
+        kind === "group" ? " " + t("and its {0} questions", [count]) : "",
+      ]),
     ))
   )
     return;
@@ -155,7 +160,7 @@ async function remove(kind: "question" | "group", id: string) {
   if (kind === "group") next.groups = next.groups.filter((g) => g.id !== id);
   next.questions = renumber(next.questions.filter((q) => !ids.includes(q.id)));
   ids.forEach((id) => delete next.reference_answers[id]);
-  await run(() => props.save(next), "Deleted from the draft.");
+  await run(() => props.save(next), t("Deleted from the draft."));
 }
 function source(id: string, checked: boolean) {
   if (!q.value) return;
@@ -169,7 +174,7 @@ function source(id: string, checked: boolean) {
   <div class="section-header question-toolbar">
     <div>
       <h2>
-        {{ groupsMode ? "Question groups" : "Questions" }}
+        {{ groupsMode ? t("Question groups") : t("Questions") }}
         <span class="count">{{
           groupsMode ? value.groups.length : value.questions.length
         }}</span>
@@ -177,8 +182,8 @@ function source(id: string, checked: boolean) {
       <p>
         {{
           groupsMode
-            ? "Core groups are required. Students choose one reading group."
-            : "Create, arrange and refine your questions."
+            ? t("Core groups are required. Students choose one reading group.")
+            : t("Create, arrange and refine your questions.")
         }}
       </p>
     </div>
@@ -189,42 +194,44 @@ function source(id: string, checked: boolean) {
         @click="edit(groupsMode ? 'group' : 'question')"
       >
         <Plus :size="16" />
-        {{ groupsMode ? "Add group" : "Add question" }}</button
+        {{ groupsMode ? t("Add group") : t("Add question") }}</button
       ><button
         v-if="!local && !groupsMode"
         class="secondary"
         :disabled="busy || disabled"
         @click="emit('import')"
       >
-        Import questions</button
+        {{ t("Import questions") }}</button
       ><button
         class="secondary"
         :disabled="busy || disabled"
         @click="groupsMode = !groupsMode"
       >
-        {{ groupsMode ? "Back to questions" : "Manage groups" }}
+        {{ groupsMode ? t("Back to questions") : t("Manage groups") }}
       </button>
     </div>
   </div>
   <FeedbackNotice :error="editor ? '' : error" :success="success" />
   <div v-if="!groupsMode && value.questions.length" class="filter-bar">
     <label class="search-field"
-      ><span>Search questions</span>
+      ><span>{{ t("Search questions") }}</span>
       <div>
         <Search :size="17" /><input
           v-model="query"
-          placeholder="Search question text…"
+          :placeholder="t('Search question text…')"
         /></div></label
     ><label
-      >Group<select v-model="groupFilter">
-        <option value="">All groups</option>
+      >{{ t("Group")
+      }}<select v-model="groupFilter">
+        <option value="">{{ t("All groups") }}</option>
         <option v-for="g in value.groups" :key="g.id" :value="g.id">
           {{ g.title }}
         </option>
       </select></label
     ><label
-      >Question type<select v-model="typeFilter">
-        <option value="">All types</option>
+      >{{ t("Question type")
+      }}<select v-model="typeFilter">
+        <option value="">{{ t("All types") }}</option>
         <option v-for="type in questionTypes" :key="type" :value="type">
           {{ label(type) }}
         </option>
@@ -236,18 +243,16 @@ function source(id: string, checked: boolean) {
       ><ItemRow
         v-for="(g, i) in value.groups"
         :key="g.id"
-        :title="g.title || 'Untitled group'"
+        :title="g.title || t('Untitled group')"
         :description="g.description"
         :number="i + 1"
         ><template #meta
           ><span class="badge">{{
-            g.kind === "core" ? "Required" : "Reading choice"
+            g.kind === "core" ? t("Required") : t("Reading choice")
           }}</span
           ><span
-            >{{
-              value.questions.filter((q) => q.group_id === g.id).length
-            }}
-            questions</span
+            >{{ value.questions.filter((q) => q.group_id === g.id).length }}
+            {{ t("questions") }}</span
           ></template
         ><template #actions
           ><button
@@ -255,13 +260,13 @@ function source(id: string, checked: boolean) {
             :disabled="busy || disabled"
             @click="edit('group', g.id)"
           >
-            Edit</button
+            {{ t("Edit") }}</button
           ><button
             class="secondary danger"
             :disabled="busy || disabled"
             @click="remove('group', g.id)"
           >
-            Delete
+            {{ t("Delete") }}
           </button></template
         ></ItemRow
       ></template
@@ -269,29 +274,29 @@ function source(id: string, checked: boolean) {
       ><ItemRow
         v-for="q in questions"
         :key="q.id"
-        :title="q.prompt || 'Untitled question'"
+        :title="q.prompt || t('Untitled question')"
         :number="q.ordinal"
         ><template #meta
           ><span class="badge">{{ label(q.type) }}</span
           ><span>{{
             value.groups.find((g) => g.id === q.group_id)?.title
           }}</span
-          ><span v-if="value.reference_answers[q.id]"
-            >Reference answer added</span
-          ></template
+          ><span v-if="value.reference_answers[q.id]">{{
+            t("Reference answer added")
+          }}</span></template
         ><template #actions
           ><button
             class="secondary"
             :disabled="busy || disabled"
             @click="edit('question', q.id)"
           >
-            Edit</button
+            {{ t("Edit") }}</button
           ><button
             class="secondary danger"
             :disabled="busy || disabled"
             @click="remove('question', q.id)"
           >
-            Delete
+            {{ t("Delete") }}
           </button></template
         ></ItemRow
       >
@@ -299,15 +304,15 @@ function source(id: string, checked: boolean) {
         <h3>
           {{
             value.questions.length
-              ? "No matching questions"
-              : "No questions yet"
+              ? t("No matching questions")
+              : t("No questions yet")
           }}
         </h3>
         <p>
           {{
             value.questions.length
-              ? "Try a different search or filter."
-              : "Use Add question or import a worksheet to begin."
+              ? t("Try a different search or filter.")
+              : t("Use Add question or import a worksheet to begin.")
           }}
         </p>
       </div></template
@@ -315,7 +320,13 @@ function source(id: string, checked: boolean) {
   </div>
   <EditorDialog
     v-if="editor"
-    :title="`${(editor.kind === 'question' ? value.questions : value.groups).some((item) => item.id === editor!.id) ? 'Edit' : 'Add'} ${editor.kind}`"
+    :title="
+      (editor.kind === 'question' ? value.questions : value.groups).some(
+        (item) => item.id === editor!.id,
+      )
+        ? t(editor.kind === 'question' ? 'Edit question' : 'Edit group')
+        : t(editor.kind === 'question' ? 'Add question' : 'Add group')
+    "
     :busy="busy"
     :dirty="dirty"
     wide
@@ -324,19 +335,22 @@ function source(id: string, checked: boolean) {
     <form id="question-editor" class="form-stack" @submit.prevent="commit">
       <template v-if="editor.kind === 'group' && g"
         ><div class="form-grid">
-          <label>Group name<input v-model="g.title" required /></label
+          <label
+            >{{ t("Group name") }}<input v-model="g.title" required /></label
           ><label
-            >Group type<select v-model="g.kind">
-              <option value="core">Core · required</option>
-              <option value="reading">Reading choice</option>
+            >{{ t("Group type")
+            }}<select v-model="g.kind">
+              <option value="core">{{ t("Core · required") }}</option>
+              <option value="reading">{{ t("Reading choice") }}</option>
             </select></label
           ><label class="span-2"
-            >Description<textarea v-model="g.description" rows="3" />
+            >{{ t("Description") }}<textarea v-model="g.description" rows="3" />
           </label></div></template
       ><template v-else-if="q"
         ><div class="form-grid">
           <label
-            >Group<select v-model="q.group_id">
+            >{{ t("Group")
+            }}<select v-model="q.group_id">
               <option
                 v-for="g in editor.value.groups"
                 :key="g.id"
@@ -346,62 +360,68 @@ function source(id: string, checked: boolean) {
               </option>
             </select></label
           ><label
-            >Question type<select v-model="q.type">
+            >{{ t("Question type")
+            }}<select v-model="q.type">
               <option v-for="type in questionTypes" :key="type" :value="type">
                 {{ label(type) }}
               </option>
             </select></label
           ><label class="span-2"
-            >Question prompt<textarea
+            >{{ t("Question prompt")
+            }}<textarea
               v-model="q.prompt"
               rows="5"
               required
-              placeholder="Write the question students will see…"
+              :placeholder="t('Write the question students will see…')"
             /></label
           ><label
             v-if="q.type === 'single_choice' || q.type === 'image_matching'"
             class="span-2"
-            >Options · one per line<textarea
-              v-model="options"
-              rows="4"
-              required
-            /></label
+            >{{ t("Options · one per line")
+            }}<textarea v-model="options" rows="4" required /></label
           ><label
             v-if="q.type === 'fill_in_blank' || q.type === 'image_matching'"
-            >Answer slots<input
+            >{{ t("Answer slots")
+            }}<input
               v-model.number="q.answer_slots"
               type="number"
               min="1"
               max="100"
               required /></label
           ><label
-            ><span>Hint <span class="optional">optional</span></span
+            ><span
+              >{{ t("Hint") }}
+              <span class="optional">{{ t("optional") }}</span></span
             ><input v-model="q.hint"
           /></label>
         </div>
         <label
           ><span
-            >Instructor answer / example
-            <span class="badge">Private</span></span
+            >{{ t("Instructor answer / example") }}
+            <span class="badge">{{ t("Private") }}</span></span
           ><textarea
             v-model="editor.value.reference_answers[q.id]"
             rows="4"
-            placeholder="An answer or example for the teaching process"
-          /><small
-            >Delivery follows the reference rules in Teaching setup.</small
-          ></label
+            :placeholder="t('An answer or example for the teaching process')"
+          /><small>{{
+            t("Delivery follows the reference rules in Teaching setup.")
+          }}</small></label
         >
         <details class="form-section">
           <summary>
-            Sources & images
+            {{ t("Sources & images") }}
             <span class="muted"
-              >{{ q.source_material_ids?.length || 0 }} selected sources ·
-              {{ q.images.length }} images</span
+              >{{ q.source_material_ids?.length || 0 }}
+              {{ t("selected sources ·") }} {{ q.images.length }}
+              {{ t("images") }}</span
             >
           </summary>
           <p class="muted">
-            With no selection, all eligible session materials can inform this
-            question.
+            {{
+              t(
+                "With no selection, all eligible session materials can inform this question.",
+              )
+            }}
           </p>
           <div class="checkbox-list">
             <label v-for="m in materials" :key="m.id" class="check"
@@ -413,44 +433,48 @@ function source(id: string, checked: boolean) {
                 "
               />{{ m.title }}
               <span class="badge">{{
-                m.visibility === "teacher" ? "Private" : "Student"
+                m.visibility === "teacher" ? t("Private") : t("Student")
               }}</span></label
             >
           </div>
           <label
-            >Source links · one per line<textarea
-              v-model="links"
-              rows="2"
-            /></label
-          ><label>Source label<input v-model="q.source_label" /></label>
+            >{{ t("Source links · one per line")
+            }}<textarea v-model="links" rows="2" /></label
+          ><label
+            >{{ t("Source label") }}<input v-model="q.source_label"
+          /></label>
           <div class="section-header">
-            <h3>Question images</h3>
+            <h3>{{ t("Question images") }}</h3>
             <button
               type="button"
               class="secondary"
               @click="q.images.push({ label: '', url: '', alt: '' })"
             >
-              Add image
+              {{ t("Add image") }}
             </button>
           </div>
           <div v-for="(img, i) in q.images" :key="i" class="image-fields">
             <label
-              >Image URL<input
+              >{{ t("Image URL")
+              }}<input
                 v-model="img.url"
                 @input="img.asset_key = undefined" /></label
-            ><label>Label<input v-model="img.label" /></label
-            ><label>Accessible description<input v-model="img.alt" /></label
+            ><label>{{ t("Label") }}<input v-model="img.label" /></label
+            ><label
+              >{{ t("Accessible description")
+              }}<input v-model="img.alt" /></label
             ><button
               type="button"
               class="secondary danger"
               @click="q.images.splice(i, 1)"
             >
-              Remove image
+              {{ t("Remove image") }}
             </button>
           </div>
         </details></template
       ><label
-        >Position<select v-model.number="position">
+        >{{ t("Position")
+        }}<select v-model.number="position">
           <option
             v-for="n in editor.kind === 'question'
               ? editor.value.questions.length
@@ -465,7 +489,7 @@ function source(id: string, checked: boolean) {
     </form>
     <template #actions
       ><button class="primary" form="question-editor" :disabled="busy">
-        {{ busy ? "Saving…" : local ? "Apply changes" : "Save draft" }}
+        {{ busy ? t("Saving…") : local ? t("Apply changes") : t("Save draft") }}
       </button></template
     ></EditorDialog
   >

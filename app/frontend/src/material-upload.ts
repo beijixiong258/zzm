@@ -1,3 +1,4 @@
+import { t } from "./i18n";
 import type { Material } from "./types";
 import { api, type UploadProgress } from "./api";
 import { errorText as errorMessage } from "./vue/utils";
@@ -79,7 +80,7 @@ export async function uploadMaterialQueue(
         (running.processing === "full_document" ? 64 : 25) * 1024 * 1024;
       if (item.file.size > limit)
         throw new Error(
-          `The upload limit is ${limit / (1024 * 1024)} MiB per file.`,
+          t("The upload limit is {0} MiB per file.", [limit / (1024 * 1024)]),
         );
       const response = await upload(
         sid,
@@ -103,15 +104,26 @@ export async function uploadMaterialQueue(
   return accepted;
 }
 export function uploadSuccessMessage(accepted: Material[]): string {
-  const prefix = `${accepted.length} ${accepted.length === 1 ? "file" : "files"} saved.`;
+  const prefix = t(
+    accepted.length === 1 ? "{0} file saved." : "{0} files saved.",
+    [accepted.length],
+  );
   const complete = accepted.filter(
     (m) => m.processing === "full_document",
   ).length;
   if (!complete)
-    return `${prefix} Text/OCR preview only; check each file’s status below.`;
+    return t("{0} Text/OCR preview only; check each file’s status below.", [
+      prefix,
+    ]);
   if (complete === accepted.length)
-    return `${prefix} Complete-document processing requested; check each file’s status below.`;
-  return `${prefix} This batch includes complete-document processing and text/OCR previews. Check each file’s status below.`;
+    return t(
+      "{0} Complete-document processing requested; check each file’s status below.",
+      [prefix],
+    );
+  return t(
+    "{0} This batch includes complete-document processing and text/OCR previews. Check each file’s status below.",
+    [prefix],
+  );
 }
 
 export function materialReadbackMatches(

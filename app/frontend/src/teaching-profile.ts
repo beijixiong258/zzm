@@ -1,3 +1,4 @@
+import { t, dateLocale } from "./i18n";
 import { api } from "./api";
 import type {
   SessionDetail,
@@ -53,7 +54,8 @@ export function effectiveTeachingProfile(
 
 export function teachingProfileErrors(p: TeachingProfile): string[] {
   const errors: string[] = [];
-  if (p.schema_version !== 1) errors.push("Use teaching framework version 1.");
+  if (p.schema_version !== 1)
+    errors.push(t("Use teaching framework version 1."));
   for (const field of [
     "background",
     "student_profile",
@@ -63,7 +65,18 @@ export function teachingProfileErrors(p: TeachingProfile): string[] {
   ] as const) {
     if (p[field].length > teachingTextLimits[field])
       errors.push(
-        `${field.replaceAll("_", " ")} exceeds ${teachingTextLimits[field].toLocaleString("en-US")} characters.`,
+        t("{0} exceeds {1} characters.", [
+          t(
+            {
+              background: "Background",
+              student_profile: "Student profile",
+              response_strategies: "Response strategies",
+              tone: "Tone",
+              reading_focus: "Reading focus",
+            }[field],
+          ),
+          teachingTextLimits[field].toLocaleString(dateLocale()),
+        ]),
       );
   }
   const phases = p.phases;
@@ -71,11 +84,11 @@ export function teachingProfileErrors(p: TeachingProfile): string[] {
     phases.some((phase) => !(phase in teachingPhaseLabels)) ||
     new Set(phases).size !== phases.length
   )
-    errors.push("Use each teaching phase only once.");
+    errors.push(t("Use each teaching phase only once."));
   if (!phases.includes("worksheet") || phases.at(-1) !== "wrap_up")
-    errors.push("Keep the required worksheet and a final wrap-up.");
+    errors.push(t("Keep the required worksheet and a final wrap-up."));
   if (phases.includes("warmup") && phases[0] !== "warmup")
-    errors.push("Welcome & review must be first.");
+    errors.push(t("Welcome & review must be first."));
   if (
     ["quiz", "reading"].some(
       (phase) =>
@@ -84,21 +97,21 @@ export function teachingProfileErrors(p: TeachingProfile): string[] {
     )
   )
     errors.push(
-      "Practice quiz and reading discussion must follow the worksheet.",
+      t("Practice quiz and reading discussion must follow the worksheet."),
     );
   if (
     !Number.isInteger(p.reading_question_count) ||
     p.reading_question_count < 1 ||
     p.reading_question_count > 5
   )
-    errors.push("Reading discussion needs 1–5 questions.");
+    errors.push(t("Reading discussion needs 1–5 questions."));
   if (
     !Number.isInteger(p.idle_hint_seconds) ||
     (p.idle_hint_seconds !== 0 &&
       (p.idle_hint_seconds < 10 || p.idle_hint_seconds > 300))
   )
     errors.push(
-      "Idle invitation must be disabled (0) or set to 10–300 seconds.",
+      t("Idle invitation must be disabled (0) or set to 10–300 seconds."),
     );
   return errors;
 }
@@ -177,7 +190,7 @@ export async function saveTeachingDraft(
   const profile = effectiveTeachingProfile(draft);
   const errors = teachingProfileErrors(profile);
   if (draft.instructions.length > teachingTextLimits.instructions)
-    errors.push("Additional instructions exceed 30,000 characters.");
+    errors.push(t("Additional instructions exceed 30,000 characters."));
   if (errors.length) throw new Error(errors.join("; "));
   const payload: SessionPatch = {
     title: draft.title,
@@ -199,7 +212,9 @@ export async function saveTeachingDraft(
     teachingPreviewKey(verified) !== teachingPreviewKey(draft)
   )
     throw new Error(
-      "Teaching changes could not be verified after saving. Your local edits are still here; retry the save.",
+      t(
+        "Teaching changes could not be verified after saving. Your local edits are still here; retry the save.",
+      ),
     );
   return verified;
 }

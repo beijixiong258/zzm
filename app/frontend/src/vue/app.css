@@ -8,6 +8,38 @@ html {
   font-size: 15px;
   line-height: 1.5;
 }
+html[lang="zh-CN"] {
+  --font-ui: "Microsoft YaHei", "PingFang SC", "Segoe UI", sans-serif;
+  --font-display: "Microsoft YaHei", "PingFang SC", sans-serif;
+}
+html[lang="zh-CN"] h1,
+html[lang="zh-CN"] .eyebrow,
+html[lang="zh-CN"] .nav-label {
+  letter-spacing: 0;
+}
+.language-select {
+  width: auto;
+  min-width: 104px;
+  max-width: 150px;
+  margin: 0;
+  padding: 6px 9px;
+  flex-shrink: 0;
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+.login-brand .language-select {
+  margin-left: auto;
+}
+.topbar .topbar-label {
+  margin-right: auto;
+}
+@media (max-width: 600px) {
+  .topbar .badge {
+    display: none;
+  }
+}
 body {
   margin: 0;
 }

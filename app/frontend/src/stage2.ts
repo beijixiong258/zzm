@@ -1,3 +1,4 @@
+import { t, dateLocale } from "./i18n";
 import type { Role, Availability, Question, Group } from "./types";
 export const isStaff = (role: Role) => role === "teacher" || role === "admin";
 
@@ -24,7 +25,7 @@ export function schedulePayload(active: boolean, start: string, end: string) {
   const starts_at = start ? new Date(start).toISOString() : null;
   const ends_at = end ? new Date(end).toISOString() : null;
   if (starts_at && ends_at && starts_at >= ends_at)
-    throw new Error("End must be after start");
+    throw new Error(t("End must be after start"));
   return { active, starts_at, ends_at };
 }
 export function moveItem<T>(items: T[], index: number, delta: number) {
@@ -40,17 +41,17 @@ export function renumber(questions: Question[]) {
 export function authoringErrors(groups: Group[], questions: Question[]) {
   const errors: string[] = [];
   if (new Set(groups.map((g) => g.id)).size !== groups.length)
-    errors.push("Duplicate group IDs");
+    errors.push(t("Duplicate group IDs"));
   if (groups.some((g) => !g.title.trim()))
-    errors.push("Group titles are required");
+    errors.push(t("Group titles are required"));
   if (new Set(questions.map((q) => q.id)).size !== questions.length)
-    errors.push("Duplicate question IDs");
+    errors.push(t("Duplicate question IDs"));
   if (
     questions.some(
       (q) => !q.prompt.trim() || !groups.some((g) => g.id === q.group_id),
     )
   )
-    errors.push("Each question needs a prompt and a valid group");
+    errors.push(t("Each question needs a prompt and a valid group"));
   return errors;
 }
 export function safeExternal(value: string | null | undefined) {
@@ -72,5 +73,8 @@ export function withVersion(url: string, version?: string | null) {
 export function retentionText(purge: string | null, now = Date.now()) {
   if (!purge) return "—";
   const remaining = Math.max(0, Date.parse(purge) - now);
-  return `${Math.ceil(remaining / 86400000)}d · ${new Date(purge).toLocaleString("en-GB")}`;
+  return t("{0}d · {1}", [
+    Math.ceil(remaining / 86400000),
+    new Date(purge).toLocaleString(dateLocale()),
+  ]);
 }

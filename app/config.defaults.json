@@ -1,0 +1,48 @@
+{
+  "server": {
+    "host": "127.0.0.1",
+    "port": 18773,
+    "open_browser": true
+  },
+  "frontend": {
+    "host": "127.0.0.1",
+    "port": 18774,
+    "locale": "en"
+  },
+  "storage": {
+    "data_dir": "./data-local",
+    "catalog_path": "./local-demo/catalog.json",
+    "upload_dir": "./data-local/uploads",
+    "frontend_dir": "./frontend/dist"
+  },
+  "auth": {
+    "demo_enabled": true,
+    "registration_enabled": false,
+    "cookie_secure": false,
+    "allowed_origins": [],
+    "allowed_hosts": []
+  },
+  "ai": {
+    "provider": "siliconflow",
+    "mode": "openai",
+    "base_url": "https://api.siliconflow.cn/v1",
+    "model": "Qwen/Qwen3.8-27B",
+    "api_key": "",
+    "use_environment_proxy": false,
+    "timeout_seconds": 120,
+    "temperature": 0.3,
+    "enable_thinking": false,
+    "thinking_budget": 4096
+  },
+  "search": {
+    "enabled": false,
+    "api_key": ""
+  },
+  "documents": {
+    "worker_command": [],
+    "formats": [
+      "pdf"
+    ],
+    "worker_timeout_seconds": 3600
+  }
+}

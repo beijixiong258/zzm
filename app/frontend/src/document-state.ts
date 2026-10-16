@@ -1,3 +1,4 @@
+import { t } from "./i18n";
 import { ApiError } from "./api";
 import type {
   DocumentInfo,
@@ -32,14 +33,17 @@ export function jobIsActive(job: DocumentJob | null) {
   return job?.status === "queued" || job?.status === "running";
 }
 export function processingLabel(job: DocumentJob) {
-  if (job.status === "queued") return "Queued for full document processing";
+  if (job.status === "queued") return t("Queued for full document processing");
   if (job.status === "failed")
-    return "Processing failed — the original is retained";
-  if (job.status === "completed") return "Complete document saved";
+    return t("Processing failed — the original is retained");
+  if (job.status === "completed") return t("Complete document saved");
   // Never synthesize percentages from elapsed time or a guessed page total.
   return job.page_count !== null && job.processed_pages > 0
-    ? `Processing · ${job.processed_pages} of ${job.page_count} PDF pages reported`
-    : "Processing complete document…";
+    ? t("Processing · {0} of {1} PDF pages reported", [
+        job.processed_pages,
+        job.page_count,
+      ])
+    : t("Processing complete document…");
 }
 export function uncertainDocumentWrite(error: unknown) {
   return (
@@ -81,9 +85,9 @@ export function reviewReadbackMatches(
 }
 export function reviewChangeError(text: string, reason: string) {
   if (Array.from(text).length > 100000)
-    return "A block cannot exceed 100,000 characters.";
-  if (!reason.trim()) return "Describe what you checked in the original.";
+    return t("A block cannot exceed 100,000 characters.");
+  if (!reason.trim()) return t("Describe what you checked in the original.");
   if (Array.from(reason).length > 2000)
-    return "Keep the source-review reason within 2,000 characters.";
+    return t("Keep the source-review reason within 2,000 characters.");
   return "";
 }

@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { t } from "../../i18n";
+
 import { askConfirm } from "../state";
 import { computed, ref, watch } from "vue";
 import { api } from "../../api";
@@ -16,6 +18,7 @@ import {
   navigate,
   useTask,
   dateText,
+  label,
   refreshCourses,
   useDirty,
 } from "../state";
@@ -82,7 +85,7 @@ async function profile() {
   await run(async () => {
     await api.profile(name.value);
     user.value = (await api.me()).user;
-  }, "Profile saved.");
+  }, t("Profile saved."));
 }
 async function avatar(e: Event) {
   const file = (e.target as HTMLInputElement).files?.[0];
@@ -90,18 +93,18 @@ async function avatar(e: Event) {
     await run(async () => {
       await api.uploadAvatar(file);
       user.value = (await api.me()).user;
-    }, "Photo updated.");
+    }, t("Photo updated."));
 }
 async function removeAvatar() {
-  if (await askConfirm("Remove your profile photo?"))
+  if (await askConfirm(t("Remove your profile photo?")))
     await run(async () => {
       await api.removeAvatar();
       user.value = (await api.me()).user;
-    }, "Photo removed.");
+    }, t("Photo removed."));
 }
 async function password() {
   if (newPassword.value !== passwordAgain.value) {
-    error.value = "The new passwords do not match.";
+    error.value = t("The new passwords do not match.");
     return;
   }
   await run(async () => {
@@ -111,7 +114,7 @@ async function password() {
     newPassword.value = "";
     passwordAgain.value = "";
     await refreshCourses();
-  }, "Password updated.");
+  }, t("Password updated."));
 }
 async function sendFeedback() {
   requestId.value = requestId.value || clientId();
@@ -122,7 +125,7 @@ async function sendFeedback() {
       subject: subject.value,
       message: message.value,
     });
-  }, "Feedback saved.");
+  }, t("Feedback saved."));
   if (ok) {
     feedbackEditor.value = false;
     subject.value = "";
@@ -139,7 +142,7 @@ async function reviewFeedback() {
       reply: reply.value,
       expected_revision: selected.value!.revision,
     });
-  }, "Reply saved.");
+  }, t("Reply saved."));
   if (ok) {
     selected.value = null;
     await load();
@@ -149,28 +152,32 @@ async function reviewFeedback() {
 <template>
   <template v-if="section === 'password'"
     ><PageHeader
-      title="Set your own password"
-      description="Replace your temporary password to continue." /></template
+      :title="t('Set your own password')"
+      :description="
+        t('Replace your temporary password to continue.')
+      " /></template
   ><template v-else
     ><PageHeader
-      title="Settings"
-      description="Manage your account and workspace."
+      :title="t('Settings')"
+      :description="t('Manage your account and workspace.')"
     />
-    <nav class="tabs" aria-label="Settings sections">
+    <nav class="tabs" :aria-label="t('Settings sections')">
       <button
         v-for="[id, title] in [
-          ['account', 'My account'],
-          ['feedback', 'Feedback'],
+          ['account', t('My account')],
+          ['feedback', t('Feedback')],
           ...(user?.role !== 'student'
             ? [
                 [
                   'users',
-                  user?.role === 'admin' ? 'User accounts' : 'Course people',
+                  user?.role === 'admin'
+                    ? t('User accounts')
+                    : t('Course people'),
                 ],
               ]
             : []),
           ...(user?.role === 'admin'
-            ? [['model', 'System configuration']]
+            ? [['model', t('System configuration')]]
             : []),
         ]"
         :key="id"
@@ -189,18 +196,19 @@ async function reviewFeedback() {
   />
   <div v-if="section === 'account'" class="settings-grid">
     <section class="panel">
-      <h2>Profile</h2>
+      <h2>{{ t("Profile") }}</h2>
       <div class="profile-photo">
         <span class="avatar large"
           ><img
             v-if="user?.avatar_url"
             :src="user.avatar_url"
-            alt="Your profile photo"
+            :alt="t('Your profile photo')"
           /><template v-else>{{ user?.name.slice(0, 1) }}</template></span
         >
         <div>
           <label
-            >Profile photo<input
+            >{{ t("Profile photo")
+            }}<input
               type="file"
               accept="image/png,image/jpeg,image/webp"
               :disabled="busy"
@@ -210,44 +218,49 @@ async function reviewFeedback() {
             class="link-button danger"
             @click="removeAvatar"
           >
-            Remove photo
+            {{ t("Remove photo") }}
           </button>
         </div>
       </div>
       <form class="form-stack" @submit.prevent="profile">
-        <label>Name<input v-model="name" required /></label
-        ><label>Email<input :value="user?.email" readonly /></label
+        <label>{{ t("Name") }}<input v-model="name" required /></label
+        ><label>{{ t("Email") }}<input :value="user?.email" readonly /></label
         ><button class="primary" :disabled="busy || name === user?.name">
-          Save profile
+          {{ t("Save profile") }}
         </button>
       </form>
     </section>
     <section class="panel">
-      <h2>Change password</h2>
+      <h2>{{ t("Change password") }}</h2>
       <p v-if="user?.is_demo" class="muted">
-        Demo accounts use local demo sign-in and have no password.
+        {{ t("Demo accounts use local demo sign-in and have no password.") }}
       </p>
       <form v-else class="form-stack" @submit.prevent="password">
         <label
-          >Current password<input
+          >{{ t("Current password")
+          }}<input
             v-model="currentPassword"
             type="password"
             autocomplete="current-password"
             required /></label
         ><label
-          >New password<input
+          >{{ t("New password")
+          }}<input
             v-model="newPassword"
             type="password"
             autocomplete="new-password"
             minlength="8"
             required /></label
         ><label
-          >Repeat new password<input
+          >{{ t("Repeat new password")
+          }}<input
             v-model="passwordAgain"
             type="password"
             autocomplete="new-password"
             required /></label
-        ><button class="primary" :disabled="busy">Change password</button>
+        ><button class="primary" :disabled="busy">
+          {{ t("Change password") }}
+        </button>
       </form>
     </section>
   </div>
@@ -257,30 +270,34 @@ async function reviewFeedback() {
     @submit.prevent="password"
   >
     <label
-      >Temporary password<input
+      >{{ t("Temporary password")
+      }}<input
         v-model="currentPassword"
         type="password"
         autocomplete="current-password"
         required /></label
     ><label
-      >New password<input
+      >{{ t("New password")
+      }}<input
         v-model="newPassword"
         type="password"
         autocomplete="new-password"
         minlength="8"
         required /></label
     ><label
-      >Repeat new password<input
+      >{{ t("Repeat new password")
+      }}<input
         v-model="passwordAgain"
         type="password"
         autocomplete="new-password"
         required /></label
-    ><button class="primary" :disabled="busy">Set password</button>
+    ><button class="primary" :disabled="busy">{{ t("Set password") }}</button>
   </form>
   <section v-else-if="section === 'users'">
     <template v-if="user?.role === 'teacher'"
       ><label
-        >Course<select v-model="courseId">
+        >{{ t("Course")
+        }}<select v-model="courseId">
           <option v-for="c in courses" :key="c.id" :value="c.id">
             {{ c.code }} · {{ c.title }}
           </option>
@@ -295,17 +312,17 @@ async function reviewFeedback() {
   <section v-else-if="section === 'feedback'">
     <div class="section-header">
       <div>
-        <h2>Feedback</h2>
+        <h2>{{ t("Feedback") }}</h2>
         <p>
           {{
             user?.role === "admin"
-              ? "Review feedback from your workspace."
-              : "Track your suggestions and reported issues."
+              ? t("Review feedback from your workspace.")
+              : t("Track your suggestions and reported issues.")
           }}
         </p>
       </div>
       <button class="primary" @click="feedbackEditor = true">
-        New feedback
+        {{ t("New feedback") }}
       </button>
     </div>
     <div class="item-list">
@@ -315,12 +332,12 @@ async function reviewFeedback() {
         :title="f.subject"
         :description="f.message"
         ><template #meta
-          ><span class="badge">{{ f.category }}</span
-          ><span>{{ f.status === "reviewed" ? "Reviewed" : "New" }}</span
+          ><span class="badge">{{ label(f.category) }}</span
+          ><span>{{ f.status === "reviewed" ? t("Reviewed") : t("New") }}</span
           ><span>{{ dateText(f.created_at) }}</span
           ><span>{{ f.author?.name }}</span></template
         >
-        <p v-if="f.reply" class="notice">Reply: {{ f.reply }}</p>
+        <p v-if="f.reply" class="notice">{{ t("Reply:") }} {{ f.reply }}</p>
         <template v-if="user?.role === 'admin'" #actions
           ><button
             class="secondary"
@@ -329,12 +346,12 @@ async function reviewFeedback() {
               reply = f.reply;
             "
           >
-            Review
+            {{ t("Review") }}
           </button></template
         ></ItemRow
       >
       <div v-if="!feedback.length && !busy" class="empty-state">
-        No feedback yet.
+        {{ t("No feedback yet.") }}
       </div>
     </div>
     <div class="pagination">
@@ -346,8 +363,8 @@ async function reviewFeedback() {
           load();
         "
       >
-        Previous</button
-      ><span>{{ total }} items</span
+        {{ t("Previous") }}</button
+      ><span>{{ total }} {{ t("items") }}</span
       ><button
         class="secondary"
         :disabled="busy || offset + 20 >= total"
@@ -356,73 +373,75 @@ async function reviewFeedback() {
           load();
         "
       >
-        Next
+        {{ t("Next") }}
       </button>
     </div>
   </section>
   <section v-else class="panel narrow">
-    <h2>System configuration</h2>
+    <h2>{{ t("System configuration") }}</h2>
     <p class="notice">
-      Deployment settings are managed in <strong>config.json</strong>. Save the
-      file and restart the local server to apply changes.
+      {{ t("Deployment settings are managed in") }} <strong>config.json</strong
+      >{{ t(". Save the file and restart the local server to apply changes.") }}
     </p>
     <dl class="config-summary">
-      <dt>Model</dt>
-      <dd>{{ model?.ai.model || "Not configured" }}</dd>
-      <dt>Endpoint</dt>
-      <dd>{{ model?.ai.base_url || "Not configured" }}</dd>
-      <dt>API key</dt>
-      <dd>{{ model?.api_key_set ? "Configured" : "Not configured" }}</dd>
-      <dt>Web search</dt>
-      <dd>{{ search?.enabled ? "Enabled" : "Disabled" }}</dd>
+      <dt>{{ t("Model") }}</dt>
+      <dd>{{ model?.ai.model || t("Not configured") }}</dd>
+      <dt>{{ t("Endpoint") }}</dt>
+      <dd>{{ model?.ai.base_url || t("Not configured") }}</dd>
+      <dt>{{ t("API key") }}</dt>
+      <dd>{{ model?.api_key_set ? t("Configured") : t("Not configured") }}</dd>
+      <dt>{{ t("Web search") }}</dt>
+      <dd>{{ search?.enabled ? t("Enabled") : t("Disabled") }}</dd>
     </dl>
     <p class="muted">
-      The interface does not display API keys or send connection tests
-      automatically.
+      {{
+        t(
+          "The interface does not display API keys or send connection tests automatically.",
+        )
+      }}
     </p>
   </section>
   <EditorDialog
     v-if="feedbackEditor"
-    title="New feedback"
+    :title="t('New feedback')"
     :busy="busy"
     :dirty="!!subject || !!message"
     @close="feedbackEditor = false"
     ><FeedbackNotice :error="error" />
     <form id="feedback-form" class="form-stack" @submit.prevent="sendFeedback">
       <label
-        >Category<select v-model="category">
-          <option value="general">General</option>
-          <option value="bug">Issue</option>
-          <option value="idea">Suggestion</option>
+        >{{ t("Category")
+        }}<select v-model="category">
+          <option value="general">{{ t("General") }}</option>
+          <option value="bug">{{ t("Issue") }}</option>
+          <option value="idea">{{ t("Suggestion") }}</option>
         </select></label
-      ><label>Subject<input v-model="subject" required maxlength="200" /></label
       ><label
-        >Message<textarea
-          v-model="message"
-          rows="5"
-          required
-          maxlength="10000"
-        />
+        >{{ t("Subject")
+        }}<input v-model="subject" required maxlength="200" /></label
+      ><label
+        >{{ t("Message")
+        }}<textarea v-model="message" rows="5" required maxlength="10000" />
       </label>
     </form>
     <template #actions
       ><button form="feedback-form" class="primary" :disabled="busy">
-        Submit feedback
+        {{ t("Submit feedback") }}
       </button></template
     ></EditorDialog
   ><EditorDialog
     v-if="selected"
-    title="Review feedback"
+    :title="t('Review feedback')"
     :busy="busy"
     :dirty="reply !== selected.reply"
     @close="selected = null"
     ><FeedbackNotice :error="error" />
     <h3>{{ selected.subject }}</h3>
     <p>{{ selected.message }}</p>
-    <label>Reply<textarea v-model="reply" rows="4" /></label
+    <label>{{ t("Reply") }}<textarea v-model="reply" rows="4" /></label
     ><template #actions
       ><button class="primary" :disabled="busy" @click="reviewFeedback">
-        Save review
+        {{ t("Save review") }}
       </button></template
     ></EditorDialog
   >

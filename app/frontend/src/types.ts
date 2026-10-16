@@ -71,7 +71,7 @@ export type Bootstrap = {
   registration_enabled?: boolean;
   app_name: string;
   demo_enabled: boolean;
-  default_locale: "en";
+  default_locale: "en" | "zh-CN";
   ai: AiStatus;
 };
 export type Course = {

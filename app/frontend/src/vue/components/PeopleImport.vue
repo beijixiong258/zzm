@@ -1,10 +1,12 @@
 <script setup lang="ts">
+import { t, systemText } from "../../i18n";
+
 import { computed, ref, watch, onBeforeUnmount } from "vue";
 import { api } from "../../api";
 import { accountApi } from "../../account-management-api";
 import type { Role, RosterPreview } from "../../types";
 import type { AccountImportPreview } from "../../account-management-types";
-import { useTask } from "../state";
+import { useTask, label } from "../state";
 import FeedbackNotice from "./FeedbackNotice.vue";
 const props = defineProps<{ courseId?: string }>();
 const emit = defineEmits<{ changed: []; hold: [boolean]; dirty: [boolean] }>();
@@ -50,7 +52,11 @@ async function commit() {
           preview.value!.import_id,
         );
         await api.roster(props.courseId);
-        success.value = `${r.created} created, ${r.enrolled} enrolled, ${r.restored} restored.`;
+        success.value = t("{0} created, {1} enrolled, {2} restored.", [
+          r.created,
+          r.enrolled,
+          r.restored,
+        ]);
       } else {
         try {
           await accountApi.commit(preview.value!.import_id);
@@ -63,7 +69,7 @@ async function commit() {
       committed.value = true;
       password.value = "";
       emit("changed");
-    }, "Import complete.");
+    }, t("Import complete."));
   } finally {
     emit("hold", false);
   }
@@ -73,10 +79,15 @@ async function commit() {
   <FeedbackNotice :error="error" :success="success" :busy="busy" />
   <form v-if="!preview" class="form-stack" @submit.prevent="inspect">
     <p>
-      CSV or XLSX with name and email columns. Review the rows before importing.
+      {{
+        t(
+          "CSV or XLSX with name and email columns. Review the rows before importing.",
+        )
+      }}
     </p>
     <label
-      >File<input
+      >{{ t("File")
+      }}<input
         type="file"
         accept=".csv,.xlsx"
         required
@@ -84,25 +95,31 @@ async function commit() {
           file = ($event.target as HTMLInputElement).files?.[0] || null
         " /></label
     ><label v-if="!courseId"
-      >Default role<select v-model="role">
-        <option value="student">Student</option>
-        <option value="teacher">Teacher</option>
-        <option value="admin">Administrator</option>
+      >{{ t("Default role")
+      }}<select v-model="role">
+        <option value="student">{{ t("Student") }}</option>
+        <option value="teacher">{{ t("Teacher") }}</option>
+        <option value="admin">{{ t("Administrator") }}</option>
       </select></label
     ><label
-      >Default temporary password<input
+      >{{ t("Default temporary password")
+      }}<input
         v-model="password"
         type="password"
         autocomplete="new-password"
-      /><small
-        >Required for new accounts unless each row includes temporary_password.
-        Use at least 8 characters with letters and numbers.</small
-      ></label
-    ><button class="primary" :disabled="busy || !file">Review import</button>
+      /><small>{{
+        t(
+          "Required for new accounts unless each row includes temporary_password. Use at least 8 characters with letters and numbers.",
+        )
+      }}</small></label
+    ><button class="primary" :disabled="busy || !file">
+      {{ t("Review import") }}
+    </button>
   </form>
   <template v-else
     ><p>
-      {{ preview.valid_count }} valid rows · {{ preview.error_count }} errors
+      {{ preview.valid_count }} {{ t("valid rows ·") }}
+      {{ preview.error_count }} {{ t("errors") }}
     </p>
     <div class="import-rows">
       <div
@@ -111,9 +128,9 @@ async function commit() {
         class="upload-result"
       >
         <strong>{{ row.name }} · {{ row.email }}</strong
-        ><span class="badge">{{ row.action }}</span>
+        ><span class="badge">{{ label(row.action) }}</span>
         <p v-for="message in [...row.errors, ...row.warnings]" :key="message">
-          {{ message }}
+          {{ systemText(message) }}
         </p>
       </div>
     </div>
@@ -126,9 +143,9 @@ async function commit() {
           committed = false;
         "
       >
-        Choose another file</button
+        {{ t("Choose another file") }}</button
       ><button class="primary" :disabled="busy || !valid" @click="commit">
-        {{ committed ? "Imported" : "Confirm import" }}
+        {{ committed ? t("Imported") : t("Confirm import") }}
       </button>
     </div></template
   >

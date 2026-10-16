@@ -78,6 +78,16 @@ Stage10安全修复已部署，题图现按账号/课程/edition授权，认证/
 
 ## Windows 本地开发
 
+### 中英文分支
+
+`vue-java-cys` 用于英文交付，`vue-java-cys-chinese` 用于中文展示。两边共用 Vue 组件、业务逻辑和 `frontend/src/locales/en.json`、`zh-CN.json`。两个分支只在 `config.defaults.json` 中的 `frontend.locale` 默认值不同：英文为 `en`，中文为 `zh-CN`。
+
+`config.defaults.json` 提供可提交的默认配置；个人设置和密钥仍集中在不进入 Git 的 `config.json` 中，后者优先。`config.json` 不填写 `frontend.locale` 时随分支切换，显式填写则固定为指定语言。切换分支后重启本机服务并刷新页面。无需为语言切换重复构建，两个分支使用同一份前端产物。登录页和页面顶栏也可临时切换语言；刷新或重新登录后恢复部署默认值。
+
+界面语言只影响操作文字、日期和已知系统提示。课程原文、题目、答案、资料及 AI 教学语言仍按原内容和教学设置处理。第三方或尚未收录的错误原文会保留，便于排查。
+
+后续功能修改应先在英文分支完成，更新两种语言资源；获得提交授权后，再将英文分支合并到中文分支，保留中文默认值。验收时运行 `git diff vue-java-cys vue-java-cys-chinese --name-only`，正常应只显示 `app/config.defaults.json`。无需为两种语言分别维护页面或业务代码。
+
 当前 `vue-java-cys` 分支已将前端迁移到 Vue 3 + TypeScript，后端沿用 FastAPI。此分支的本机运行方式见 [本机运行说明](LOCAL_SETUP.html)，实际截图和待验收项见 [Vue 视觉检查记录](../docs/frontend-vue-review-20261016/report.html)。上面的 Stage 文档描述历史生产环境，不代表本轮已经重新验证。
 
 双击 `start.cmd`，或在 app 目录执行 `pwsh.exe -NoProfile -File .\start.ps1`。默认地址 <http://127.0.0.1:18773>。所有部署设置集中到 `config.json`，相对路径按该文件位置解析，修改后重启。本轮使用隔离的 `data-local` 与 `local-demo` 合成课程。

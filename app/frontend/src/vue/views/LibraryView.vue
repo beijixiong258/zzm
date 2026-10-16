@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { t } from "../../i18n";
+
 import { ref } from "vue";
 import { api } from "../../api";
 import type { CourseMaterial } from "../../types";
@@ -18,11 +20,15 @@ void load();
 </script>
 <template>
   <PageHeader
-    title="Course library"
+    :title="t('Course library')"
     :eyebrow="courses.find((c) => c.id === courseId)?.code"
-    description="All files and links saved in this course. Add or edit them from a session’s Materials tab."
+    :description="
+      t(
+        'All files and links saved in this course. Add or edit them from a session’s Materials tab.',
+      )
+    "
     ><button class="secondary" :disabled="busy" @click="load">
-      Refresh
+      {{ t("Refresh") }}
     </button></PageHeader
   ><FeedbackNotice :error="error" :busy="busy" /><MaterialsPane
     :materials="materials"
