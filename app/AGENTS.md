@@ -1,6 +1,6 @@
 # AIcademiya · 项目协作入口
 
-当前生产基线为Stage16 R4/API0.11.0/schema9。先读 `../docs/project-review-20261014/README.md`、`README.md`、`CONTEXT.md`和 `DEPLOYMENT_STAGE16_RESULT.md`，再读对应模块源码与测试。历史Stage文档按功能查阅；当前用户请求决定授权、预算、并发和文件所有权。
+当前本机前端为 Vue 3，后端为 FastAPI。文档从 `../docs/INDEX.md` 进入；本机配置和双语维护见 `../docs/guides/`，历史 Stage16 R4/API0.11.0/schema9 的契约与部署记录见 `../docs/history/`。按当前任务查阅对应模块，历史授权、预算和文件所有权不替代当前用户请求。
 
 Windows使用项目 `.venv/Scripts/python.exe`和frontend本地npm依赖；模块 `backend.aicademiya`，配置 `AICADEMIYA_*`，默认新数据 `data-v2`。产物文案采用 `anti-defensive-writing`，作用与结论先行，证据与适用条件集中交代。
 

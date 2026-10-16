@@ -1,6 +1,6 @@
-# AIcademiya frontend
+# 前端开发说明
 
-当前分支使用 **Vue 3 + TypeScript + Vite**，界面沿用英文。课件、题目、答案和教学语言仍使用各自保存的内容。应用版本保持 0.1.0。
+当前前端使用 **Vue 3 + TypeScript + Vite**，共用中英文组件和语言资源；默认界面语言由分支配置决定，见[双语维护说明](bilingual-maintenance.md)。课件、题目、答案和教学语言仍使用各自保存的内容。应用版本保持 0.1.0。
 
 ## 本机开发
 
@@ -22,6 +22,8 @@ npm run build
 
 ## 文件职责
 
+以下路径均相对于 `app/frontend/`。
+
 - `src/main.ts`、`src/vue/App.vue`：Vue 入口、登录状态、角色导航和页面加载。
 - `src/vue/views/`：课程、教学设置、学习、版本、人员、材料库、设置和历史页面。
 - `src/vue/components/`：公共页面标题、横向列表行、编辑窗口、通知，以及题目管理、材料管理、文档预览、导入组件。
@@ -37,4 +39,4 @@ npm run build
 
 现有接口、作答规则、文档客户端测试继续使用；旧 React 渲染测试及其专属页面已移出工作目录。Vue 题目组件交互测试覆盖新增、取消、修改、失败保留和删除确认。
 
-`tests/vue-questions.test.ts` 使用内存 DOM 检查交互，不代表浏览器视觉验收。四种视口尺寸、三种演示身份的实际截图、交互结果和验证边界见 [Vue 视觉检查记录](../../docs/frontend-vue-review-20261016/report.html)。AI、搜索和外部文档工作器未在本轮接入或调用。
+`tests/vue-questions.test.ts` 使用内存 DOM 检查交互，不代表浏览器视觉验收。迁移阶段的四种视口尺寸、三种演示身份及交互记录见 [Vue 视觉检查记录](../frontend-vue-review-20261016/report.html)，双语页面及验证范围见[双语检查记录](../bilingual-review-20261016/report.html)。各记录只说明其标注轮次的实际检查结果。

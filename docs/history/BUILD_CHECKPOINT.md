@@ -1,6 +1,6 @@
 # Akademiya · 历史样例checkpoint
 
-> 当前入口：`../docs/project-review-20261014/README.md`、`DEPLOYMENT_STAGE16_RESULT.md`。生产Stage16 R4/API0.11/schema9已核验。下文保存旧样例的形成记录、预算与当时状态。
+> 当前入口：`../project-review-20261014/README.md`、`DEPLOYMENT_STAGE16_RESULT.md`。生产Stage16 R4/API0.11/schema9已核验。下文保存旧样例的形成记录、预算与当时状态。
 
 ## Historical delivery
 
