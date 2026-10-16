@@ -22,7 +22,7 @@ class ModelConnectionMonitor:
  def check(self):
   with self.lock:
    config,binding=self.settings();model=config['model']
-   if config['mode']!='openai' or not(config['base_url'].strip()and model.strip()):return self.result('not_configured',model,'No real model endpoint configured.','configuration')
+   if not self.tutor.is_configured(config):return self.result('not_configured',model,'Model endpoint, model name, or required API key is not configured.','configuration')
    if self.saved and self.saved['binding']==binding and time.monotonic()-self.saved['time']<self.interval:return dict(self.saved['result'])
    base=config['base_url'].rstrip('/');router=self.tutor.uses_aicademiya_router(config);endpoint=base[:-3]+'/health'if router else base+('/models'if base.endswith('/v1')else'/v1/models');kind='router_health'if router else'model_listing'
    headers={'Accept-Encoding':'identity'}

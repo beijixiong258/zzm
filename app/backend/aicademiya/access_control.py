@@ -3,6 +3,8 @@ from fastapi import Depends, HTTPException, Request
 from pydantic import BaseModel, ConfigDict, StrictBool
 
 from .auth import session_user
+from .deployment_config import file_managed
+import os
 
 REGISTRATION_KEY = 'registration_enabled'
 
@@ -13,6 +15,8 @@ class AccessSettings(BaseModel):
 
 
 def registration_enabled(conn):
+    if file_managed():
+        return os.getenv('AICADEMIYA_REGISTRATION_ENABLED', 'false') == 'true'
     row = conn.execute('SELECT value FROM settings WHERE key=?', (REGISTRATION_KEY,)).fetchone()
     # Existing installations are unchanged; malformed stored overrides fail closed.
     return row is None or row[0] == 'true'
@@ -35,6 +39,8 @@ def register_access_settings_routes(application, database, admin_user, cookie_na
     @application.put('/api/admin/access-settings')
     def put_access_settings(payload: AccessSettings, request: Request,
                             user=Depends(admin_user)):
+        if file_managed():
+            raise HTTPException(409, 'Registration is managed in config.json; edit the file and restart the server')
         with database.connect() as conn:
             conn.execute('BEGIN IMMEDIATE')
             # Re-check live authorization while holding the same write lock as

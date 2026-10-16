@@ -78,19 +78,15 @@ Stage10安全修复已部署，题图现按账号/课程/edition授权，认证/
 
 ## Windows 本地开发
 
-双击 `start.cmd`，默认打开 <http://127.0.0.1:18773>。这是独立本地应用，不是 CT255 生产站。正常启动不再启用演示登录/模拟模式；无有效模型时如实显示未配置。开发QA可显式使用隔离测试adapter。
+当前 `vue-java-cys` 分支已将前端迁移到 Vue 3 + TypeScript，后端沿用 FastAPI。此分支的本机运行方式见 [本机运行说明](LOCAL_SETUP.html)，实际截图和待验收项见 [Vue 视觉检查记录](../docs/frontend-vue-review-20261016/report.html)。上面的 Stage 文档描述历史生产环境，不代表本轮已经重新验证。
 
-- 环境：项目 `.venv` 与 `frontend/node_modules`。
-- 私有本机配置：`local-settings-v2.json`；默认数据 `data-v2/aicademiya.sqlite3`。
-- 后端模块：`backend.aicademiya`；配置变量：`AICADEMIYA_*`。
-- 页面文案：`frontend/src/uiText.ts`；不再提供界面语言切换。
-- 旧本机数据/配置未迁入 V2，不要删库来刷新课程种子。catalog 只在首次初始化导入。
+双击 `start.cmd`，或在 app 目录执行 `pwsh.exe -NoProfile -File .\start.ps1`。默认地址 <http://127.0.0.1:18773>。所有部署设置集中到 `config.json`，相对路径按该文件位置解析，修改后重启。本轮使用隔离的 `data-local` 与 `local-demo` 合成课程。
 
-```bash
-.venv/Scripts/python.exe tools/launch.py --check
-.venv/Scripts/python.exe tools/run_backend_tests.py backend/tests -q
-.venv/Scripts/python.exe tools/run_stage12_regression.py
-cd frontend
+本机分支默认接入硅基流动：`ai.provider=siliconflow`，`ai.base_url=https://api.siliconflow.cn/v1`，`ai.model=Qwen/Qwen3.8-27B`，`ai.mode=openai`。密钥填写在不进入 Git 的 `config.json` 的 `ai.api_key`，只由后端读取。超时、温度、思考开关和思考预算也在同一文件中；默认直连、120 秒读取超时、温度 0.3、关闭思考。缺少密钥时不会尝试调用。调用方式依据[硅基流动官方文档](https://api-docs.siliconflow.cn/docs/api/chat-completions-post)，模型名依据[官方模型目录](https://www.siliconflow.cn/models)；连通性检查与教学质量验收分别进行。
+
+```powershell
+pwsh.exe -NoProfile -File .\start.ps1 -Check
+# 在 frontend 目录执行
 npm test
 npm run build
 ```

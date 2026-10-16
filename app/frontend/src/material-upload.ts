@@ -1,6 +1,6 @@
 import type { Material } from "./types";
 import { api, type UploadProgress } from "./api";
-import { errorMessage } from "./ui";
+import { errorText as errorMessage } from "./vue/utils";
 import type { DocumentCapability } from "./document-types";
 
 export type MaterialUpload = {
@@ -20,16 +20,31 @@ export function selectMaterialFiles(
   files: File[],
   capability: boolean | DocumentCapability = false,
 ): MaterialUpload[] {
-  const formats = typeof capability === "boolean" ? capability ? ["pdf"] : [] : capability.available ? capability.formats : [];
-  const maximum = typeof capability === "boolean" ? 64 * 1024 * 1024 : capability.max_upload_bytes;
+  const formats =
+    typeof capability === "boolean"
+      ? capability
+        ? ["pdf"]
+        : []
+      : capability.available
+        ? capability.formats
+        : [];
+  const maximum =
+    typeof capability === "boolean"
+      ? 64 * 1024 * 1024
+      : capability.max_upload_bytes;
   return files.map((file, index) => ({
     key: `${index}-${file.webkitRelativePath || file.name}`,
     file,
     relativePath: file.webkitRelativePath || file.name,
     status: "queued",
-    processing:
-      formats.includes(file.name.split(".").pop()?.toLowerCase() ?? "") ? "full_document" : "preview",
-    maxBytes: formats.includes(file.name.split(".").pop()?.toLowerCase() ?? "") ? maximum : 25 * 1024 * 1024,
+    processing: formats.includes(
+      file.name.split(".").pop()?.toLowerCase() ?? "",
+    )
+      ? "full_document"
+      : "preview",
+    maxBytes: formats.includes(file.name.split(".").pop()?.toLowerCase() ?? "")
+      ? maximum
+      : 25 * 1024 * 1024,
   }));
 }
 // A bounded queue prevents several CPU OCR jobs from saturating the small app guest.
@@ -54,21 +69,28 @@ export async function uploadMaterialQueue(
       visibility: item.visibility ?? defaults.visibility,
       kind: item.kind ?? defaults.kind,
       processing: item.processing ?? "preview",
-      progress: {loaded: 0, total: null, complete: false},
+      progress: { loaded: 0, total: null, complete: false },
     };
     if (running.kind === "answer_key") running.visibility = "teacher";
     changed(running);
     try {
-      const limit = item.maxBytes ?? (running.processing === "full_document" ? 64 : 25) * 1024 * 1024;
+      const limit =
+        item.maxBytes ??
+        (running.processing === "full_document" ? 64 : 25) * 1024 * 1024;
       if (item.file.size > limit)
-        throw new Error(`The upload limit is ${limit / (1024 * 1024)} MiB per file.`);
+        throw new Error(
+          `The upload limit is ${limit / (1024 * 1024)} MiB per file.`,
+        );
       const response = await upload(
         sid,
         item.file,
         running.visibility!,
         running.kind!,
         running.processing,
-        (progress) => { running = {...running, progress}; if (isActive()) changed(running); },
+        (progress) => {
+          running = { ...running, progress };
+          if (isActive()) changed(running);
+        },
       );
       const material = { ...response, processing: running.processing };
       accepted.push(material);
@@ -82,8 +104,11 @@ export async function uploadMaterialQueue(
 }
 export function uploadSuccessMessage(accepted: Material[]): string {
   const prefix = `${accepted.length} ${accepted.length === 1 ? "file" : "files"} saved.`;
-  const complete = accepted.filter((m) => m.processing === "full_document").length;
-  if (!complete) return `${prefix} Text/OCR preview only; check each file’s status below.`;
+  const complete = accepted.filter(
+    (m) => m.processing === "full_document",
+  ).length;
+  if (!complete)
+    return `${prefix} Text/OCR preview only; check each file’s status below.`;
   if (complete === accepted.length)
     return `${prefix} Complete-document processing requested; check each file’s status below.`;
   return `${prefix} This batch includes complete-document processing and text/OCR previews. Check each file’s status below.`;

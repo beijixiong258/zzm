@@ -12,6 +12,7 @@ from fastapi import HTTPException
 from .version_context import material_rows
 from .web_search import TavilySearch, SearchFailure, SEARCH_TOOL, MAX_SEARCHES, search_status, web_citations
 from .service_settings import connection_check, effective_search_settings, fingerprint, invalidate_check, put_value
+from .deployment_config import file_managed
 
 
 class ModelFailure(Exception):
@@ -34,6 +35,8 @@ from .evidence import bounded_evidence
 
 def use_environment_proxy(base_url):
     """Keep local model traffic out of Windows/system proxies; preserve remote routing."""
+    if os.getenv("AICADEMIYA_USE_ENVIRONMENT_PROXY", "true") == "false":
+        return False
     host = (urlsplit(base_url).hostname or "").lower()
     if host in {"localhost", "host.docker.internal"}:
         return False
@@ -75,8 +78,11 @@ class Tutor:
             "model": os.getenv("AICADEMIYA_AI_MODEL", ""),
             "api_key": os.getenv("AICADEMIYA_AI_API_KEY", ""),
         }
-        for row in conn.execute("SELECT key,value FROM settings WHERE key LIKE 'ai_%'"):
-            defaults[row["key"][3:]] = row["value"]
+        if not file_managed():
+            for row in conn.execute("SELECT key,value FROM settings WHERE key LIKE 'ai_%'"):
+                defaults[row["key"][3:]] = row["value"]
+        for key in ("base_url", "model", "api_key"):
+            defaults[key] = defaults[key].strip()
         if defaults["mode"] not in ("demo", "openai"):
             defaults["mode"] = "openai"
         if defaults["mode"] == "demo" and not self.demo_enabled:
@@ -87,14 +93,34 @@ class Tutor:
 
     def check_config(self, settings):
         return {**{key: settings[key] for key in ("mode", "base_url", "model", "api_key")},
-                "provider": os.getenv("AICADEMIYA_AI_PROVIDER", ""), "demo_enabled": self.demo_enabled}
+                "provider": os.getenv("AICADEMIYA_AI_PROVIDER", ""), "demo_enabled": self.demo_enabled,
+                "request_options": self.request_options(settings)}
+
+    @staticmethod
+    def uses_siliconflow(settings):
+        return os.getenv("AICADEMIYA_AI_PROVIDER", "") == "siliconflow" and settings["mode"] == "openai"
+
+    def is_configured(self, settings):
+        return (settings["mode"] == "openai" and bool(settings["base_url"].strip() and settings["model"].strip())
+                and (not self.uses_siliconflow(settings) or bool(settings["api_key"].strip())))
+
+    def request_options(self, settings):
+        default_timeout = 600 if self.uses_aicademiya_router(settings) else 60
+        options = {
+            "timeout_seconds": int(os.getenv("AICADEMIYA_AI_TIMEOUT_SECONDS", str(default_timeout))),
+            "temperature": float(os.getenv("AICADEMIYA_AI_TEMPERATURE", "0.3")),
+        }
+        if self.uses_siliconflow(settings):
+            options["enable_thinking"] = os.getenv("AICADEMIYA_AI_ENABLE_THINKING", "false").lower() == "true"
+            options["thinking_budget"] = int(os.getenv("AICADEMIYA_AI_THINKING_BUDGET", "4096"))
+        return options
 
     def status(self, conn, teacher=False):
         settings = self.settings(conn)
         row = conn.execute("SELECT value FROM meta WHERE key='ai_last_error'").fetchone()
         binding = conn.execute("SELECT value FROM meta WHERE key='ai_last_error_binding'").fetchone()
         current = self.check_config(settings)
-        real_configured = settings["mode"] == "openai" and bool(settings["base_url"].strip() and settings["model"].strip())
+        real_configured = self.is_configured(settings)
         error = bool(row and row[0] and (not binding or binding[0] == fingerprint(current)))
         return {"mode": settings["mode"], "configured": settings["mode"] == "demo" or real_configured,
                 "base_url": settings["base_url"] if teacher else "", "model": settings["model"],
@@ -126,6 +152,8 @@ class Tutor:
         return "aicv2-" + hmac.new(bytes.fromhex(secret), identity.encode(), hashlib.sha256).hexdigest()
 
     def update(self, conn, payload):
+        if file_managed():
+            raise HTTPException(409, "Model settings are managed in config.json; edit the file and restart the server")
         if payload.mode == "demo" and not self.demo_enabled:
             raise HTTPException(422, "Demo model mode is disabled; configure an OpenAI-compatible endpoint")
         before = self.check_config(self.settings(conn))
@@ -148,17 +176,26 @@ class Tutor:
             invalidate_check(conn, "ai")
 
     def completion_message(self, settings, messages, *, tools=None, tool_choice=None, kv_scope=None, max_tokens=900, response_format=None):
-        if not settings["base_url"] or not settings["model"]:
+        if not settings["base_url"].strip() or not settings["model"].strip():
             raise ModelFailure("Model is not configured. Ask an administrator to configure an OpenAI-compatible endpoint.")
+        siliconflow = self.uses_siliconflow(settings)
+        if siliconflow and not settings["api_key"].strip():
+            raise ModelFailure("SiliconFlow API key is not configured. Set ai.api_key in config.json and restart the server.")
+        options = self.request_options(settings)
         base = settings["base_url"].rstrip("/")
         endpoint = base + ("/chat/completions" if base.endswith("/v1") else "/v1/chat/completions")
         headers = {"Content-Type": "application/json"}
-        if settings["api_key"]:
-            headers["Authorization"] = "Bearer " + settings["api_key"]
-        payload = {"model": settings["model"], "messages": messages, "temperature": 0.3, "max_tokens": max_tokens, "stream": False}
+        if settings["api_key"].strip():
+            headers["Authorization"] = "Bearer " + settings["api_key"].strip()
+        payload = {"model": settings["model"], "messages": messages, "temperature": options["temperature"], "max_tokens": max_tokens, "stream": False}
+        if siliconflow:
+            payload["enable_thinking"] = options["enable_thinking"]
+            if options["enable_thinking"]:
+                payload["thinking_budget"] = options["thinking_budget"]
         has_images=any(isinstance(m.get('content'),list)and any(p.get('type')=='image_url'for p in m['content'])for m in messages)
         if has_images:
-            payload['cache_prompt']=False
+            if not siliconflow:
+                payload['cache_prompt']=False
             if len(json.dumps(payload,ensure_ascii=False).encode('utf-8'))>8*1024*1024:
                 raise ModelFailure('Multimodal source request exceeds its byte budget. Select fewer source pages.')
         if response_format is not None:
@@ -172,13 +209,28 @@ class Tutor:
         if tools is not None:
             payload.update(tools=tools, tool_choice=tool_choice or "auto")
         try:
-            with httpx.Client(timeout=httpx.Timeout(600 if router else 60, connect=10), transport=self.transport,
+            with httpx.Client(timeout=httpx.Timeout(options["timeout_seconds"], connect=min(10, options["timeout_seconds"])), transport=self.transport,
                               follow_redirects=False, trust_env=use_environment_proxy(base)) as client:
                 response = client.post(endpoint, headers=headers, json=payload)
             if response.status_code >= 400:
+                if siliconflow:
+                    explanation = {
+                        401: "API key authentication failed; check ai.api_key.",
+                        403: "Access was denied; check the account's model access and service status.",
+                        404: "The endpoint or model was not found; check ai.base_url and ai.model.",
+                        429: "The rate limit was reached; wait before retrying and check the account quota.",
+                        503: "The model service is temporarily overloaded; retry later.",
+                        504: "The model service timed out; retry later.",
+                    }.get(response.status_code, "Check the request settings and account service status.")
+                    raise ModelFailure(f"SiliconFlow returned HTTP {response.status_code}. {explanation} Your work remains saved.")
                 raise ModelFailure(f"Model provider returned HTTP {response.status_code}. Your answer and message remain saved; retry after checking settings.")
             data = response.json()
-            message = data["choices"][0]["message"]
+            choice = data["choices"][0]
+            if not isinstance(choice, dict):
+                raise ValueError("Invalid choice")
+            if choice.get("finish_reason") == "length":
+                raise ModelFailure("Model output reached its token limit and is incomplete. Your work remains saved; shorten the request before retrying.")
+            message = choice["message"]
             if not isinstance(message, dict):
                 raise ValueError("Invalid message")
             return message

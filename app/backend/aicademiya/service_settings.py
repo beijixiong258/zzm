@@ -11,6 +11,7 @@ import secrets
 from fastapi import HTTPException
 
 from .db import now
+from .deployment_config import file_managed
 
 SEARCH_TEST_QUERY = "public education formative assessment research"
 MODEL_CHECK_OK = "OpenAI-compatible endpoint returned a nonempty response."
@@ -70,7 +71,7 @@ def record_check(conn, service, snapshot, current_config, *, ok):
 
 
 def effective_search_settings(conn=None):
-    overrides = dict(conn.execute("SELECT key,value FROM settings WHERE key IN ('web_search_enabled','web_search_api_key')")) if conn is not None else {}
+    overrides = dict(conn.execute("SELECT key,value FROM settings WHERE key IN ('web_search_enabled','web_search_api_key')")) if conn is not None and not file_managed() else {}
     enabled = overrides.get("web_search_enabled", os.getenv("AICADEMIYA_WEB_SEARCH_ENABLED", "false")).lower() == "true"
     if "web_search_api_key" in overrides:
         key = overrides["web_search_api_key"].strip()
@@ -90,6 +91,8 @@ def search_projection(conn, *, public=False):
 
 
 def update_search_settings(conn, payload):
+    if file_managed():
+        raise HTTPException(409, "Search settings are managed in config.json; edit the file and restart the server")
     before = effective_search_settings(conn)
     if payload.enabled is not None:
         put_value(conn, "settings", "web_search_enabled", "true" if payload.enabled else "false")

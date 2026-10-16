@@ -1,0 +1,49 @@
+{
+  "python_environment_created_for_review_moved": true,
+  "server_stopped": true,
+  "moves": [
+    {
+      "destination": "C:\\Users\\user\\Desktop\\智能体回收站\\垃圾桶\\zzm-frontend-review-20261015-184625\\intermediate-screenshots\\10-teaching-setup-mobile.jpg",
+      "source": "C:\\Users\\user\\Desktop\\zzm\\docs\\frontend-visual-review-20261015\\screenshots\\10-teaching-setup-mobile.jpg"
+    },
+    {
+      "destination": "C:\\Users\\user\\Desktop\\智能体回收站\\垃圾桶\\zzm-frontend-review-20261015-184625\\intermediate-screenshots\\20-student-workspace-desktop.jpg",
+      "source": "C:\\Users\\user\\Desktop\\zzm\\docs\\frontend-visual-review-20261015\\screenshots\\20-student-workspace-desktop.jpg"
+    },
+    {
+      "destination": "C:\\Users\\user\\Desktop\\智能体回收站\\垃圾桶\\zzm-frontend-review-20261015-184625\\intermediate-screenshots\\21-student-workspace-mobile.jpg",
+      "source": "C:\\Users\\user\\Desktop\\zzm\\docs\\frontend-visual-review-20261015\\screenshots\\21-student-workspace-mobile.jpg"
+    },
+    {
+      "destination": "C:\\Users\\user\\Desktop\\智能体回收站\\垃圾桶\\zzm-frontend-review-20261015-184625\\intermediate-screenshots\\22-student-conversation-mobile.jpg",
+      "source": "C:\\Users\\user\\Desktop\\zzm\\docs\\frontend-visual-review-20261015\\screenshots\\22-student-conversation-mobile.jpg"
+    },
+    {
+      "destination": "C:\\Users\\user\\Desktop\\智能体回收站\\垃圾桶\\zzm-frontend-review-20261015-184625\\intermediate-screenshots\\23-conversation-mobile-dismissed.jpg",
+      "source": "C:\\Users\\user\\Desktop\\zzm\\docs\\frontend-visual-review-20261015\\screenshots\\23-conversation-mobile-dismissed.jpg"
+    },
+    {
+      "destination": "C:\\Users\\user\\Desktop\\智能体回收站\\垃圾桶\\zzm-frontend-review-20261015-184625\\intermediate-screenshots\\24-composer-mobile.jpg",
+      "source": "C:\\Users\\user\\Desktop\\zzm\\docs\\frontend-visual-review-20261015\\screenshots\\24-composer-mobile.jpg"
+    },
+    {
+      "destination": "C:\\Users\\user\\Desktop\\智能体回收站\\垃圾桶\\zzm-frontend-review-20261015-184625\\intermediate-screenshots\\25-saved-responses-mobile.jpg",
+      "source": "C:\\Users\\user\\Desktop\\zzm\\docs\\frontend-visual-review-20261015\\screenshots\\25-saved-responses-mobile.jpg"
+    },
+    {
+      "destination": "C:\\Users\\user\\Desktop\\智能体回收站\\垃圾桶\\zzm-frontend-review-20261015-184625\\.ui-review-20261015",
+      "source": "C:\\Users\\user\\Desktop\\zzm\\app\\.ui-review-20261015"
+    },
+    {
+      "destination": "C:\\Users\\user\\Desktop\\智能体回收站\\垃圾桶\\zzm-frontend-review-20261015-184625\\.venv",
+      "source": "C:\\Users\\user\\Desktop\\zzm\\app\\.venv"
+    }
+  ],
+  "temporary_runtime_moved": true,
+  "task": "frontend visual review",
+  "application_source_changed": false,
+  "port_18773_listening": false,
+  "permanent_deletion": false,
+  "retained_screenshots": 31,
+  "trash_directory": "C:\\Users\\user\\Desktop\\智能体回收站\\垃圾桶\\zzm-frontend-review-20261015-184625"
+}

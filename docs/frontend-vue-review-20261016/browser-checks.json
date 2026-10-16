@@ -1,0 +1,34 @@
+{
+  "layoutChecks": [
+    {
+      "page": "Questions",
+      "width": 390,
+      "height": 844,
+      "documentWidth": 375,
+      "firstRowTop": 699.4000244140625,
+      "viewportWidth": 390
+    },
+    {
+      "page": "Questions",
+      "width": 1366,
+      "height": 768,
+      "documentWidth": 1351,
+      "viewportWidth": 1366
+    },
+    {
+      "page": "Empty questions",
+      "width": 768,
+      "height": 1024,
+      "documentWidth": 768,
+      "viewportWidth": 768
+    },
+    {
+      "page": "Questions",
+      "width": 1440,
+      "height": 900,
+      "documentWidth": 1425,
+      "viewportWidth": 1440
+    }
+  ],
+  "latestPageLogs": []
+}

@@ -53,9 +53,9 @@ def create_app(*, data_dir=None, db_path=None, catalog_path=None, upload_dir=Non
                document_processor=None, document_worker_timeout=None):
     data_root = Path(data_dir or os.getenv("AICADEMIYA_DATA_DIR", str(APP_ROOT / "data-v2"))).resolve()
     database = Database(db_path or data_root / "aicademiya.sqlite3")
-    catalog = Path(catalog_path or APP_ROOT / "sample_data" / "catalog.json").resolve()
-    uploads = Path(upload_dir or data_root / "uploads").resolve()
-    frontend = Path(frontend_dir or APP_ROOT / "frontend" / "dist").resolve()
+    catalog = Path(catalog_path or os.getenv("AICADEMIYA_CATALOG_PATH", str(APP_ROOT / "sample_data" / "catalog.json"))).resolve()
+    uploads = Path(upload_dir or os.getenv("AICADEMIYA_UPLOAD_DIR", str(data_root / "uploads"))).resolve()
+    frontend = Path(frontend_dir or os.getenv("AICADEMIYA_FRONTEND_DIR", str(APP_ROOT / "frontend" / "dist"))).resolve()
     demo = demo_enabled if demo_enabled is not None else os.getenv("AICADEMIYA_DEMO_ENABLED", "").lower() in ("1", "true", "yes")
     tutor = Tutor(database, transport=ai_transport, demo_enabled=demo)
     security = SecurityConfig.from_environment()

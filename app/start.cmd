@@ -7,5 +7,5 @@ if not exist ".venv\Scripts\python.exe" (
   pause
   exit /b 1
 )
-".venv\Scripts\python.exe" tools\launch.py
+pwsh.exe -NoProfile -File "%~dp0start.ps1"
 if errorlevel 1 pause

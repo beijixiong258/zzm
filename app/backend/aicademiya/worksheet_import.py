@@ -116,6 +116,7 @@ def _office_guard(path):
 
 def _docx_blocks(path, assets, warnings):
     from docx import Document
+    from docx.opc.constants import RELATIONSHIP_TYPE as RT
     from docx.oxml.ns import qn
     from docx.table import Table
     from docx.text.paragraph import Paragraph
@@ -123,7 +124,12 @@ def _docx_blocks(path, assets, warnings):
     document = Document(path)
     blocks = _Blocks()
     counters = {}
-    numbering = document.part.numbering_part.element
+    # Numbering is optional in DOCX. The numbering_part property attempts to
+    # create it when absent, which python-docx does not implement.
+    try:
+        numbering = document.part.part_related_by(RT.NUMBERING).element
+    except KeyError:
+        numbering = None
 
     def prefix(paragraph):
         props = paragraph._p.pPr
@@ -132,6 +138,11 @@ def _docx_blocks(path, assets, warnings):
             props = paragraph.style.element.pPr
             num = props.numPr if props is not None else None
         if num is None or num.numId is None:
+            return ""
+        if numbering is None:
+            warning = "Automatic list numbering has no definition; paragraph text was retained. Review original numbering."
+            if warning not in warnings:
+                warnings.append(warning)
             return ""
         num_id = str(num.numId.val)
         level = str(num.ilvl.val if num.ilvl is not None else 0)

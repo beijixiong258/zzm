@@ -1,11 +1,12 @@
 .venv/
 frontend/node_modules/
-frontend/dist/
 *.tsbuildinfo
 __pycache__/
 *.py[cod]
 .pytest_cache/
 .env
+config.json
+data-local/
 .env.*
 local-settings*.json
 !.env.example
@@ -30,3 +31,4 @@ artifacts/downloads/
 *.sqlite3-*
 *.db
 *.db-*
+local-materials/

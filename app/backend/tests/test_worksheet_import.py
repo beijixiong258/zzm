@@ -131,6 +131,29 @@ def test_word_automatic_numbering_and_bullet_options(tmp_path):
     assert "1. Which" in result["source_text"] and "2. Explain" in result["source_text"]
 
 
+@pytest.mark.parametrize("dangling_numbering", [False, True])
+def test_docx_without_numbering_part_preserves_text_and_answers(tmp_path, dangling_numbering):
+    from docx import Document
+    from docx.opc.constants import RELATIONSHIP_TYPE as RT
+    document = Document()
+    for line in TEXT.splitlines():
+        document.add_paragraph(line)
+    if dangling_numbering:
+        document.paragraphs[2].style = "List Number"
+    numbering_rel = next(rid for rid, rel in document.part.rels.items() if rel.reltype == RT.NUMBERING)
+    document.part.drop_rel(numbering_rel)
+    path = tmp_path / "without_numbering.docx"
+    document.save(path)
+    before = path.read_bytes()
+    result = wi.preview_worksheet(path, assets_dir=tmp_path / "assets")
+    assert result["method"] == "deterministic", result["warnings"]
+    assert len(result["questions"]) == 3
+    assert list(result["reference_answers"].values()) == ["star; gravity", "a) Star", "Reflected sunlight."]
+    assert "A planet orbits" in result["source_text"]
+    assert any("no definition" in warning for warning in result["warnings"]) == dangling_numbering
+    assert path.read_bytes() == before
+
+
 def test_matching_figures_and_explicit_labels(tmp_path):
     from docx import Document
     from docx.shared import Inches

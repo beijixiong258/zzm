@@ -8,10 +8,12 @@ import sqlite3
 from .db import Database
 from .models import validate_new_password
 from .roster import maintenance
+from .deployment_config import load_config
 
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Local AIcademiya administration (no password command-line arguments)")
+    parser.add_argument("--config", type=Path)
     sub = parser.add_subparsers(dest="action", required=True)
     create = sub.add_parser("create")
     create.add_argument("--email", required=True)
@@ -22,7 +24,9 @@ def main(argv=None):
     cleanup.add_argument("--dry-run", action="store_true")
     args = parser.parse_args(argv)
     root = Path(__file__).resolve().parents[2]
-    data = Path(os.getenv("AICADEMIYA_DATA_DIR", str(root / "data-v2")))
+    config_path = args.config or root / "config.json"
+    storage = load_config(config_path)["storage"] if args.config or config_path.is_file() else {}
+    data = Path(storage.get("data_dir", os.getenv("AICADEMIYA_DATA_DIR", str(root / "data-v2"))))
     db = Database(data / "aicademiya.sqlite3")
     if args.action == "create":
         if not args.name.strip() or "@" not in args.email or " " in args.email:
@@ -39,7 +43,7 @@ def main(argv=None):
         if not db.path.is_file():
             parser.error("Existing migrated database is required for maintenance")
     else:
-        db.initialize(root / "sample_data" / "catalog.json", demo_enabled=False)
+        db.initialize(Path(storage.get("catalog_path", str(root / "sample_data" / "catalog.json"))), demo_enabled=False)
     try:
         if args.action == "create":
             uid = db.create_admin(args.name, args.email, password)

@@ -1,0 +1,104 @@
+[
+  {
+    "source": "C:\\Users\\user\\Desktop\\zzm\\app\\data-local\\uploads\\180fdf16ddbc9b1822ed344a573cd46a.docx",
+    "destination": "C:\\Users\\user\\Desktop\\智能体回收站\\垃圾桶\\zzm-session4-20261016\\test-temporary-files\\failed-imports\\180fdf16ddbc9b1822ed344a573cd46a.docx",
+    "destination_exists": true,
+    "source_absent": true
+  },
+  {
+    "source": "C:\\Users\\user\\Desktop\\zzm\\app\\data-local\\uploads\\180fdf16ddbc9b1822ed344a573cd46a-assets",
+    "destination": "C:\\Users\\user\\Desktop\\智能体回收站\\垃圾桶\\zzm-session4-20261016\\test-temporary-files\\failed-imports\\180fdf16ddbc9b1822ed344a573cd46a-assets",
+    "destination_exists": true,
+    "source_absent": true
+  },
+  {
+    "source": "C:\\Users\\user\\Desktop\\zzm\\app\\data-local\\uploads\\29b6498c3e2185902708448acfc4fec8.docx",
+    "destination": "C:\\Users\\user\\Desktop\\智能体回收站\\垃圾桶\\zzm-session4-20261016\\test-temporary-files\\failed-imports\\29b6498c3e2185902708448acfc4fec8.docx",
+    "destination_exists": true,
+    "source_absent": true
+  },
+  {
+    "source": "C:\\Users\\user\\Desktop\\zzm\\app\\data-local\\uploads\\29b6498c3e2185902708448acfc4fec8-assets",
+    "destination": "C:\\Users\\user\\Desktop\\智能体回收站\\垃圾桶\\zzm-session4-20261016\\test-temporary-files\\failed-imports\\29b6498c3e2185902708448acfc4fec8-assets",
+    "destination_exists": true,
+    "source_absent": true
+  },
+  {
+    "source": "C:\\Users\\user\\Desktop\\zzm\\app\\data-local\\uploads\\e2f387f6a2cba8e2cbe9aab276b964b7.docx",
+    "destination": "C:\\Users\\user\\Desktop\\智能体回收站\\垃圾桶\\zzm-session4-20261016\\test-temporary-files\\failed-imports\\e2f387f6a2cba8e2cbe9aab276b964b7.docx",
+    "destination_exists": true,
+    "source_absent": true
+  },
+  {
+    "source": "C:\\Users\\user\\Desktop\\zzm\\app\\data-local\\uploads\\e2f387f6a2cba8e2cbe9aab276b964b7-assets",
+    "destination": "C:\\Users\\user\\Desktop\\智能体回收站\\垃圾桶\\zzm-session4-20261016\\test-temporary-files\\failed-imports\\e2f387f6a2cba8e2cbe9aab276b964b7-assets",
+    "destination_exists": true,
+    "source_absent": true
+  },
+  {
+    "source": "C:\\Users\\user\\Desktop\\zzm\\app\\data-local\\uploads\\effe81d873cafc68fd129ef6a8df0351.docx",
+    "destination": "C:\\Users\\user\\Desktop\\智能体回收站\\垃圾桶\\zzm-session4-20261016\\test-temporary-files\\failed-imports\\effe81d873cafc68fd129ef6a8df0351.docx",
+    "destination_exists": true,
+    "source_absent": true
+  },
+  {
+    "source": "C:\\Users\\user\\Desktop\\zzm\\app\\data-local\\uploads\\effe81d873cafc68fd129ef6a8df0351-assets",
+    "destination": "C:\\Users\\user\\Desktop\\智能体回收站\\垃圾桶\\zzm-session4-20261016\\test-temporary-files\\failed-imports\\effe81d873cafc68fd129ef6a8df0351-assets",
+    "destination_exists": true,
+    "source_absent": true
+  },
+  {
+    "source": "C:\\Users\\user\\Desktop\\zzm\\app\\.agent-session4-20261016",
+    "destination": "C:\\Users\\user\\Desktop\\智能体回收站\\垃圾桶\\zzm-session4-20261016\\test-temporary-files\\scripts-and-test-data",
+    "destination_exists": true,
+    "source_absent": true
+  },
+  {
+    "source": "C:\\Users\\user\\Desktop\\zzm\\app\\frontend\\node_modules\\.vite",
+    "destination": "C:\\Users\\user\\Desktop\\智能体回收站\\垃圾桶\\zzm-session4-20261016\\test-temporary-files\\frontend-cache\\.vite",
+    "destination_exists": true,
+    "source_absent": true
+  },
+  {
+    "source": "C:\\Users\\user\\Desktop\\zzm\\app\\frontend\\node_modules\\.vite-temp",
+    "destination": "C:\\Users\\user\\Desktop\\智能体回收站\\垃圾桶\\zzm-session4-20261016\\test-temporary-files\\frontend-cache\\.vite-temp",
+    "destination_exists": true,
+    "source_absent": true
+  },
+  {
+    "source": "C:\\Users\\user\\Desktop\\zzm\\docs\\session4-acceptance-20261016\\screenshots\\13-correct-answer-next-question.jpg",
+    "destination": "C:\\Users\\user\\Desktop\\智能体回收站\\垃圾桶\\zzm-session4-20261016\\test-temporary-files\\intermediate-screenshot.jpg",
+    "destination_exists": true,
+    "source_absent": true
+  },
+  {
+    "source": "C:\\Users\\user\\AppData\\Local\\npm-cache\\_logs\\2026-10-16T08_31_00_536Z-debug-0.log",
+    "destination": "C:\\Users\\user\\Desktop\\智能体回收站\\垃圾桶\\zzm-session4-20261016\\test-temporary-files\\npm-logs\\2026-10-16T08_31_00_536Z-debug-0.log",
+    "destination_exists": true,
+    "source_absent": true
+  },
+  {
+    "source": "C:\\Users\\user\\AppData\\Local\\npm-cache\\_logs\\2026-10-16T08_38_42_955Z-debug-0.log",
+    "destination": "C:\\Users\\user\\Desktop\\智能体回收站\\垃圾桶\\zzm-session4-20261016\\test-temporary-files\\npm-logs\\2026-10-16T08_38_42_955Z-debug-0.log",
+    "destination_exists": true,
+    "source_absent": true
+  },
+  {
+    "source": "C:\\Users\\user\\AppData\\Local\\npm-cache\\_logs\\2026-10-16T08_55_02_880Z-debug-0.log",
+    "destination": "C:\\Users\\user\\Desktop\\智能体回收站\\垃圾桶\\zzm-session4-20261016\\test-temporary-files\\npm-logs\\2026-10-16T08_55_02_880Z-debug-0.log",
+    "destination_exists": true,
+    "source_absent": true
+  },
+  {
+    "source": "C:\\Users\\user\\AppData\\Local\\npm-cache\\_logs\\2026-10-16T08_56_30_662Z-debug-0.log",
+    "destination": "C:\\Users\\user\\Desktop\\智能体回收站\\垃圾桶\\zzm-session4-20261016\\test-temporary-files\\npm-logs\\2026-10-16T08_56_30_662Z-debug-0.log",
+    "destination_exists": true,
+    "source_absent": true
+  },
+  {
+    "source": "C:\\Users\\user\\Downloads\\aicademiya-e7d0ce66e3a524dd5327e02e97ebd655-demo-student-1-v1.json",
+    "destination": "C:\\Users\\user\\Desktop\\智能体回收站\\垃圾桶\\zzm-session4-20261016\\test-temporary-files\\test-export\\aicademiya-e7d0ce66e3a524dd5327e02e97ebd655-demo-student-1-v1.json",
+    "destination_exists": true,
+    "source_absent": true
+  }
+]

@@ -1,5 +1,0 @@
-{
-  "extends": "../tsconfig.json",
-  "include": ["stage11-personnel-harness.tsx", "stage11-personnel.test.tsx"],
-  "compilerOptions": { "noEmit": true }
-}

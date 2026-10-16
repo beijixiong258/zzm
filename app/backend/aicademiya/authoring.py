@@ -453,7 +453,11 @@ def register_authoring_routes(app, db, tutor, uploads, teacher_user, current_use
                     session_access(conn, session_id, user)
                 if len(json.dumps(messages, ensure_ascii=False)) > 100000:
                     raise HTTPException(413, "AI worksheet extraction payload exceeds the bounded document limit")
-                args = {"kv_scope": tutor.kv_scope(user, session_id+":"+mid, "worksheet-import")} if tutor.uses_aicademiya_router(settings) else {}
+                args = {"max_tokens": 8192}
+                if tutor.uses_aicademiya_router(settings):
+                    args["kv_scope"] = tutor.kv_scope(user, session_id+":"+mid, "worksheet-import")
+                if tutor.uses_aicademiya_router(settings) or tutor.uses_siliconflow(settings):
+                    args["response_format"] = {"type": "json_object"}
                 try:
                     return tutor.complete(settings, messages, **args)
                 except ModelFailure as exc:
