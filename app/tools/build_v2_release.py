@@ -87,9 +87,9 @@ def collect(source):
     source = Path(source).resolve()
     files = {}
 
-    def add(destination, origin=None, component="code"):
+    def add(destination, origin=None, component="code", source_root=source):
         permitted_name(destination)
-        data = regular(source, origin or destination).read_bytes()
+        data = regular(source_root, origin or destination).read_bytes()
         mode = 0o755 if destination.endswith(".sh") else (0o600 if component == "private_seed" else 0o644)
         files[destination] = {"data": data, "component": component, "mode": mode}
 
@@ -127,7 +127,10 @@ def collect(source):
     for name in RUNTIME_FILES:
         add("runtime_v2/" + name)
     for name in ("RUNTIME_V2.md", "BACKUP-RESTORE-V2.md"):
-        add(name)
+        if (source / name).is_file():
+            add(name)
+        else:
+            add(name, "docs/history/" + name, source_root=source.parent)
 
     catalog = json.loads(regular(source, "sample_data/catalog.json").read_text(encoding="utf-8-sig"))
     if set(catalog) != {"schema_version", "course", "sessions"} or catalog["schema_version"] != 1:

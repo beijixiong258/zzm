@@ -31,7 +31,7 @@ def main():
     assert config['AICADEMIYA_AI_MODE']=='demo' and config['AICADEMIYA_AI_MODEL']=='qwen27b-q8'
     guard=subprocess.run([sys.executable,'tools/live_model_probe.py'],cwd=ROOT,capture_output=True,text=True)
     assert guard.returncode!=0 and 'Confirm resource availability first' in guard.stderr
-    required=['README.md','VERIFICATION.md','DEPLOYMENT.md','CONTRACT.md','AUTH_CHANGE.md','AGENTS.md','start.cmd','setup.cmd','Dockerfile','compose.yaml','frontend/dist/index.html','backend/requirements.txt','sample_data/catalog.json']
+    required=['../README.md','VERIFICATION.md','DEPLOYMENT.md','../docs/history/CONTRACT.md','AUTH_CHANGE.md','AGENTS.md','start.cmd','setup.cmd','Dockerfile','compose.yaml','frontend/dist/index.html','backend/requirements.txt','sample_data/catalog.json']
     assert all((ROOT/name).is_file() for name in required)
     documents=[PROJECT/'README.md',*sorted((PROJECT/'docs').glob('*.md')),
                *sorted((PROJECT/'research').glob('*.md')),PROJECT/'research/course-analysis/README.md',PROJECT/'research/course-analysis/worksheet-map.md',

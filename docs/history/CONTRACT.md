@@ -1,6 +1,6 @@
 # EDUC7703 Sample App — Historical Integration Contract
 
-> 初始样例契约。当前应用为AIcademiya Stage16 R4/API0.11/schema9；当前入口与模块契约索引见 `../docs/project-review-20261014/README.md`。本文保留初版字段、品牌、预算和权限模型供历史对照。
+> 初始样例契约。当前应用为AIcademiya Stage16 R4/API0.11/schema9；当前入口与模块契约索引见 `../project-review-20261014/README.md`。本文保留初版字段、品牌、预算和权限模型供历史对照。
 
 Date: 2026-10-03. This file is the shared contract for the first working sample. Read `../docs/requirements-review.md` §3 and §11, plus `../research/course-analysis/README.md`. Do not modify original course/research files.
 
