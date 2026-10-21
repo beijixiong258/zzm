@@ -11,7 +11,7 @@ from . import models as m
 from .db import new_id, now
 from .materials import MAX_UPLOAD_BYTES
 from .material_library import (session_material_rows, member_material, course_material_rows,
-                               linked_session_ids, attach_material, detach_material)
+                               linked_session_ids, attach_material, detach_material, course_material)
 from .roster import staging, ensure_staging_capacity
 from .services import public_detail, public_material
 from .version_context import is_staff, course_access, session_access, material_rows
@@ -154,6 +154,14 @@ def safe_asset_path(raw, key):
 
 
 def authorized_image_url(conn, sid, url):
+    preview = re.fullmatch(r"/api/materials/([A-Za-z0-9-]+)/preview", url)
+    if preview:
+        row = next((r for r in session_material_rows(conn, sid) if r["id"] == preview[1]), None)
+        if not row:
+            return False
+        raw = json.loads(row["content_json"])
+        path = Path(row["file_path"]) if row["file_path"] else None
+        return raw.get("visibility") == "student" and raw.get("kind") != "answer_key" and bool(path and path.is_file() and path.suffix.lower() in (".png", ".jpg", ".jpeg", ".webp"))
     match = re.fullmatch(r"/api/materials/([A-Za-z0-9-]+)/assets/([A-Za-z0-9_.-]+)", url)
     if not match:
         return False
@@ -336,6 +344,29 @@ def register_authoring_routes(app, db, tutor, uploads, teacher_user, current_use
             course_access(conn, course_id, user)
             return versions.restore(conn, course_id, version_id, user["id"], payload.label)
 
+    @app.post("/api/courses/{course_id}/materials/link")
+    def create_course_link(course_id: str, payload: m.LinkCreate, user=Depends(teacher_user)):
+        with db.connect() as conn:
+            course_access(conn, course_id, user)
+        item = link_data(payload.url, payload.title, payload.visibility)
+        with db.connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            course_access(conn, course_id, user)
+            conn.execute("INSERT INTO materials VALUES(?,NULL,?,?,0)", (item["id"], json.dumps(item), None))
+            conn.execute("INSERT INTO material_courses VALUES(?,?)", (item["id"], course_id))
+            return public_material(conn.execute("SELECT * FROM materials WHERE id=?", (item["id"],)).fetchone(), True)
+
+    @app.delete("/api/courses/{course_id}/materials/{material_id}")
+    def archive_course_material(course_id: str, material_id: str, user=Depends(teacher_user)):
+        with db.connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            course_access(conn, course_id, user)
+            course_material(conn, course_id, material_id)
+            if linked_session_ids(conn, material_id):
+                raise HTTPException(409, "Remove this material from its session drafts before removing it from the course library")
+            conn.execute("UPDATE materials SET archived=1 WHERE id=?", (material_id,))
+            return {"ok": True}
+
     @app.post("/api/sessions/{session_id}/materials/link")
     def create_link(session_id: str, payload: m.LinkCreate, user=Depends(teacher_user)):
         with db.connect() as conn:
@@ -347,12 +378,23 @@ def register_authoring_routes(app, db, tutor, uploads, teacher_user, current_use
             conn.execute("INSERT INTO materials VALUES(?,?,?,?,0)", (item["id"], session_id, json.dumps(item), None))
             return public_material(conn.execute("SELECT * FROM materials WHERE id=?", (item["id"],)).fetchone(), True)
 
+    @app.patch("/api/courses/{course_id}/materials/{material_id}")
+    def patch_course_material(course_id: str, material_id: str, payload: m.MaterialPatch, user=Depends(teacher_user)):
+        return patch_material_record(None, course_id, material_id, payload, user)
+
     @app.patch("/api/sessions/{session_id}/materials/{material_id}")
     def patch_material(session_id: str, material_id: str, payload: m.MaterialPatch, user=Depends(teacher_user)):
+        return patch_material_record(session_id, None, material_id, payload, user)
+
+    def patch_material_record(session_id, course_id, material_id, payload, user):
         with db.connect() as conn:
             conn.execute("BEGIN IMMEDIATE")
-            session_access(conn, session_id, user)
-            r = member_material(conn, session_id, material_id)
+            if session_id:
+                session_access(conn, session_id, user)
+                r = member_material(conn, session_id, material_id)
+            else:
+                course_access(conn, course_id, user)
+                r = course_material(conn, course_id, material_id)
             raw = json.loads(r["content_json"])
             values = payload.model_dump(exclude_unset=True)
             if any(v is None for v in values.values()) or ("title" in values and not values["title"].strip()):
@@ -379,6 +421,12 @@ def register_authoring_routes(app, db, tutor, uploads, teacher_user, current_use
                         if old_url in q.get("source_links", []):
                             q["source_links"] = [raw["url"] if x == old_url else x for x in q.get("source_links", [])]
                     conn.execute("UPDATE sessions SET content_json=? WHERE id=?", (json.dumps(detail), sid))
+            if values.get("visibility", raw.get("visibility")) != "student" or values.get("kind", raw.get("kind")) == "answer_key":
+                image_url = f"/api/materials/{material_id}/preview"
+                for sid in linked_session_ids(conn, material_id):
+                    detail = json.loads(conn.execute("SELECT content_json FROM sessions WHERE id=?", (sid,)).fetchone()[0])
+                    if any(image.get("url", "").split("?", 1)[0] == image_url for q in detail.get("questions", []) for image in q.get("images", [])):
+                        raise HTTPException(422, "Student question images must remain student-visible")
             raw.update({k: v for k, v in values.items() if k != "url"})
             conn.execute("UPDATE materials SET content_json=? WHERE id=?", (json.dumps(raw), material_id))
             return public_material(conn.execute("SELECT * FROM materials WHERE id=?", (material_id,)).fetchone(), True)

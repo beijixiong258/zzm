@@ -272,11 +272,18 @@ export const api = {
     }),
   restoreSession: (sid: string) =>
     post<{ id: string; restored: boolean }>(`${session(sid)}/restore`),
-  createSession: (cid: string, title: string, number: number, subtitle = "") =>
+  createSession: (
+    cid: string,
+    title: string,
+    number: number,
+    subtitle = "",
+    teaching_language = "en",
+  ) =>
     post<SessionDetail>(`/courses/${id(cid)}/sessions`, {
       title,
       number,
       subtitle,
+      teaching_language,
       instructions: "",
       learning_objectives: [],
     }),
@@ -398,19 +405,19 @@ export const api = {
     kind: string,
     processing?: "preview" | "full_document",
     onProgress?: (value: UploadProgress) => void,
+    relativePath?: string,
+    scope: "session" | "course" = "session",
   ) => {
     const body = new FormData();
     body.set("file", file);
     body.set("visibility", visibility);
     body.set("kind", kind);
     if (processing !== undefined) body.set("processing", processing);
+    if (relativePath) body.set("relative_path", relativePath);
+    const target = scope === "course" ? `/courses/${id(sid)}` : session(sid);
     if (onProgress)
-      return uploadRequest<Material>(
-        `${session(sid)}/materials`,
-        body,
-        onProgress,
-      );
-    return request<Material>(`${session(sid)}/materials`, {
+      return uploadRequest<Material>(`${target}/materials`, body, onProgress);
+    return request<Material>(`${target}/materials`, {
       method: "POST",
       body,
     });
@@ -424,7 +431,12 @@ export const api = {
   createLink: (
     sid: string,
     body: { url: string; title?: string; visibility: "student" | "teacher" },
-  ) => post<Material>(`${session(sid)}/materials/link`, body),
+    scope: "session" | "course" = "session",
+  ) =>
+    post<Material>(
+      `${scope === "course" ? `/courses/${id(sid)}` : session(sid)}/materials/link`,
+      body,
+    ),
   updateMaterial: (
     sid: string,
     mid: string,
@@ -434,11 +446,23 @@ export const api = {
       visibility?: "student" | "teacher";
       url?: string;
     },
-  ) => patch<Material>(`${session(sid)}/materials/${id(mid)}`, body),
-  archiveMaterial: (sid: string, mid: string) =>
-    request<unknown>(`${session(sid)}/materials/${id(mid)}`, {
-      method: "DELETE",
-    }),
+    scope: "session" | "course" = "session",
+  ) =>
+    patch<Material>(
+      `${scope === "course" ? `/courses/${id(sid)}` : session(sid)}/materials/${id(mid)}`,
+      body,
+    ),
+  archiveMaterial: (
+    sid: string,
+    mid: string,
+    scope: "session" | "course" = "session",
+  ) =>
+    request<unknown>(
+      `${scope === "course" ? `/courses/${id(sid)}` : session(sid)}/materials/${id(mid)}`,
+      {
+        method: "DELETE",
+      },
+    ),
   previewUrl: (mid: string, vid?: string | null) =>
     `/api/materials/${id(mid)}/preview${versionQuery(vid)}`,
   worksheetFromMaterial: (

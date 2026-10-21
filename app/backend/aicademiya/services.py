@@ -51,6 +51,7 @@ def public_material(row, teacher=False, version_id=None):
     from .document_storage import public_document
     result["document"] = public_document(raw.get("document"))
     result["warning"] = raw.get("warning")
+    result["source_relative_path"] = raw.get("source_relative_path")
     suffix = "?" + urlencode({"version_id": version_id}) if version_id else ""
     result["download_url"] = f"/api/materials/{row['id']}/download{suffix}" if row["file_path"] else None
     result["preview_url"] = f"/api/materials/{row['id']}/preview{suffix}"

@@ -11,6 +11,7 @@ const props = withDefaults(
     dirty?: boolean;
     wide?: boolean;
     compact?: boolean;
+    closeLabel?: string;
   }>(),
   { busy: false, dirty: false, wide: false, compact: false },
 );
@@ -72,7 +73,7 @@ function close() {
           </button></template
         ><template v-else
           ><button class="secondary" :disabled="busy" @click="close">
-            {{ $slots.actions ? t("Cancel") : t("Done") }}</button
+            {{ closeLabel || t("Cancel") }}</button
           ><slot name="actions"
         /></template>
       </footer></dialog

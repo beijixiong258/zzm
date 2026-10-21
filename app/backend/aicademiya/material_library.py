@@ -6,6 +6,35 @@ The insert trigger covers legacy positional INSERT callers without schema churn.
 from fastapi import HTTPException
 
 
+def migrate_material_origin(conn):
+    if not next(r for r in conn.execute("PRAGMA table_info(materials)") if r["name"] == "session_id")["notnull"]:
+        return
+    # Initialization calls this before any data transaction. Do not rename the old
+    # table: SQLite would rewrite foreign keys in dependent tables to that name.
+    if conn.in_transaction:
+        raise RuntimeError("Material origin migration requires an idle connection")
+    objects = [r[0] for r in conn.execute("SELECT sql FROM sqlite_master WHERE tbl_name='materials' AND type IN ('index','trigger') AND sql IS NOT NULL")]
+    conn.execute("PRAGMA foreign_keys=OFF")
+    try:
+        conn.execute("BEGIN IMMEDIATE")
+        conn.execute("""CREATE TABLE materials_origin_nullable (
+            id TEXT PRIMARY KEY, session_id TEXT REFERENCES sessions(id), content_json TEXT NOT NULL,
+            file_path TEXT, archived INTEGER NOT NULL DEFAULT 0)""")
+        conn.execute("INSERT INTO materials_origin_nullable(rowid,id,session_id,content_json,file_path,archived) SELECT rowid,id,session_id,content_json,file_path,archived FROM materials")
+        conn.execute("DROP TABLE materials")
+        conn.execute("ALTER TABLE materials_origin_nullable RENAME TO materials")
+        for sql in objects:
+            conn.execute(sql)
+        if conn.execute("PRAGMA foreign_key_check").fetchone():
+            raise RuntimeError("Material origin migration found invalid references")
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.execute("PRAGMA foreign_keys=ON")
+
+
 def migrate_material_library(conn):
     # Runs before stage-2's baseline snapshot, and also on existing stage-3 DBs.
     conn.execute("SAVEPOINT stage4_materials")
@@ -25,12 +54,13 @@ def migrate_material_library(conn):
                 SELECT 1 FROM sessions s JOIN material_courses c ON c.course_id=s.course_id
                 WHERE s.id=NEW.session_id AND c.material_id=NEW.material_id)
             BEGIN SELECT RAISE(ABORT,'Material membership must remain in its course'); END""")
-        conn.execute("""CREATE TRIGGER IF NOT EXISTS material_library_insert
+        conn.execute("DROP TRIGGER IF EXISTS material_library_insert")
+        conn.execute("""CREATE TRIGGER material_library_insert
             AFTER INSERT ON materials BEGIN
                 INSERT INTO material_courses(material_id,course_id)
                     SELECT NEW.id,course_id FROM sessions WHERE id=NEW.session_id;
                 INSERT INTO session_materials(session_id,material_id)
-                    SELECT NEW.session_id,NEW.id WHERE NEW.archived=0;
+                    SELECT NEW.session_id,NEW.id WHERE NEW.archived=0 AND NEW.session_id IS NOT NULL;
             END""")
         if not conn.execute("SELECT 1 FROM meta WHERE key='stage4_material_library'").fetchone():
             conn.execute("""INSERT INTO material_courses(material_id,course_id)
@@ -64,6 +94,13 @@ def course_material_rows(conn, cid):
     return conn.execute("""SELECT m.* FROM materials m
         JOIN material_courses c ON c.material_id=m.id
         WHERE c.course_id=? AND m.archived=0 ORDER BY m.rowid""", (cid,)).fetchall()
+
+
+def course_material(conn, cid, mid):
+    row = next((r for r in course_material_rows(conn, cid) if r["id"] == mid), None)
+    if not row:
+        raise HTTPException(404, "Course material not found")
+    return row
 
 
 def linked_session_ids(conn, mid):

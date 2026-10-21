@@ -17,7 +17,9 @@ import {
   saveTeachingDraft,
   teachingPhaseLabels,
   toggleTeachingPhase,
+  teachingTextLimits,
 } from "../../teaching-profile";
+import { worksheetReadbackMatches } from "../../question-draft";
 import { localDateTime, schedulePayload } from "../../stage2";
 import {
   clone,
@@ -28,6 +30,8 @@ import {
   useDirty,
   refreshCourses,
   askConfirm,
+  useRouteTab,
+  updateRouteContext,
 } from "../state";
 import PageHeader from "../components/PageHeader.vue";
 import FeedbackNotice from "../components/FeedbackNotice.vue";
@@ -37,10 +41,11 @@ import MaterialsPane from "../components/MaterialsPane.vue";
 import ItemRow from "../components/ItemRow.vue";
 import EditorDialog from "../components/EditorDialog.vue";
 import RichText from "../components/RichText.vue";
+import { uploadFormats, acceptFormats } from "../../upload-capabilities";
 const props = defineProps<{ sid: string }>();
 const session = ref<SessionDetail | null>(null),
   draft = ref<SessionDetail | null>(null),
-  tab = ref("setup"),
+  tab = useRouteTab("setup", ["setup", "questions", "materials", "records"]),
   importing = ref(false),
   preview = ref(false),
   compiled = ref<TeachingPreview | null>(null),
@@ -53,6 +58,15 @@ const dirty = computed(
 );
 useDirty(dirty);
 const profile = computed(() => draft.value!.teaching_profile!);
+const teachingLanguageChoice = computed({
+  get: () =>
+    draft.value?.teaching_language?.toLowerCase().startsWith("zh")
+      ? "zh"
+      : draft.value?.teaching_language || "en",
+  set: (value: string) => {
+    if (draft.value) draft.value.teaching_language = value;
+  },
+});
 const objectives = computed({
   get: () => draft.value?.learning_objectives.join("\n") || "",
   set: (v: string) => {
@@ -87,7 +101,13 @@ function fill(s: SessionDetail) {
     active.value = s.active !== false;
   }
 }
-void run(async () => fill(await api.session(props.sid)));
+void run(async () => {
+  fill(await api.session(props.sid));
+  if (!location.hash.includes("course="))
+    updateRouteContext({ course: session.value!.course_id });
+}).then(() => {
+  if (tab.value === "records" && session.value) void loadRecords();
+});
 async function save() {
   if (!draft.value) return;
   await run(async () => {
@@ -96,21 +116,41 @@ async function save() {
   }, t("Draft saved. Publish when ready to share with students."));
 }
 async function saveQuestions(value: WorksheetDraft) {
-  const next = {
-    ...clone(draft.value!),
+  const patch = {
     groups: value.groups,
     questions: value.questions,
     reference_answers: value.reference_answers,
   };
-  const verified = await saveTeachingDraft(props.sid, next);
+  await api.updateSession(props.sid, patch);
+  const verified = await api.session(props.sid);
   if (
-    JSON.stringify(verified.questions) !== JSON.stringify(next.questions) ||
-    JSON.stringify(verified.groups) !== JSON.stringify(next.groups)
+    !worksheetReadbackMatches(
+      { title: value.title, ...patch },
+      {
+        title: verified.title,
+        groups: verified.groups,
+        questions: verified.questions,
+        reference_answers: verified.reference_answers || {},
+      },
+    )
   )
     throw Error(
       t("Saved questions could not be verified. Refresh before retrying."),
     );
-  fill(verified);
+  session.value = {
+    ...session.value!,
+    groups: verified.groups,
+    questions: verified.questions,
+    reference_answers: verified.reference_answers,
+    materials: verified.materials,
+  };
+  draft.value = {
+    ...draft.value!,
+    groups: clone(verified.groups),
+    questions: clone(verified.questions),
+    reference_answers: clone(verified.reference_answers),
+    materials: verified.materials,
+  };
   await refreshCourses();
 }
 async function availability() {
@@ -169,7 +209,13 @@ function materialsChanged(s: SessionDetail) {
   draft.value!.materials = s.materials;
 }
 async function discard() {
-  if (await askConfirm(t("Discard your unsaved teaching changes?")))
+  if (
+    await askConfirm(t("Discard your unsaved teaching changes?"), {
+      title: t("Discard changes"),
+      confirmLabel: t("Discard changes"),
+      danger: true,
+    })
+  )
     fill(session.value!);
 }
 async function inspect() {
@@ -201,11 +247,13 @@ async function inspect() {
         :disabled="busy || !dirty"
         @click="save"
       >
-        <Save :size="16" /> {{ t("Save draft") }}
+        <Save :size="16" /> {{ t("Save teaching settings") }}
       </button></PageHeader
     >
     <div class="status-strip">
-      <span>{{ dirty ? t("Unsaved draft") : t("Draft saved") }}</span
+      <span>{{
+        dirty ? t("Unsaved teaching settings") : t("Teaching draft saved")
+      }}</span
       ><span
         class="badge"
         :class="session.effective_active ? 'positive' : 'neutral'"
@@ -264,7 +312,7 @@ async function inspect() {
           <div class="form-grid">
             <label
               >{{ t("Teaching language")
-              }}<select v-model="draft.teaching_language">
+              }}<select v-model="teachingLanguageChoice">
                 <option value="en">{{ t("English") }}</option>
                 <option value="zh">{{ t("Chinese") }}</option>
               </select></label
@@ -289,27 +337,29 @@ async function inspect() {
             }}<textarea
               v-model="profile.background"
               rows="3"
-              maxlength="8000"
+              :maxlength="teachingTextLimits.background"
             /></label
           ><label
             >{{ t("Student profile")
             }}<textarea
               v-model="profile.student_profile"
               rows="2"
-              maxlength="8000"
+              :maxlength="teachingTextLimits.student_profile"
             /></label
           ><label
             >{{ t("Response strategies")
             }}<textarea
               v-model="profile.response_strategies"
               rows="3"
-              maxlength="8000"
+              :maxlength="teachingTextLimits.response_strategies"
             />
           </label>
           <div class="form-grid">
             <label
               >{{ t("Tone")
-              }}<input v-model="profile.tone" maxlength="1000" /></label
+              }}<input
+                v-model="profile.tone"
+                :maxlength="teachingTextLimits.tone" /></label
             ><label
               >{{ t("Response detail")
               }}<select v-model="profile.response_detail">
@@ -347,7 +397,11 @@ async function inspect() {
             </div>
             <label
               >{{ t("Reading focus")
-              }}<textarea v-model="profile.reading_focus" rows="2" />
+              }}<textarea
+                v-model="profile.reading_focus"
+                rows="2"
+                :maxlength="teachingTextLimits.reading_focus"
+              />
             </label>
             <div class="form-grid">
               <label
@@ -384,17 +438,34 @@ async function inspect() {
                     {{ t("After a sufficient answer") }}
                   </option>
                 </select></label
-              ><label
-                >{{ t("Idle hint delay · seconds")
-                }}<input
-                  v-model.number="profile.idle_hint_seconds"
-                  type="number"
-                  min="0"
-                  max="300"
-                /><small>{{
-                  t("0 disables idle hints; otherwise use 10–300 seconds.")
-                }}</small></label
               >
+              <div class="form-stack">
+                <label class="check"
+                  ><input
+                    type="checkbox"
+                    :checked="profile.idle_hint_seconds !== 0"
+                    @change="
+                      profile.idle_hint_seconds = (
+                        $event.target as HTMLInputElement
+                      ).checked
+                        ? 10
+                        : 0
+                    "
+                  />{{ t("Enable idle hints") }}</label
+                >
+                <label v-if="profile.idle_hint_seconds !== 0"
+                  >{{ t("Idle hint delay · seconds")
+                  }}<input
+                    v-model.number="profile.idle_hint_seconds"
+                    type="number"
+                    min="10"
+                    max="300"
+                    step="1"
+                /></label>
+                <small>{{
+                  t("0 disables idle hints; otherwise use 10–300 seconds.")
+                }}</small>
+              </div>
             </div>
           </details>
           <details class="form-section">
@@ -404,15 +475,20 @@ async function inspect() {
               }}<textarea
                 v-model="draft.instructions"
                 rows="6"
-                maxlength="30000"
+                :maxlength="teachingTextLimits.instructions"
               /></label
             ><label
               >{{ t("Import instructions")
               }}<input
                 type="file"
-                accept=".txt,.md,.docx,.pdf"
+                :accept="acceptFormats(uploadFormats.instructions)"
                 @change="importInstructions"
-            /></label>
+              /><small>{{
+                t(
+                  "Instruction import: TXT, Markdown, DOCX or PDF; up to 25 MiB. Review the extracted text before saving.",
+                )
+              }}</small></label
+            >
           </details>
         </section>
       </div>
@@ -420,7 +496,11 @@ async function inspect() {
         <section class="panel">
           <h2>{{ t("Availability") }}</h2>
           <p class="muted">
-            {{ t("Controls when students can enter the published session.") }}
+            {{
+              t(
+                "Applied immediately to student access. This setting is independent of saving or publishing course content.",
+              )
+            }}
           </p>
           <label class="check"
             ><input v-model="active" type="checkbox" />{{
@@ -438,7 +518,7 @@ async function inspect() {
             :disabled="busy || !scheduleDirty"
             @click="availability"
           >
-            {{ t("Apply availability") }}
+            {{ t("Apply availability now") }}
           </button>
         </section>
         <section class="panel quiet-panel">
@@ -472,12 +552,17 @@ async function inspect() {
         " /><template v-else
         ><p v-if="dirty" class="notice warning">
           {{
-            t("Saving a question will also save your current teaching changes.")
+            t(
+              "Teaching changes are still unsaved. Saving questions changes only questions and groups.",
+            )
           }}
         </p>
         <QuestionManager
           :value="worksheet"
           :materials="session.materials"
+          :session-id="sid"
+          :teaching-language="draft.teaching_language"
+          @materials-changed="materialsChanged"
           :save="saveQuestions"
           :disabled="busy"
           @import="
@@ -561,13 +646,14 @@ async function inspect() {
         <button class="secondary" :disabled="busy" @click="discard">
           {{ t("Discard") }}</button
         ><button class="primary" :disabled="busy" @click="save">
-          {{ t("Save draft") }}
+          {{ t("Save teaching settings") }}
         </button>
       </div>
     </div>
     <EditorDialog
       v-if="preview"
       :title="t('Draft preview')"
+      :close-label="t('Close')"
       wide
       :busy="busy"
       @close="preview = false"
@@ -588,6 +674,7 @@ async function inspect() {
         v-for="q in draft.questions"
         :key="q.id"
         :title="q.prompt"
+        expandable
         :number="q.ordinal"
         ><template #meta>{{ label(q.type) }}</template></ItemRow
       >

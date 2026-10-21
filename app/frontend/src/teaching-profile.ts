@@ -201,9 +201,6 @@ export async function saveTeachingDraft(
     teaching_language: draft.teaching_language,
     teaching_profile: profile,
     status: draft.status,
-    groups: draft.groups,
-    questions: draft.questions,
-    reference_answers: draft.reference_answers || {},
   };
   await api.updateSession(sid, payload);
   const verified = await api.session(sid);

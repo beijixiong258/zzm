@@ -2,12 +2,18 @@
 import { t } from "../../i18n";
 
 import { askConfirm } from "../state";
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import { Plus, Search } from "lucide-vue-next";
-import type { Material, WorksheetDraft } from "../../types";
+import type { Material, WorksheetDraft, SessionDetail } from "../../types";
 import { authoringErrors, renumber } from "../../stage2";
 import { newGroup, newQuestion } from "../../question-draft";
 import { clone, label, useTask } from "../state";
+import { api } from "../../api";
+import { uploadFormats, acceptFormats } from "../../upload-capabilities";
+import MaterialSelector from "./MaterialSelector.vue";
+import MaterialPreview from "./MaterialPreview.vue";
+import Pagination from "./Pagination.vue";
+import FilterBar from "./FilterBar.vue";
 import ItemRow from "./ItemRow.vue";
 import EditorDialog from "./EditorDialog.vue";
 import FeedbackNotice from "./FeedbackNotice.vue";
@@ -17,8 +23,22 @@ const props = defineProps<{
   save: (value: WorksheetDraft) => Promise<void>;
   local?: boolean;
   disabled?: boolean;
+  sessionId?: string;
+  teachingLanguage?: string;
 }>();
-const emit = defineEmits<{ import: [] }>();
+const emit = defineEmits<{ import: []; materialsChanged: [SessionDetail] }>();
+const imageSelection = ref<string[]>([]),
+  imagePicker = ref(false),
+  imagePreview = ref<Material | null>(null);
+const imageMaterials = computed(() =>
+  props.materials.filter(
+    (m) =>
+      m.preview_kind === "image" &&
+      m.visibility === "student" &&
+      m.kind !== "answer_key",
+  ),
+);
+const pageOffset = ref(0);
 const query = ref(""),
   groupFilter = ref(""),
   typeFilter = ref(""),
@@ -59,6 +79,21 @@ const questionTypes = [
   "single_choice",
   "image_matching",
 ] as const;
+watch([query, groupFilter, typeFilter, groupsMode], () => {
+  pageOffset.value = 0;
+});
+watch(
+  () => [props.value.questions.length, props.value.groups.length],
+  () => {
+    const total = groupsMode.value
+      ? props.value.groups.length
+      : questions.value.length;
+    pageOffset.value = Math.min(
+      pageOffset.value,
+      Math.max(0, Math.ceil(total / 20) - 1) * 20,
+    );
+  },
+);
 const options = computed({
   get: () => q.value?.options.join("\n") || "",
   set: (value: string) => {
@@ -81,7 +116,12 @@ function edit(kind: "question" | "group", id?: string) {
       value.groups.push(group);
     } else {
       if (!value.groups.length)
-        value.groups.push({ ...newGroup(), title: "Core questions" });
+        value.groups.push({
+          ...newGroup(),
+          title: props.teachingLanguage?.toLowerCase().startsWith("zh")
+            ? "核心题目"
+            : "Core questions",
+        });
       const question = newQuestion(
         groupFilter.value || value.groups[0].id,
         value.questions.length + 1,
@@ -133,7 +173,9 @@ async function commit() {
     () => props.save(next),
     props.local
       ? t("Changes applied.")
-      : t("Draft saved. Publish the course when it is ready for students."),
+      : t(
+          "Questions and groups saved. Teaching settings and availability are saved separately. Publish when ready.",
+        ),
   );
   if (ok) editor.value = null;
 }
@@ -149,6 +191,11 @@ async function remove(kind: "question" | "group", id: string) {
         item?.slice(0, 100),
         kind === "group" ? " " + t("and its {0} questions", [count]) : "",
       ]),
+      {
+        title: kind === "group" ? t("Delete group") : t("Delete question"),
+        confirmLabel: t("Delete"),
+        danger: true,
+      },
     ))
   )
     return;
@@ -161,6 +208,65 @@ async function remove(kind: "question" | "group", id: string) {
   next.questions = renumber(next.questions.filter((q) => !ids.includes(q.id)));
   ids.forEach((id) => delete next.reference_answers[id]);
   await run(() => props.save(next), t("Deleted from the draft."));
+}
+async function uploadImages(files: File[]) {
+  if (!props.sessionId || !q.value || !files.length) return;
+  const questionId = q.value.id;
+  await run(async () => {
+    for (const file of files) {
+      if (
+        !uploadFormats.images.includes(
+          file.name
+            .split(".")
+            .pop()
+            ?.toLowerCase() as (typeof uploadFormats.images)[number],
+        )
+      )
+        throw Error(t("Choose PNG, JPEG or WebP images."));
+      if (file.size > 25 * 1048576)
+        throw Error(t("The upload limit is {0} MiB per file.", [25]));
+      const material = await api.upload(
+        props.sessionId!,
+        file,
+        "student",
+        "reference",
+        "preview",
+      );
+      emit("materialsChanged", await api.session(props.sessionId!));
+      if (q.value?.id === questionId)
+        q.value.images.push({
+          label: "",
+          alt: file.name,
+          url: material.preview_url!,
+        });
+    }
+  });
+}
+function pasteImages(event: ClipboardEvent) {
+  const files = Array.from(event.clipboardData?.files || []).filter((file) =>
+    file.type.startsWith("image/"),
+  );
+  if (files.length) {
+    event.preventDefault();
+    void uploadImages(files);
+  }
+}
+function chooseImages() {
+  if (!q.value) return;
+  for (const mid of imageSelection.value) {
+    const material = imageMaterials.value.find((m) => m.id === mid);
+    if (
+      material?.preview_url &&
+      !q.value.images.some((image) => image.url === material.preview_url)
+    )
+      q.value.images.push({
+        label: "",
+        alt: material.title,
+        url: material.preview_url,
+      });
+  }
+  imagePicker.value = false;
+  imageSelection.value = [];
 }
 function source(id: string, checked: boolean) {
   if (!q.value) return;
@@ -212,7 +318,10 @@ function source(id: string, checked: boolean) {
     </div>
   </div>
   <FeedbackNotice :error="editor ? '' : error" :success="success" />
-  <div v-if="!groupsMode && value.questions.length" class="filter-bar">
+  <FilterBar
+    v-if="!groupsMode && value.questions.length"
+    :active="!!query || !!groupFilter || !!typeFilter"
+  >
     <label class="search-field"
       ><span>{{ t("Search questions") }}</span>
       <div>
@@ -237,15 +346,15 @@ function source(id: string, checked: boolean) {
         </option>
       </select></label
     >
-  </div>
+  </FilterBar>
   <div class="item-list">
     <template v-if="groupsMode"
       ><ItemRow
-        v-for="(g, i) in value.groups"
+        v-for="(g, i) in value.groups.slice(pageOffset, pageOffset + 20)"
         :key="g.id"
         :title="g.title || t('Untitled group')"
         :description="g.description"
-        :number="i + 1"
+        :number="pageOffset + i + 1"
         ><template #meta
           ><span class="badge">{{
             g.kind === "core" ? t("Required") : t("Reading choice")
@@ -272,9 +381,10 @@ function source(id: string, checked: boolean) {
       ></template
     ><template v-else
       ><ItemRow
-        v-for="q in questions"
+        v-for="q in questions.slice(pageOffset, pageOffset + 20)"
         :key="q.id"
         :title="q.prompt || t('Untitled question')"
+        expandable
         :number="q.ordinal"
         ><template #meta
           ><span class="badge">{{ label(q.type) }}</span
@@ -318,6 +428,12 @@ function source(id: string, checked: boolean) {
       </div></template
     >
   </div>
+  <Pagination
+    :offset="pageOffset"
+    :total="groupsMode ? value.groups.length : questions.length"
+    :busy="busy"
+    @change="pageOffset = $event"
+  />
   <EditorDialog
     v-if="editor"
     :title="
@@ -453,6 +569,42 @@ function source(id: string, checked: boolean) {
               {{ t("Add image") }}
             </button>
           </div>
+          <div
+            v-if="sessionId && !local"
+            class="image-upload-zone"
+            tabindex="0"
+            @paste="pasteImages"
+          >
+            <label
+              >{{ t("Upload or paste images")
+              }}<input
+                type="file"
+                multiple
+                :accept="acceptFormats(uploadFormats.images)"
+                :disabled="busy"
+                @change="
+                  uploadImages(
+                    Array.from(($event.target as HTMLInputElement).files || []),
+                  );
+                  ($event.target as HTMLInputElement).value = '';
+                " /></label
+            ><small>{{
+              t(
+                "PNG, JPEG or WebP; up to 25 MiB each. Click here and paste a screenshot. Images are saved to session materials immediately.",
+              )
+            }}</small>
+          </div>
+          <button
+            v-if="imageMaterials.length"
+            type="button"
+            class="secondary"
+            @click="
+              imagePicker = true;
+              imageSelection = [];
+            "
+          >
+            {{ t("Choose material images") }}
+          </button>
           <div v-for="(img, i) in q.images" :key="i" class="image-fields">
             <label
               >{{ t("Image URL")
@@ -489,8 +641,42 @@ function source(id: string, checked: boolean) {
     </form>
     <template #actions
       ><button class="primary" form="question-editor" :disabled="busy">
-        {{ busy ? t("Saving…") : local ? t("Apply changes") : t("Save draft") }}
+        {{
+          busy
+            ? t("Saving…")
+            : local
+              ? t("Apply changes")
+              : editor.kind === "group"
+                ? t("Save group draft")
+                : t("Save question draft")
+        }}
       </button></template
     ></EditorDialog
   >
+  <EditorDialog
+    v-if="imagePicker"
+    :title="t('Choose material images')"
+    wide
+    @close="imagePicker = false"
+    ><MaterialSelector
+      v-model="imageSelection"
+      :materials="imageMaterials"
+      @preview="imagePreview = $event"
+    /><template #actions
+      ><button
+        class="primary"
+        :disabled="!imageSelection.length"
+        @click="chooseImages"
+      >
+        {{ t("Use selected images") }}
+      </button></template
+    ></EditorDialog
+  >
+  <EditorDialog
+    v-if="imagePreview"
+    :title="imagePreview.title"
+    :close-label="t('Close')"
+    @close="imagePreview = null"
+    ><MaterialPreview :material="imagePreview"
+  /></EditorDialog>
 </template>

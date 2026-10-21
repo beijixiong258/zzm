@@ -16,6 +16,8 @@ export type Route = {
   sid?: string;
   uid?: string;
   version?: string;
+  course?: string;
+  tab?: string;
   section?: "account" | "feedback" | "model" | "search" | "users";
 };
 export function readRoute(hash = location.hash): Route {
@@ -23,6 +25,7 @@ export function readRoute(hash = location.hash): Route {
   const [page, sid, uid] = path.split("/");
   if (
     ![
+      "home",
       "history",
       "workspace",
       "teacher",
@@ -38,27 +41,57 @@ export function readRoute(hash = location.hash): Route {
   )
     return { page: "home" };
   try {
+    const params = new URLSearchParams(query);
+    const context = {
+      course: params.get("course") || undefined,
+      tab: params.get("tab") || undefined,
+    };
     if (page === "settings") {
-      const section = ["account", "feedback", "model", "search", "users"].includes(sid) ? sid as Route["section"] : undefined;
-      return { page: "settings", ...(section ? { section } : {}) };
+      const section = [
+        "account",
+        "feedback",
+        "model",
+        "search",
+        "users",
+      ].includes(sid)
+        ? (sid as Route["section"])
+        : undefined;
+      return { page: "settings", ...context, ...(section ? { section } : {}) };
     }
     return {
       page: page as Route["page"],
       sid: sid ? decodeURIComponent(sid) : undefined,
       uid: uid ? decodeURIComponent(uid) : undefined,
-      version: new URLSearchParams(query).get("version_id") || undefined,
+      version: params.get("version_id") || undefined,
+      ...context,
     };
   } catch {
     return { page: "home" };
   }
 }
 export function routeHash(r: Route) {
-  if (r.page === "settings") return `/settings${r.section ? `/${r.section}` : ""}`;
-  return `/${r.page}${r.sid ? `/${encodeURIComponent(r.sid)}` : ""}${r.uid ? `/${encodeURIComponent(r.uid)}` : ""}${r.version ? `?version_id=${encodeURIComponent(r.version)}` : ""}`;
+  const params = new URLSearchParams();
+  if (r.version) params.set("version_id", r.version);
+  if (r.course) params.set("course", r.course);
+  if (r.tab) params.set("tab", r.tab);
+  const path =
+    r.page === "settings"
+      ? `/settings${r.section ? `/${r.section}` : ""}`
+      : `/${r.page}${r.sid ? `/${encodeURIComponent(r.sid)}` : ""}${r.uid ? `/${encodeURIComponent(r.uid)}` : ""}`;
+  return path + (params.size ? `?${params}` : "");
 }
 export function canAccessRoute(role: Role, page: Route["page"]) {
-  if (page === "accounts") return role !== "student";
-  if (["teacher", "record", "roster", "versions", "course-materials", "course-trash"].includes(page))
+  if (
+    [
+      "accounts",
+      "teacher",
+      "record",
+      "roster",
+      "versions",
+      "course-materials",
+      "course-trash",
+    ].includes(page)
+  )
     return role !== "student";
   return true;
 }

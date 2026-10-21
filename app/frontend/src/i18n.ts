@@ -34,8 +34,21 @@ const systemPatterns = Object.entries(en).flatMap(([key]) => {
   });
 });
 
+export function savedLocale(): Locale | null {
+  try {
+    const value = localStorage.getItem("aicademiya.ui-locale");
+    return value === "en" || value === "zh-CN" ? value : null;
+  } catch {
+    return null;
+  }
+}
 export function setLocale(value: string) {
   locale.value = value === "zh-CN" ? "zh-CN" : "en";
+  try {
+    localStorage.setItem("aicademiya.ui-locale", locale.value);
+  } catch {
+    /* In-memory choice remains usable. */
+  }
   if (typeof document !== "undefined")
     document.documentElement.lang = locale.value;
 }

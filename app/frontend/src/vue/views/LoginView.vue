@@ -95,6 +95,13 @@ async function login(role?: Role) {
             <ArrowRight :size="16" />
           </button>
         </form>
+        <p v-if="!register" class="muted">
+          {{
+            t(
+              "Use the email address provided by your teacher or administrator. Contact them if you need a password reset.",
+            )
+          }}
+        </p>
         <button
           v-if="bootstrap?.registration_enabled"
           class="link-button"

@@ -1,4 +1,8 @@
 import { t } from "./i18n";
+import {
+  effectiveUploadSettings,
+  materialFormats,
+} from "./upload-capabilities";
 import type { Material } from "./types";
 import { api, type UploadProgress } from "./api";
 import { errorText as errorMessage } from "./vue/utils";
@@ -33,11 +37,26 @@ export function selectMaterialFiles(
     typeof capability === "boolean"
       ? 64 * 1024 * 1024
       : capability.max_upload_bytes;
-  return files.map((file, index) => ({
-    key: `${index}-${file.webkitRelativePath || file.name}`,
+  return files.map((file) => ({
+    key: `${file.webkitRelativePath || file.name}-${file.size}-${file.lastModified}`,
     file,
     relativePath: file.webkitRelativePath || file.name,
-    status: "queued",
+    status:
+      typeof capability !== "boolean" &&
+      !materialFormats(capability).includes(
+        file.name.split(".").pop()?.toLowerCase() ?? "",
+      )
+        ? "failed"
+        : "queued",
+    error:
+      typeof capability !== "boolean" &&
+      !materialFormats(capability).includes(
+        file.name.split(".").pop()?.toLowerCase() ?? "",
+      )
+        ? t(
+            "This file format is not supported. Convert it to a listed format first.",
+          )
+        : undefined,
     processing: formats.includes(
       file.name.split(".").pop()?.toLowerCase() ?? "",
     )
@@ -47,6 +66,21 @@ export function selectMaterialFiles(
       ? maximum
       : 25 * 1024 * 1024,
   }));
+}
+export function appendMaterialFiles(
+  current: MaterialUpload[],
+  files: File[],
+  capability: boolean | DocumentCapability = false,
+): MaterialUpload[] {
+  const keys = new Set(current.map((item) => item.key));
+  return [
+    ...current,
+    ...selectMaterialFiles(files, capability).filter((item) => {
+      if (keys.has(item.key)) return false;
+      keys.add(item.key);
+      return true;
+    }),
+  ];
 }
 // A bounded queue prevents several CPU OCR jobs from saturating the small app guest.
 // Store the successful server response before readback so a failed refresh cannot
@@ -67,8 +101,7 @@ export async function uploadMaterialQueue(
       ...item,
       status: "uploading",
       error: undefined,
-      visibility: item.visibility ?? defaults.visibility,
-      kind: item.kind ?? defaults.kind,
+      ...effectiveUploadSettings(item, defaults),
       processing: item.processing ?? "preview",
       progress: { loaded: 0, total: null, complete: false },
     };
@@ -92,6 +125,7 @@ export async function uploadMaterialQueue(
           running = { ...running, progress };
           if (isActive()) changed(running);
         },
+        item.relativePath,
       );
       const material = { ...response, processing: running.processing };
       accepted.push(material);

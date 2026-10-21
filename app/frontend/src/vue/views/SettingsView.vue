@@ -26,6 +26,7 @@ import PageHeader from "../components/PageHeader.vue";
 import FeedbackNotice from "../components/FeedbackNotice.vue";
 import EditorDialog from "../components/EditorDialog.vue";
 import ItemRow from "../components/ItemRow.vue";
+import Pagination from "../components/Pagination.vue";
 import PeopleView from "./PeopleView.vue";
 const props = defineProps<{ forcePassword?: boolean }>();
 const { busy, error, success, run } = useTask();
@@ -177,7 +178,7 @@ async function reviewFeedback() {
               ]
             : []),
           ...(user?.role === 'admin'
-            ? [['model', t('System configuration')]]
+            ? [['model', t('Deployment information')]]
             : []),
         ]"
         :key="id"
@@ -302,11 +303,19 @@ async function reviewFeedback() {
             {{ c.code }} · {{ c.title }}
           </option>
         </select></label
-      ><PeopleView
-        embedded
-        v-if="courseId"
-        :key="courseId"
-        :course-id="courseId" /></template
+      >
+      <p class="muted">
+        {{
+          t("Manage students and teaching staff from the course people page.")
+        }}
+      </p>
+      <button
+        class="primary"
+        :disabled="!courseId"
+        @click="navigate({ page: 'roster', sid: courseId })"
+      >
+        {{ t("Open course people") }}
+      </button></template
     ><PeopleView v-else embedded />
   </section>
   <section v-else-if="section === 'feedback'">
@@ -354,36 +363,31 @@ async function reviewFeedback() {
         {{ t("No feedback yet.") }}
       </div>
     </div>
-    <div class="pagination">
-      <button
-        class="secondary"
-        :disabled="busy || offset === 0"
-        @click="
-          offset -= 20;
-          load();
-        "
-      >
-        {{ t("Previous") }}</button
-      ><span>{{ total }} {{ t("items") }}</span
-      ><button
-        class="secondary"
-        :disabled="busy || offset + 20 >= total"
-        @click="
-          offset += 20;
-          load();
-        "
-      >
-        {{ t("Next") }}
-      </button>
-    </div>
+    <Pagination
+      :offset="offset"
+      :total="total"
+      :busy="busy"
+      @change="
+        offset = $event;
+        load();
+      "
+    />
   </section>
   <section v-else class="panel narrow">
-    <h2>{{ t("System configuration") }}</h2>
+    <h2>{{ t("Deployment information") }}</h2>
     <p class="notice">
       {{ t("Deployment settings are managed in") }} <strong>config.json</strong
       >{{ t(". Save the file and restart the local server to apply changes.") }}
     </p>
     <dl class="config-summary">
+      <dt>{{ t("AI mode") }}</dt>
+      <dd>
+        {{
+          model?.ai.mode === "demo"
+            ? t("Demo responses")
+            : t("Configured model service")
+        }}
+      </dd>
       <dt>{{ t("Model") }}</dt>
       <dd>{{ model?.ai.model || t("Not configured") }}</dd>
       <dt>{{ t("Endpoint") }}</dt>
@@ -393,6 +397,13 @@ async function reviewFeedback() {
       <dt>{{ t("Web search") }}</dt>
       <dd>{{ search?.enabled ? t("Enabled") : t("Disabled") }}</dd>
     </dl>
+    <p class="muted">
+      {{
+        t(
+          "Ask the deployment administrator to change model, search or upload processing settings, then restart this application. Demo sign-in and demo AI responses are separate settings.",
+        )
+      }}
+    </p>
     <p class="muted">
       {{
         t(
