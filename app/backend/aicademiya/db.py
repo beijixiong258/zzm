@@ -58,7 +58,7 @@ CREATE TABLE IF NOT EXISTS sessions (
  id TEXT PRIMARY KEY, course_id TEXT NOT NULL REFERENCES courses(id), content_json TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS materials (
- id TEXT PRIMARY KEY, session_id TEXT NOT NULL REFERENCES sessions(id), content_json TEXT NOT NULL,
+ id TEXT PRIMARY KEY, session_id TEXT REFERENCES sessions(id), content_json TEXT NOT NULL,
  file_path TEXT, archived INTEGER NOT NULL DEFAULT 0
 );
 CREATE TABLE IF NOT EXISTS workspaces (
@@ -116,7 +116,8 @@ class Database:
         with self.connect() as conn:
             conn.execute("PRAGMA journal_mode=WAL")
             conn.executescript(SCHEMA)
-            from .material_library import migrate_material_library
+            from .material_library import migrate_material_origin, migrate_material_library
+            migrate_material_origin(conn)
             migrate_material_library(conn)
             from .migrations import migrate, baseline_versions
             migrate(conn)

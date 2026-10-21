@@ -135,6 +135,7 @@ class TeachingProfile(Payload):
 
 
 class SessionCreate(Payload):
+    teaching_language: str = Field(default="en", min_length=1, max_length=100)
     teaching_profile: TeachingProfile | None = None
     title: str = Field(min_length=1, max_length=300)
     subtitle: str = Field(default="", max_length=1000)

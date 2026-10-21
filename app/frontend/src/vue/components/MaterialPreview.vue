@@ -24,7 +24,7 @@ import {
 } from "../../document-state";
 import { withVersion } from "../../stage2";
 import { clientId } from "../../ids";
-import { useTask, user, label } from "../state";
+import { dateText, useTask, user, label } from "../state";
 import FeedbackNotice from "./FeedbackNotice.vue";
 import RichText from "./RichText.vue";
 const props = defineProps<{
@@ -378,7 +378,8 @@ async function shareNotes() {
             <summary>{{ t("Original text & review") }}</summary>
             <p v-if="b.raw_text" class="preserve-text">{{ b.raw_text }}</p>
             <p v-if="b.review">
-              {{ b.review.reason }} · {{ b.review.by }} · {{ b.review.at }}
+              {{ b.review.reason }} · {{ b.review.by }} ·
+              {{ dateText(b.review.at) }}
             </p>
           </details>
           <button
@@ -439,7 +440,7 @@ async function shareNotes() {
         :key="item.id"
         class="document-block"
       >
-        <strong>{{ item.kind.replaceAll("_", " ") }}</strong
+        <strong>{{ label(item.kind) }}</strong
         ><span class="badge">{{
           item.visibility === "teacher"
             ? t("Teachers only")

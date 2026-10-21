@@ -17,6 +17,8 @@ import PageHeader from "../components/PageHeader.vue";
 import ItemRow from "../components/ItemRow.vue";
 import EditorDialog from "../components/EditorDialog.vue";
 import FeedbackNotice from "../components/FeedbackNotice.vue";
+import FilterBar from "../components/FilterBar.vue";
+import Pagination from "../components/Pagination.vue";
 import PeopleImport from "../components/PeopleImport.vue";
 const props = defineProps<{ courseId?: string; embedded?: boolean }>();
 const { busy, error, success, run } = useTask();
@@ -154,6 +156,13 @@ async function enrollment(r: RosterEntry) {
           : "Remove {0} from this course?",
         [r.user.name],
       ),
+      {
+        title: archived.value
+          ? t("Restore enrollment")
+          : t("Remove enrollment"),
+        confirmLabel: archived.value ? t("Restore") : t("Remove"),
+        danger: !archived.value,
+      },
     ))
   )
     return;
@@ -178,6 +187,11 @@ async function status(a: GlobalAccount) {
         a.active ? t("Disable") : t("Enable"),
         a.user.name,
       ]),
+      {
+        title: t("Account status"),
+        confirmLabel: a.active ? t("Disable") : t("Enable"),
+        danger: a.active,
+      },
     ))
   )
     return;
@@ -197,6 +211,11 @@ async function removeStaff(uid: string, primary = false) {
       primary
         ? t("Transfer primary responsibility to this person?")
         : t("Remove this teaching assignment?"),
+      {
+        title: t("Teaching assignment"),
+        confirmLabel: primary ? t("Transfer responsibility") : t("Remove"),
+        danger: true,
+      },
     ))
   )
     return;
@@ -262,38 +281,42 @@ async function removeStaff(uid: string, primary = false) {
     :busy="busy && !modal"
   />
   <template v-if="tab !== 'staff'"
-    ><form
-      class="filter-bar"
-      @submit.prevent="
-        offset = 0;
-        load();
-      "
+    ><FilterBar :active="!!query || !!roleFilter || archived"
+      ><form
+        class="filter-form"
+        @submit.prevent="
+          offset = 0;
+          load();
+        "
+      >
+        <label class="grow"
+          >{{ t(courseId ? "Search students" : "Search accounts")
+          }}<input v-model="query" :placeholder="t('Name or email')" /></label
+        ><label v-if="!courseId"
+          >{{ t("Role")
+          }}<select
+            v-model="roleFilter"
+            @change="
+              offset = 0;
+              load();
+            "
+          >
+            <option value="">{{ t("All roles") }}</option>
+            <option value="student">{{ t("Student") }}</option>
+            <option value="teacher">{{ t("Teacher") }}</option>
+            <option value="admin">{{ t("Administrator") }}</option>
+          </select></label
+        ><label v-else
+          >{{ t("Status")
+          }}<select v-model="archived" :disabled="busy">
+            <option :value="false">{{ t("Enrolled") }}</option>
+            <option :value="true">{{ t("Removed") }}</option>
+          </select></label
+        ><button v-if="!courseId" class="secondary" :disabled="busy">
+          {{ t("Search") }}
+        </button>
+      </form></FilterBar
     >
-      <label class="grow"
-        >{{ t(courseId ? "Search students" : "Search accounts")
-        }}<input v-model="query" :placeholder="t('Name or email')" /></label
-      ><label v-if="!courseId"
-        >{{ t("Role")
-        }}<select
-          v-model="roleFilter"
-          @change="
-            offset = 0;
-            load();
-          "
-        >
-          <option value="">{{ t("All roles") }}</option>
-          <option value="student">{{ t("Student") }}</option>
-          <option value="teacher">{{ t("Teacher") }}</option>
-          <option value="admin">{{ t("Administrator") }}</option>
-        </select></label
-      ><label v-else
-        >{{ t("Status")
-        }}<select v-model="archived" :disabled="busy">
-          <option :value="false">{{ t("Enrolled") }}</option>
-          <option :value="true">{{ t("Removed") }}</option>
-        </select></label
-      ><button class="secondary" :disabled="busy">{{ t("Search") }}</button>
-    </form>
     <div class="item-list">
       <template v-if="courseId"
         ><ItemRow
@@ -357,33 +380,16 @@ async function removeStaff(uid: string, primary = false) {
         <div v-if="!accounts.length && !busy" class="empty-state">
           {{ t("No matching accounts.") }}
         </div>
-        <div class="pagination">
-          <button
-            class="secondary"
-            :disabled="busy || offset === 0"
-            @click="
-              offset -= 20;
-              load();
-            "
-          >
-            {{ t("Previous") }}</button
-          ><span
-            >{{ total ? offset + 1 : 0 }}–{{ Math.min(offset + 20, total) }}
-            {{ t("of") }} {{ total }}</span
-          ><button
-            class="secondary"
-            :disabled="busy || offset + 20 >= total"
-            @click="
-              offset += 20;
-              load();
-            "
-          >
-            {{ t("Next") }}
-          </button>
-        </div></template
-      >
-    </div></template
-  >
+        <Pagination
+          :offset="offset"
+          :total="total"
+          :busy="busy"
+          @change="
+            offset = $event;
+            load();
+          "
+      /></template></div
+  ></template>
   <div v-else class="item-list">
     <ItemRow
       v-for="member in staff?.staff"

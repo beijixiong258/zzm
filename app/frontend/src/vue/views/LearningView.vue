@@ -13,8 +13,23 @@ import {
   clearDraft,
   type DraftScope,
 } from "../../drafts";
-import { activeQuestions, canReveal, canSubmit, isLocked } from "../../study";
-import { dateText, useTask, useDirty, label } from "../state";
+import {
+  activeQuestions,
+  canReveal,
+  canSubmit,
+  isLocked,
+  referenceBlockedReason,
+} from "../../study";
+import {
+  dateText,
+  useTask,
+  useDirty,
+  label,
+  useRouteTab,
+  updateRouteContext,
+} from "../state";
+import AnswerInput from "../components/AnswerInput.vue";
+import { answerIsComplete } from "../../answer-fields";
 import PageHeader from "../components/PageHeader.vue";
 import ItemRow from "../components/ItemRow.vue";
 import EditorDialog from "../components/EditorDialog.vue";
@@ -24,7 +39,7 @@ import FeedbackNotice from "../components/FeedbackNotice.vue";
 const props = defineProps<{ sid: string; uid?: string; version?: string }>();
 const { busy, error, success, run } = useTask();
 const workspace = ref<Workspace | null>(null),
-  panel = ref("conversation"),
+  panel = useRouteTab("conversation", ["conversation", "answers", "materials"]),
   message = ref(""),
   question = ref<Question | null>(null),
   answer = ref(""),
@@ -80,6 +95,8 @@ async function load() {
     workspace.value = props.uid
       ? await api.studentWorkspace(props.sid, props.uid, props.version)
       : await api.workspace(props.sid, props.version);
+    if (!location.hash.includes("course="))
+      updateRouteContext({ course: workspace.value.session.course_id });
     note.value = workspace.value.submission.teacher_note;
     if (!readonly.value)
       message.value = readDraft(draftScope("conversation")) || "";
@@ -438,6 +455,7 @@ async function example() {
           v-for="q in questions"
           :key="q.id"
           :title="q.prompt"
+          expandable
           :number="q.ordinal"
           ><template #meta
             ><span>{{ label(q.type) }}</span
@@ -500,25 +518,19 @@ async function example() {
       :title="t('Question {0}', [question.ordinal])"
       :busy="busy"
       :dirty="answer !== answerInitial"
+      :close-label="readonly ? t('Close') : undefined"
       @close="closeAnswer"
       ><FeedbackNotice :error="error" /><RichText :text="question.prompt" />
-      <div v-for="img in question.images" :key="img.url">
+      <figure v-for="(img, index) in question.images" :key="img.url">
+        <figcaption>{{ img.label || t("Image {0}", [index + 1]) }}</figcaption>
         <img class="question-image" :src="img.url" :alt="img.alt" />
-      </div>
+      </figure>
       <form id="answer-editor" class="form-stack" @submit.prevent="saveAnswer">
-        <template v-if="question.type === 'single_choice'"
-          ><label v-for="option in question.options" :key="option" class="check"
-            ><input
-              v-model="answer"
-              type="radio"
-              :value="option"
-              :disabled="readonly"
-            />{{ option }}</label
-          ></template
-        ><label v-else
-          >{{ t("Your answer")
-          }}<textarea v-model="answer" rows="6" :readonly="readonly" required />
-        </label>
+        <AnswerInput
+          v-model="answer"
+          :question="question"
+          :readonly="readonly"
+        />
       </form>
       <p v-if="question.hint" class="muted">
         {{ t("Hint:") }} {{ question.hint }}
@@ -529,14 +541,21 @@ async function example() {
         :disabled="busy || !canReveal(workspace, question.id)"
         @click="example"
       >
-        {{ t("Request example") }}</button
-      ><RichText v-if="reference" :text="reference" /><template
+        {{ t("Request example") }}
+      </button>
+      <p
+        v-if="!uid && referenceBlockedReason(workspace, question.id)"
+        class="muted"
+      >
+        {{ t(referenceBlockedReason(workspace, question.id)!) }}
+      </p>
+      <RichText v-if="reference" :text="reference" /><template
         v-if="!readonly"
         #actions
         ><button
           form="answer-editor"
           class="primary"
-          :disabled="busy || !answer.trim()"
+          :disabled="busy || !answerIsComplete(question, answer)"
         >
           {{ t("Save answer") }}
         </button></template

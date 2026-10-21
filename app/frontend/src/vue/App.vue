@@ -1,7 +1,14 @@
 <script setup lang="ts">
 import { t } from "../i18n";
 
-import { computed, defineAsyncComponent, ref } from "vue";
+import {
+  computed,
+  defineAsyncComponent,
+  ref,
+  watch,
+  nextTick,
+  onBeforeUnmount,
+} from "vue";
 import {
   BookOpen,
   Settings2,
@@ -54,6 +61,54 @@ const HistoryView = defineAsyncComponent(
 const { busy, error, run } = useTask();
 const mobile = ref(false),
   ready = ref(false);
+const sidebar = ref<HTMLElement>();
+let menuPrevious: HTMLElement | null = null;
+let menuOverflow = "";
+watch(mobile, async (open) => {
+  if (open) {
+    menuPrevious = document.activeElement as HTMLElement;
+    menuOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    await nextTick();
+    sidebar.value?.querySelector<HTMLElement>("button, a")?.focus();
+  } else {
+    document.body.style.overflow = menuOverflow;
+    if (menuPrevious?.isConnected) menuPrevious.focus();
+  }
+});
+function menuKey(event: KeyboardEvent) {
+  if (!mobile.value || document.querySelector("dialog[open]")) return;
+  if (event.key === "Escape") {
+    event.preventDefault();
+    mobile.value = false;
+  }
+  if (event.key !== "Tab") return;
+  const nodes = [
+    ...(sidebar.value?.querySelectorAll<HTMLElement>(
+      "a[href],button:not(:disabled),select,input",
+    ) || []),
+  ].filter((el) => el.getClientRects().length);
+  const first = nodes[0],
+    last = nodes.at(-1);
+  if (event.shiftKey && document.activeElement === first) {
+    event.preventDefault();
+    last?.focus();
+  } else if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault();
+    first?.focus();
+  }
+}
+const menuMedia = window.matchMedia("(max-width: 980px)");
+const menuResize = () => {
+  if (!menuMedia.matches) mobile.value = false;
+};
+document.addEventListener("keydown", menuKey);
+menuMedia.addEventListener("change", menuResize);
+onBeforeUnmount(() => {
+  document.removeEventListener("keydown", menuKey);
+  menuMedia.removeEventListener("change", menuResize);
+  if (mobile.value) document.body.style.overflow = menuOverflow;
+});
 const active = computed(() =>
   ["settings", "profile", "accounts"].includes(route.value.page)
     ? "settings"
@@ -86,7 +141,14 @@ async function logout() {
   </div>
   <LoginView v-else-if="!user" :bootstrap="bootstrap" @authenticated="boot" />
   <div v-else class="app-shell">
-    <aside class="sidebar" :class="{ visible: mobile }">
+    <aside
+      ref="sidebar"
+      class="sidebar"
+      :class="{ visible: mobile }"
+      :role="mobile ? 'dialog' : undefined"
+      :aria-modal="mobile || undefined"
+      :aria-label="t('Main navigation')"
+    >
       <a
         href="#/home"
         class="brand"
@@ -167,7 +229,7 @@ async function logout() {
       :aria-label="t('Close navigation')"
       @click="mobile = false"
     />
-    <div class="app-main">
+    <div class="app-main" :inert="mobile">
       <header class="topbar">
         <button
           class="icon-button mobile-toggle"
@@ -180,7 +242,7 @@ async function logout() {
           ><GraduationCap :size="18" />
           {{ staff ? t("Teaching workspace") : t("Learning workspace") }}</span
         ><span v-if="bootstrap?.demo_enabled" class="badge local">{{
-          t("Local demo")
+          t("Demo sign-in enabled")
         }}</span
         ><span v-else class="badge">{{ t("Local workspace") }}</span>
         <LanguageSelect />
@@ -246,13 +308,16 @@ async function logout() {
   <FeedbackNotice v-if="!user" :error="error" />
   <EditorDialog
     v-if="confirmation"
-    :title="t('Confirm action')"
+    :title="confirmation.title || t('Confirm action')"
     compact
     @close="resolveConfirm(false)"
     ><p>{{ confirmation.message }}</p>
     <template #actions
-      ><button class="primary" @click="resolveConfirm(true)">
-        {{ t("Confirm") }}
+      ><button
+        :class="confirmation.danger ? 'secondary danger' : 'primary'"
+        @click="resolveConfirm(true)"
+      >
+        {{ confirmation.confirmLabel || t("Confirm") }}
       </button></template
     ></EditorDialog
   >

@@ -10,7 +10,7 @@ import type {
   VersionSnapshot,
   VersionDiff,
 } from "../../types";
-import { courses, dateText, useTask, refreshCourses } from "../state";
+import { courses, dateText, useTask, refreshCourses, label } from "../state";
 import PageHeader from "../components/PageHeader.vue";
 import ItemRow from "../components/ItemRow.vue";
 import EditorDialog from "../components/EditorDialog.vue";
@@ -32,6 +32,7 @@ async function publish() {
   if (
     !(await askConfirm(
       t("Publish the complete saved course draft to students?"),
+      { title: t("Publish course draft"), confirmLabel: t("Publish") },
     ))
   )
     return;
@@ -62,6 +63,11 @@ async function restore(v: VersionEntry) {
         "Restore version {0} as a new published version? This replaces the saved draft. Learning records and schedules are retained.",
         [v.number],
       ),
+      {
+        title: t("Replace draft and publish"),
+        confirmLabel: t("Replace and publish"),
+        danger: true,
+      },
     ))
   )
     return;
@@ -98,6 +104,24 @@ const fieldName = (key: string) => {
     teaching_profile: t("Teaching approach"),
     reference_answers: t("Instructor answers"),
     schema_version: t("Format version"),
+    background: t("Background"),
+    student_profile: t("Student profile"),
+    response_strategies: t("Response strategies"),
+    tone: t("Tone"),
+    response_detail: t("Response detail"),
+    phases: t("Teaching sequence"),
+    reading_focus: t("Reading focus"),
+    reading_question_count: t("Reading questions"),
+    reference_delivery: t("Reference delivery"),
+    idle_hint_seconds: t("Idle hint delay · seconds"),
+    presentation: t("Question presentation"),
+    title: t("Title"),
+    description: t("Description"),
+    subtitle: t("Subtitle"),
+    source_relative_path: t("Source path"),
+    alt: t("Accessible description"),
+    label: t("Label"),
+    url: t("Source URL"),
   };
   const text = names[key] || key.replaceAll("_", " ");
   return t(text.charAt(0).toUpperCase() + text.slice(1));
@@ -125,19 +149,33 @@ function changeTitle(path: string) {
     })
     .join(" · ");
 }
-function display(value: unknown): string {
+function display(value: unknown, field = ""): string {
   if (value == null) return t("Not set");
   if (value === "") return t("Empty");
   if (typeof value === "boolean") return value ? t("Yes") : t("No");
   if (Array.isArray(value))
     return value.length
-      ? value.map((item) => `• ${display(item)}`).join("\n")
+      ? value.map((item) => `• ${display(item, field)}`).join("\n")
       : t("No items");
   if (typeof value === "object")
     return Object.entries(value)
-      .map(([key, item]) => `${fieldName(key)}: ${display(item)}`)
+      .map(([key, item]) => `${fieldName(key)}: ${display(item, key)}`)
       .join("\n");
-  return String(value);
+  const enums = [
+    "type",
+    "kind",
+    "visibility",
+    "reference_policy",
+    "teaching_language",
+    "response_detail",
+    "phases",
+    "reference_delivery",
+    "presentation",
+    "status",
+  ];
+  return typeof value === "string" && enums.includes(field)
+    ? label(value)
+    : String(value);
 }
 </script>
 <template>
@@ -185,7 +223,10 @@ function display(value: unknown): string {
           ><input
             v-model="publicationLabel"
             :placeholder="t('e.g. Week 2 materials')" /></label
-        ><button class="primary" :disabled="busy">
+        ><button
+          class="primary"
+          :disabled="busy || !list.has_unpublished_changes"
+        >
           {{ t("Publish course draft") }}
         </button>
       </form>
@@ -213,8 +254,16 @@ function display(value: unknown): string {
         ><template #actions
           ><button class="secondary" :disabled="busy" @click="browse(v)">
             {{ t("View & compare") }}</button
-          ><button class="secondary" :disabled="busy" @click="restore(v)">
-            {{ t("Restore") }}
+          ><button
+            class="secondary danger"
+            :disabled="
+              busy ||
+              (v.id === list.current_version_id &&
+                !list.has_unpublished_changes)
+            "
+            @click="restore(v)"
+          >
+            {{ t("Replace draft and publish") }}
           </button></template
         ></ItemRow
       >
@@ -231,6 +280,7 @@ function display(value: unknown): string {
       ])
     "
     wide
+    :close-label="t('Close')"
     :busy="busy"
     @close="selected = null"
     ><FeedbackNotice :error="error" :busy="busy" /><template v-if="snapshot"
@@ -243,11 +293,15 @@ function display(value: unknown): string {
           <div class="form-grid">
             <div>
               <strong>{{ t("Selected version") }}</strong>
-              <pre class="diff-value">{{ display(c.before) }}</pre>
+              <pre class="diff-value">{{
+                display(c.before, c.path.split(".").at(-1))
+              }}</pre>
             </div>
             <div>
               <strong>{{ t("Saved draft") }}</strong>
-              <pre class="diff-value">{{ display(c.after) }}</pre>
+              <pre class="diff-value">{{
+                display(c.after, c.path.split(".").at(-1))
+              }}</pre>
             </div>
           </div>
         </section>
@@ -266,11 +320,16 @@ function display(value: unknown): string {
       ></template
     ><template #actions
       ><button
-        class="primary"
-        :disabled="busy || !snapshot"
+        class="secondary danger"
+        :disabled="
+          busy ||
+          !snapshot ||
+          (selected.id === list?.current_version_id &&
+            !list?.has_unpublished_changes)
+        "
         @click="restore(selected!)"
       >
-        {{ t("Restore as new version") }}
+        {{ t("Replace draft and publish") }}
       </button></template
     ></EditorDialog
   >

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { t } from "../../i18n";
+import { t, locale } from "../../i18n";
 
 import { askConfirm } from "../state";
 import { computed, ref, watch } from "vue";
@@ -14,12 +14,20 @@ import {
   useTask,
   label,
   errorText,
+  route,
+  updateRouteContext,
 } from "../state";
 import PageHeader from "../components/PageHeader.vue";
 import ItemRow from "../components/ItemRow.vue";
 import EditorDialog from "../components/EditorDialog.vue";
 import FeedbackNotice from "../components/FeedbackNotice.vue";
-const selected = ref(courses.value[0]?.id || ""),
+const selected = computed({
+    get: () =>
+      courses.value.some((c) => c.id === route.value.course)
+        ? route.value.course!
+        : courses.value[0]?.id || "",
+    set: (course: string) => updateRouteContext({ course }),
+  }),
   loading = ref(false),
   sessions = ref<SessionSummary[]>([]),
   trash = ref(false),
@@ -35,9 +43,16 @@ const modal = ref<"course" | "session" | "join" | null>(null),
   code = ref(""),
   description = ref(""),
   number = ref(1),
-  initial = ref("");
+  initial = ref(""),
+  teachingLanguage = ref("en");
 const formKey = computed(() =>
-  JSON.stringify([title.value, code.value, description.value, number.value]),
+  JSON.stringify([
+    title.value,
+    code.value,
+    description.value,
+    number.value,
+    teachingLanguage.value,
+  ]),
 );
 const dirty = computed(() => formKey.value !== initial.value);
 let loadId = 0;
@@ -86,6 +101,7 @@ function open(
     item && "number" in item
       ? item.number
       : Math.max(0, ...sessions.value.map((s) => s.number)) + 1;
+  teachingLanguage.value = locale.value === "zh-CN" ? "zh-CN" : "en";
   initial.value = formKey.value;
 }
 async function save() {
@@ -125,11 +141,18 @@ async function save() {
           title.value,
           number.value,
           description.value,
+          teachingLanguage.value,
         );
       sessions.value = await api.sessions(selected.value);
     }
   }, t("Saved."));
   if (ok) modal.value = null;
+}
+async function copyCode() {
+  if (!course.value?.join_code) return;
+  await run(async () => {
+    await navigator.clipboard.writeText(course.value!.join_code!);
+  }, t("Invitation code copied."));
 }
 async function removeSession(s: SessionSummary) {
   if (
@@ -137,6 +160,11 @@ async function removeSession(s: SessionSummary) {
       t("Delete “{0}” from the draft? It can be restored from Deleted items.", [
         s.title,
       ]),
+      {
+        title: t("Delete session"),
+        confirmLabel: t("Move to Deleted items"),
+        danger: true,
+      },
     ))
   )
     return;
@@ -150,7 +178,14 @@ async function removeSession(s: SessionSummary) {
 async function removeCourse() {
   if (
     !course.value ||
-    !(await askConfirm(t("Move “{0}” to Deleted items?", [course.value.title])))
+    !(await askConfirm(
+      t("Move “{0}” to Deleted items?", [course.value.title]),
+      {
+        title: t("Delete course"),
+        confirmLabel: t("Move to Deleted items"),
+        danger: true,
+      },
+    ))
   )
     return;
   const id = course.value.id;
@@ -190,7 +225,11 @@ async function restore(id: string, kind: "course" | "session") {
   <PageHeader
     :title="t('Courses')"
     :eyebrow="staff ? t('TEACH & ORGANIZE') : t('YOUR LEARNING')"
-    :description="t('Your courses, materials and sessions, in one place.')"
+    :description="
+      staff
+        ? t('Your courses, materials and sessions, in one place.')
+        : t('Find your courses, study materials and continue learning.')
+    "
     ><button v-if="staff" class="primary" @click="open('course')">
       <Plus :size="17" /> {{ t("New course") }}</button
     ><button v-else class="primary" @click="open('join')">
@@ -226,7 +265,10 @@ async function restore(id: string, kind: "course" | "session") {
           ><span>{{ course.student_count }} {{ t("students") }}</span
           ><span v-if="staff && course.join_code"
             >{{ t("Invitation code") }}
-            <strong class="code">{{ course.join_code }}</strong></span
+            <strong class="code">{{ course.join_code }}</strong
+            ><button type="button" class="link-button" @click="copyCode">
+              {{ t("Copy code") }}
+            </button></span
           >
         </div>
       </div>
@@ -331,7 +373,13 @@ async function restore(id: string, kind: "course" | "session") {
       class="empty-state"
     >
       <h3>{{ t("No sessions yet") }}</h3>
-      <p>{{ t("Add your first session to start organizing this course.") }}</p>
+      <p>
+        {{
+          staff
+            ? t("Add your first session to start organizing this course.")
+            : t("Your teacher has not published a session yet.")
+        }}
+      </p>
     </div></template
   >
   <div v-else-if="!busy" class="empty-state">
@@ -375,6 +423,17 @@ async function restore(id: string, kind: "course" | "session") {
         >{{ modal === "course" ? t("Description") : t("Subtitle")
         }}<textarea v-model="description" rows="3" />
       </label>
+      <label v-if="modal === 'session' && !editId"
+        >{{ t("Teaching language")
+        }}<select v-model="teachingLanguage">
+          <option value="zh-CN">{{ t("Chinese") }}</option>
+          <option value="en">{{ t("English") }}</option></select
+        ><small>{{
+          t(
+            "Sets defaults for new teaching content. Changing the interface language does not translate saved course content.",
+          )
+        }}</small></label
+      >
     </form>
     <template #actions
       ><button form="home-editor" class="primary" :disabled="busy">
@@ -385,6 +444,7 @@ async function restore(id: string, kind: "course" | "session") {
   <EditorDialog
     v-if="trash"
     :title="t('Deleted items')"
+    :close-label="t('Close')"
     :busy="busy"
     @close="trash = false"
     ><FeedbackNotice :error="error" />

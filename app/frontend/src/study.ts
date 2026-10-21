@@ -4,9 +4,12 @@ export function activeQuestions(workspace: Workspace): Question[] {
   const ids = new Set(workspace.progress.active_question_ids);
   return workspace.session.questions.filter((q) => ids.has(q.id));
 }
-export function canReveal(workspace: Workspace, question_id: string): boolean {
+export function referenceBlockedReason(
+  workspace: Workspace,
+  question_id: string,
+): string | null {
   const a = workspace.attempts[question_id];
-  if (a?.reference_revealed) return true;
+  if (a?.reference_revealed) return null;
   if (
     workspace.read_only ||
     (workspace.version &&
@@ -15,24 +18,30 @@ export function canReveal(workspace: Workspace, question_id: string): boolean {
     (workspace.user.role === "student" &&
       !effectiveAvailability(workspace.session).active)
   )
-    return false;
-  if (!a?.answer.trim()) return false;
-  switch (workspace.session.reference_policy) {
-    case "after_submit":
-      return ["submitted", "confirmed", "needs_revision"].includes(
-        workspace.submission.status,
-      );
-    case "after_feedback":
-      return workspace.messages.some(
-        (m) =>
-          m.role === "assistant" &&
-          m.question_id === question_id &&
-          (m.mode === "demo" || m.mode === "openai") &&
-          Date.parse(m.created_at) >= Date.parse(a.updated_at),
-      );
-    default:
-      return true;
-  }
+    return "References cannot be requested in this read-only or closed session.";
+  if (!a?.answer.trim()) return "Save an answer to this question first.";
+  if (
+    workspace.session.reference_policy === "after_submit" &&
+    !["submitted", "confirmed", "needs_revision"].includes(
+      workspace.submission.status,
+    )
+  )
+    return "Submit your work before requesting an example.";
+  if (
+    workspace.session.reference_policy === "after_feedback" &&
+    !workspace.messages.some(
+      (m) =>
+        m.role === "assistant" &&
+        m.question_id === question_id &&
+        (m.mode === "demo" || m.mode === "openai") &&
+        Date.parse(m.created_at) >= Date.parse(a.updated_at),
+    )
+  )
+    return "Receive tutor feedback on your latest saved answer first.";
+  return null;
+}
+export function canReveal(workspace: Workspace, question_id: string): boolean {
+  return referenceBlockedReason(workspace, question_id) === null;
 }
 export function isLocked(workspace: Workspace): boolean {
   return (

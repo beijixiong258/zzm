@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { t, systemText } from "../../i18n";
+import { t, systemText, locale } from "../../i18n";
 
 import { computed, ref, watch, onBeforeUnmount } from "vue";
 import { api } from "../../api";
@@ -81,10 +81,31 @@ async function commit() {
     <p>
       {{
         t(
-          "CSV or XLSX with name and email columns. Review the rows before importing.",
+          "Use an Excel or WPS XLSX workbook, or a UTF-8 / GB18030 CSV. Up to 1000 rows and 2 MiB. Review all rows before importing.",
         )
       }}
     </p>
+    <p class="muted">
+      {{
+        courseId
+          ? t(
+              "Headers: 姓名, 邮箱, 临时密码 (optional), or name, email, temporary_password. Do not add other columns.",
+            )
+          : t(
+              "Headers: 姓名, 邮箱, 临时密码 (optional), 角色 (optional), or name, email, temporary_password, role. Roles use student, teacher or admin. Do not add other columns.",
+            )
+      }}
+    </p>
+    <a
+      class="secondary template-download"
+      :href="
+        locale === 'zh-CN'
+          ? '/roster-template-zh-CN.csv'
+          : '/roster-template.csv'
+      "
+      download
+      >{{ t("Download roster template") }}</a
+    >
     <label
       >{{ t("File")
       }}<input

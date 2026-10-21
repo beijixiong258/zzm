@@ -116,9 +116,13 @@ def parse_rows(data, suffix, *, global_accounts=False):
     max_columns = 4 if global_accounts else 3
     if suffix == ".csv":
         try:
-            rows = list(csv.reader(io.StringIO(data.decode("utf-8-sig"))))
+            try:
+                text = data.decode("utf-8-sig")
+            except UnicodeDecodeError:
+                text = data.decode("gb18030")
+            rows = list(csv.reader(io.StringIO(text)))
         except (UnicodeError, csv.Error):
-            raise HTTPException(422, "Provide a valid UTF-8 CSV") from None
+            raise HTTPException(422, "Provide a valid UTF-8 or GB18030 CSV") from None
     elif suffix == ".xlsx":
         try:
             from .extraction_limits import office_guard
@@ -161,7 +165,9 @@ def parse_rows(data, suffix, *, global_accounts=False):
         raise HTTPException(415, "Supported roster formats: CSV and XLSX")
     if not rows:
         raise HTTPException(422, "The roster is empty")
-    headers = [str(x or "").strip().lower() for x in rows[0]]
+    aliases = {"姓名": "name", "邮箱": "email", "电子邮箱": "email", "电子邮件": "email",
+               "临时密码": "temporary_password", "角色": "role"}
+    headers = [aliases.get(str(x or "").strip().lower(), str(x or "").strip().lower()) for x in rows[0]]
     permitted = {'name', 'email', 'temporary_password'} | ({'role'} if global_accounts else set())
     if len(set(headers)) != len(headers) or not {'name', 'email'} <= set(headers) or not set(headers) <= permitted:
         raise HTTPException(422, 'Headers must be name,email and optional ' + ('role,' if global_accounts else '') + 'temporary_password')

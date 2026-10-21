@@ -169,6 +169,7 @@ export type ExtractionReport = {
 };
 export type CourseMaterial = Material & { session_ids: string[] };
 export type Material = {
+  source_relative_path?: string;
   source_format?: string | null;
   document?: import("./document-types").DocumentInfo | null;
   processing?: "preview" | "full_document";

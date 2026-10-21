@@ -373,9 +373,13 @@ def create_app(*, data_dir=None, db_path=None, catalog_path=None, upload_dir=Non
             course_access(conn, course_id, user)
             from .models import TeachingProfile
             values = payload.model_dump()
-            values["teaching_profile"] = values.get("teaching_profile") or TeachingProfile().model_dump()
+            if not values.get("teaching_profile"):
+                profile = TeachingProfile().model_dump()
+                if values["teaching_language"].lower().startswith("zh"):
+                    profile["tone"] = "耐心、具体、尊重学生，避免过度表扬。"
+                values["teaching_profile"] = profile
             detail = {"id": new_id(), "course_id": course_id, **values, "status": "draft", "estimated_minutes": 40,
-                      "reference_policy": "after_attempt", "teaching_language": "en", "groups": [{"id": "core", "title": "Core tasks", "kind": "core"}],
+                      "reference_policy": "after_attempt", "groups": [{"id": "core", "title": "核心任务" if values["teaching_language"].lower().startswith("zh") else "Core tasks", "kind": "core"}],
                       "questions": [], "reference_answers": {}}
             conn.execute("INSERT INTO sessions(id,course_id,content_json) VALUES(?,?,?)", (detail["id"], course_id, json.dumps(detail)))
             return public_detail(conn, detail, True)
@@ -405,9 +409,7 @@ def create_app(*, data_dir=None, db_path=None, catalog_path=None, upload_dir=Non
     from .teacher_workbench_routes import register_teacher_workbench_routes
     register_teacher_workbench_routes(application, database, tutor, teacher_user)
 
-    @application.post("/api/sessions/{session_id}/materials")
-    def upload_material(session_id: str, file: UploadFile = File(...), visibility: str = Form("student"),
-                        kind: str = Form("reading"), processing: str = Form("preview"), user=Depends(teacher_user)):
+    def store_material(session_id, course_id, file, visibility, kind, processing, relative_path, user):
         if processing not in ("preview", "full_document"):
             raise HTTPException(422, "Invalid material processing mode")
         if visibility not in ("student", "teacher") or kind not in ("reading", "worksheet", "answer_key", "slides", "reference"):
@@ -418,7 +420,7 @@ def create_app(*, data_dir=None, db_path=None, catalog_path=None, upload_dir=Non
         if suffix not in SUPPORTED and not (processing == 'full_document' and suffix.lstrip('.') in FULL_FORMATS):
             raise HTTPException(415, "Supported formats: txt, md, pdf, docx, pptx, png, jpg, jpeg, webp")
         with database.connect() as conn:
-            session_access(conn, session_id, user)
+            session_access(conn, session_id, user) if session_id else course_access(conn, course_id, user)
         if processing == "full_document":
             if suffix.lstrip('.') not in document_queue.formats:
                 raise HTTPException(415, "This source format is not enabled for complete processing")
@@ -428,6 +430,9 @@ def create_app(*, data_dir=None, db_path=None, catalog_path=None, upload_dir=Non
         data = file.file.read(upload_limit + 1)
         if len(data) > upload_limit:
             raise HTTPException(413, "Upload exceeds the 64 MiB complete-document limit" if processing == 'full_document' else "Upload exceeds the 25 MiB preview limit")
+        relative_path = relative_path.replace("\\", "/").strip()
+        if len(relative_path) > 1000 or any(p in (".", "..") for p in relative_path.split("/")) or relative_path.startswith("/") or ":" in relative_path:
+            raise HTTPException(422, "Invalid source relative path")
         mid = new_id()
         destination = uploads / (mid + suffix)
         destination.write_bytes(data)
@@ -436,20 +441,34 @@ def create_app(*, data_dir=None, db_path=None, catalog_path=None, upload_dir=Non
             "status": "processing", "excerpt": "", "warning": None, "extraction_report": None}
         filename = (file.filename or "Uploaded material").replace("\\", "/").split("/")[-1]
         item = {"id": mid, "title": filename, "kind": kind, "visibility": visibility,
-                "source_label": filename, "extracted_at": now(),
+                "source_label": filename, "source_relative_path": relative_path or filename, "extracted_at": now(),
                 **{k: extraction[k] for k in ("status", "excerpt", "warning", "extraction_report")}}
         if processing == "full_document":
             item["processing"] = "full_document"
         with database.connect() as conn:
             conn.execute("BEGIN IMMEDIATE")
-            session_access(conn, session_id, user)
+            session_access(conn, session_id, user) if session_id else course_access(conn, course_id, user)
             conn.execute("INSERT INTO materials VALUES(?,?,?,?,0)", (mid, session_id, json.dumps(item), str(destination)))
+            if not session_id:
+                conn.execute("INSERT INTO material_courses(material_id,course_id) VALUES(?,?)", (mid, course_id))
             if processing == "full_document":
                 from .document_storage import enqueue_job
                 enqueue_job(conn, mid, user, "upload:" + mid, None)
             result = public_material(conn.execute("SELECT * FROM materials WHERE id=?", (mid,)).fetchone(), True)
         document_queue.notify()
         return result
+
+    @application.post("/api/sessions/{session_id}/materials")
+    def upload_material(session_id: str, file: UploadFile = File(...), visibility: str = Form("student"),
+                        kind: str = Form("reading"), processing: str = Form("preview"),
+                        relative_path: str = Form(""), user=Depends(teacher_user)):
+        return store_material(session_id, None, file, visibility, kind, processing, relative_path, user)
+
+    @application.post("/api/courses/{course_id}/materials")
+    def upload_course_material(course_id: str, file: UploadFile = File(...), visibility: str = Form("student"),
+                               kind: str = Form("reading"), processing: str = Form("preview"),
+                               relative_path: str = Form(""), user=Depends(teacher_user)):
+        return store_material(None, course_id, file, visibility, kind, processing, relative_path, user)
 
     @application.delete("/api/sessions/{session_id}/materials/{material_id}")
     def detach_session_material(session_id: str, material_id: str, user=Depends(teacher_user)):
@@ -459,7 +478,7 @@ def create_app(*, data_dir=None, db_path=None, catalog_path=None, upload_dir=Non
             row = member_material(conn, session_id, material_id)
             detail = session_access(conn, session_id, user)
             material_url = json.loads(row["content_json"]).get("url")
-            if any(material_id in q.get("source_material_ids", []) or (material_url and material_url in q.get("source_links", [])) or any(image.get("url", "").startswith(f"/api/materials/{material_id}/assets/") for image in q.get("images", [])) for q in detail.get("questions", [])):
+            if any(material_id in q.get("source_material_ids", []) or (material_url and material_url in q.get("source_links", [])) or any(image.get("url", "").split("?", 1)[0].startswith(f"/api/materials/{material_id}/") for image in q.get("images", [])) for q in detail.get("questions", [])):
                 raise HTTPException(409, "Material is referenced by current questions; remove those relationships first")
             detach_material(conn, session_id, material_id)
             return {"ok": True}

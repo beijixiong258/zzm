@@ -24,7 +24,7 @@ void load();
     :eyebrow="courses.find((c) => c.id === courseId)?.code"
     :description="
       t(
-        'All files and links saved in this course. Add or edit them from a session’s Materials tab.',
+        'Manage files and links independently of sessions. Attach selected materials from a session when needed.',
       )
     "
     ><button class="secondary" :disabled="busy" @click="load">
@@ -32,5 +32,7 @@ void load();
     </button></PageHeader
   ><FeedbackNotice :error="error" :busy="busy" /><MaterialsPane
     :materials="materials"
+    :course-id="courseId"
+    @library-changed="materials = $event"
   />
 </template>

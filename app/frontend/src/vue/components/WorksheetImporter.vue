@@ -10,6 +10,7 @@ import type {
   WorksheetDraft,
 } from "../../types";
 import { useTask, useDirty } from "../state";
+import { uploadFormats, acceptFormats } from "../../upload-capabilities";
 import QuestionManager from "./QuestionManager.vue";
 import FeedbackNotice from "./FeedbackNotice.vue";
 const props = defineProps<{ session: SessionDetail }>();
@@ -155,10 +156,14 @@ async function edit(value: WorksheetDraft) {
       >{{ t("Worksheet file")
       }}<input
         type="file"
-        accept=".txt,.md,.docx,.pdf,.pptx"
+        :accept="acceptFormats(uploadFormats.worksheet)"
         required
         @change="file = ($event.target as HTMLInputElement).files?.[0] || null"
-      /><small>{{ t("TXT, Markdown, DOCX, PDF or PowerPoint.") }}</small></label
+      /><small>{{
+        t(
+          "Worksheet import: TXT, Markdown, DOCX, PDF or PPTX; up to 25 MiB. Export WPS documents to one of these formats first.",
+        )
+      }}</small></label
     >
     <label class="check-label">
       <input v-model="useAi" type="checkbox" :disabled="busy" />
@@ -200,6 +205,7 @@ async function edit(value: WorksheetDraft) {
     <QuestionManager
       :value="preview.draft"
       :materials="session.materials"
+      :teaching-language="session.teaching_language"
       :save="edit"
       :disabled="busy"
       local

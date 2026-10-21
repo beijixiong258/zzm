@@ -1,4 +1,4 @@
-import { t, locale, setLocale } from "../i18n";
+import { t, locale, setLocale, savedLocale } from "../i18n";
 import { computed, onBeforeUnmount, ref, watch, type Ref } from "vue";
 import { api, ApiError } from "../api";
 import { readRoute, routeHash, type Route } from "../routes";
@@ -32,12 +32,18 @@ export function useDirty(dirty: Ref<boolean>) {
 }
 export const confirmation = ref<{
   message: string;
+  title?: string;
+  confirmLabel?: string;
+  danger?: boolean;
   resolve: (value: boolean) => void;
 } | null>(null);
-export function askConfirm(message: string): Promise<boolean> {
+export function askConfirm(
+  message: string,
+  options: { title?: string; confirmLabel?: string; danger?: boolean } = {},
+): Promise<boolean> {
   if (confirmation.value) return Promise.resolve(false);
   return new Promise((resolve) => {
-    confirmation.value = { message, resolve };
+    confirmation.value = { message, ...options, resolve };
   });
 }
 export function resolveConfirm(value: boolean) {
@@ -52,10 +58,34 @@ export async function confirmLeave() {
       t(
         "Leave this page with unsaved changes? Changes have not been saved to the server.",
       ),
+      {
+        title: t("Leave page"),
+        confirmLabel: t("Discard and leave"),
+        danger: true,
+      },
     ))
   );
 }
+export function updateRouteContext(context: Pick<Route, "course" | "tab">) {
+  route.value = { ...route.value, ...context };
+  location.hash = routeHash(route.value);
+}
+export function useRouteTab(fallback: string, allowed: string[]) {
+  return computed({
+    get: () =>
+      allowed.includes(route.value.tab || "") ? route.value.tab! : fallback,
+    set: (tab: string) => updateRouteContext({ tab }),
+  });
+}
 export async function navigate(next: Route) {
+  next = {
+    ...next,
+    course:
+      next.course ||
+      (["roster", "versions", "course-materials"].includes(next.page)
+        ? next.sid
+        : route.value.course),
+  };
   if (routeHash(next) === routeHash(route.value)) return;
   if (!(await confirmLeave())) return;
   route.value = next;
@@ -77,7 +107,7 @@ export async function refreshCourses() {
 }
 export async function initialize() {
   bootstrap.value = await api.bootstrap();
-  setLocale(bootstrap.value.default_locale);
+  setLocale(savedLocale() || bootstrap.value.default_locale);
   try {
     user.value = (await api.me()).user;
   } catch (e) {
