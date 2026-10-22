@@ -8,7 +8,6 @@
     "build": "vue-tsc --noEmit && vite build",
     "build:brand": "node tests/brand-assets.mjs",
     "preview": "vite preview",
-    "test": "vitest run tests/",
     "format": "prettier --write src tests vite.config.ts"
   },
   "devDependencies": {

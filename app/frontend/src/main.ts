@@ -1,6 +1,6 @@
 import { createApp } from "vue";
-import App from "./vue/App.vue";
+import App from "./vue/ClassroomApp.vue";
 import "./design-tokens.css";
-import "./vue/app.css";
+import "./vue/classroom.css";
 
 createApp(App).mount("#root");

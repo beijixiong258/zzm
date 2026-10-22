@@ -1,6 +1,14 @@
 .venv
 frontend/node_modules
 frontend/dist
+server/target
+config.json
+config.*.json
+data-local
+local-materials
+local-demo
+legacy-export
+ocr-models
 *.tsbuildinfo
 frontend/tests/artifacts
 artifacts

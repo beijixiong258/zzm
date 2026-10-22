@@ -1,12 +1,12 @@
 {
   "server": {
     "host": "127.0.0.1",
-    "port": 18773,
+    "port": 8001,
     "open_browser": true
   },
   "frontend": {
     "host": "127.0.0.1",
-    "port": 18774,
+    "port": 5173,
     "locale": "zh-CN"
   },
   "storage": {

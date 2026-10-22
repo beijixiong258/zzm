@@ -1,0 +1,40 @@
+server:
+  port: 8001
+  error:
+    include-message: never
+spring:
+  application:
+    name: aicademiya
+  task:
+    scheduling:
+      pool:
+        size: 2
+  datasource:
+    url: ${MYSQL_URL:jdbc:mysql://localhost:3306/aicademiya?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC}
+    username: ${MYSQL_USER:aicademiya}
+    password: ${MYSQL_PASSWORD:}
+  sql:
+    init:
+      mode: always
+      encoding: UTF-8
+  servlet:
+    multipart:
+      max-file-size: 25MB
+      max-request-size: 26MB
+mybatis-plus:
+  global-config:
+    banner: false
+    db-config:
+      id-type: assign_uuid
+  configuration:
+    default-enum-type-handler: org.apache.ibatis.type.EnumTypeHandler
+app:
+  config-path: ${AICADEMIYA_CONFIG:../config.json}
+  upload-dir: ${AICADEMIYA_UPLOAD_DIR:../data-local/uploads}
+  document-max-units: ${AICADEMIYA_DOCUMENT_MAX_UNITS:300}
+  document-max-characters: ${AICADEMIYA_DOCUMENT_MAX_CHARACTERS:300000}
+  document-image-max-edge: ${AICADEMIYA_DOCUMENT_IMAGE_MAX_EDGE:2000}
+  allowed-origins: ${AICADEMIYA_ALLOWED_ORIGINS:http://localhost:5173,http://127.0.0.1:5173}
+  cookie-secure: ${AICADEMIYA_COOKIE_SECURE:false}
+  demo-enabled: ${AICADEMIYA_DEMO_ENABLED:false}
+  legacy-import: ${AICADEMIYA_LEGACY_IMPORT:}

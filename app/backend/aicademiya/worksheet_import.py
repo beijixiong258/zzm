@@ -222,19 +222,26 @@ def _local_ocr_engine():
     """Load installed ONNX models with CPU only and no implicit downloads."""
     import rapidocr
     import onnxruntime
-    root = Path(rapidocr.__file__).parent / "models"
-    models = {"Det": root / "PP-OCRv6_det_small.onnx", "Cls": root / "ch_ppocr_mobile_v2.0_cls_mobile.onnx", "Rec": root / "PP-OCRv6_rec_small.onnx"}
+    import os
+    configuredRoot = os.getenv("AICADEMIYA_OCR_MODEL_DIR", "")
+    root = Path(configuredRoot) if configuredRoot else Path(rapidocr.__file__).parent / "models"
+    names = {"Det": "det.onnx", "Cls": "cls.onnx", "Rec": "rec.onnx"} if configuredRoot else {
+        "Det": "PP-OCRv6_det_small.onnx", "Cls": "ch_ppocr_mobile_v2.0_cls_mobile.onnx", "Rec": "PP-OCRv6_rec_small.onnx"}
+    models = {kind: root / name for kind, name in names.items()}
     if not all(path.is_file() for path in models.values()):
         raise ImportError("Local RapidOCR model files are unavailable")
-    # The recognition dictionary must be embedded. Without this preflight the
-    # upstream recognizer may download a dictionary even with explicit models.
+    # Require an embedded or explicitly installed dictionary. Without this
+    # preflight the recognizer may download one even with explicit models.
     options = onnxruntime.SessionOptions()
     options.intra_op_num_threads = 2
     options.inter_op_num_threads = 1
     session = onnxruntime.InferenceSession(str(models["Rec"]), sess_options=options, providers=["CPUExecutionProvider"])
-    if "character" not in session.get_modelmeta().custom_metadata_map:
+    dictionary = root / "keys.txt"
+    if "character" not in session.get_modelmeta().custom_metadata_map and not dictionary.is_file():
         raise ImportError("Installed local recognition model lacks its dictionary")
     params = {f"{kind}.model_path": str(path) for kind, path in models.items()}
+    if dictionary.is_file():
+        params["Rec.rec_keys_path"] = str(dictionary)
     params.update({"Global.log_level": "error", "EngineConfig.onnxruntime.intra_op_num_threads": 2, "EngineConfig.onnxruntime.inter_op_num_threads": 1})
     for name in ("cuda", "dml", "cann", "coreml"):
         params[f"EngineConfig.onnxruntime.use_{name}"] = False

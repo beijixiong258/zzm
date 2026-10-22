@@ -1,22 +1,55 @@
 services:
-  aicademiya:
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: aicademiya
+      MYSQL_USER: aicademiya
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?Set MYSQL_PASSWORD in .env}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Set MYSQL_ROOT_PASSWORD in .env}
+    ports:
+      - "127.0.0.1:3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "--silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+  backend:
     build: .
     restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
     ports:
-      - "127.0.0.1:18773:8000"
+      - "127.0.0.1:8001:8001"
     environment:
-      AICADEMIYA_DEMO_ENABLED: "false"
-      AICADEMIYA_COOKIE_SECURE: "true"
-      AICADEMIYA_DATA_DIR: /data
-      AICADEMIYA_AI_MODE: openai
-      AICADEMIYA_AI_PROVIDER: ${AICADEMIYA_AI_PROVIDER:-}
+      MYSQL_URL: jdbc:mysql://mysql:3306/aicademiya?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC
+      MYSQL_USER: aicademiya
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      AICADEMIYA_CONFIG: /config/config.json
+      AICADEMIYA_UPLOAD_DIR: /data/uploads
+      AICADEMIYA_DOCUMENT_MAX_UNITS: ${AICADEMIYA_DOCUMENT_MAX_UNITS:-300}
+      AICADEMIYA_DOCUMENT_MAX_CHARACTERS: ${AICADEMIYA_DOCUMENT_MAX_CHARACTERS:-300000}
+      AICADEMIYA_DOCUMENT_IMAGE_MAX_EDGE: ${AICADEMIYA_DOCUMENT_IMAGE_MAX_EDGE:-2000}
+      AICADEMIYA_DEMO_ENABLED: ${AICADEMIYA_DEMO_ENABLED:-false}
+      AICADEMIYA_COOKIE_SECURE: "false"
+      AICADEMIYA_ALLOWED_ORIGINS: http://localhost:5173,http://127.0.0.1:5173
       AICADEMIYA_AI_BASE_URL: ${AICADEMIYA_AI_BASE_URL:-}
       AICADEMIYA_AI_MODEL: ${AICADEMIYA_AI_MODEL:-}
       AICADEMIYA_AI_API_KEY: ${AICADEMIYA_AI_API_KEY:-}
-      AICADEMIYA_WEB_SEARCH_ENABLED: ${AICADEMIYA_WEB_SEARCH_ENABLED:-false}
-      TAVILY_API_KEY: ${TAVILY_API_KEY:-}
-      AICADEMIYA_ALLOWED_ORIGINS: ${AICADEMIYA_ALLOWED_ORIGINS:-}
     volumes:
-      - aicademiya-data:/data
+      - uploads:/data/uploads
+      - ./config.json:/config/config.json:ro
+  frontend:
+    build: ./frontend
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5173:5173"
+    depends_on:
+      - backend
 volumes:
-  aicademiya-data:
+  mysql-data:
+  uploads:

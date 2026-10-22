@@ -3,7 +3,7 @@ import en from "./locales/en.json";
 import zh from "./locales/zh-CN.json";
 
 export type Locale = "en" | "zh-CN";
-export const locale = ref<Locale>("en");
+export const locale = ref<Locale>(savedLocale() || "zh-CN");
 const catalogs: Record<Locale, Record<string, string>> = { en, "zh-CN": zh };
 const englishByChinese = new Map(
   Object.entries(zh).map(([key, text]) => [text, key]),
@@ -11,6 +11,13 @@ const englishByChinese = new Map(
 const escapePattern = (text: string) =>
   text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const numericServerMessages = new Set([
+  "Page {0}",
+  "Slide {0}",
+  "Image {0}",
+  "Sheet {0}",
+  "Office graphic {0}",
+  "Equation {0}",
+  "Text box {0}",
   "{0} extraction unit(s) failed; inspect failed_units and the retained original.",
   "{0} introductory/unassigned text blocks remain in source_text, not automatically converted into questions.",
   "Request failed ({0})",

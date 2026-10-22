@@ -1,36 +1,19 @@
 import { defineConfig } from "vite";
 import vue from "@vitejs/plugin-vue";
-import { readFileSync } from "node:fs";
-// Only server addresses are consumed here; the configuration is never bundled.
-const config = JSON.parse(
-  readFileSync(new URL("../config.json", import.meta.url), "utf8").replace(
-    /^\uFEFF/,
-    "",
-  ),
-);
-const apiHost = config.server.host.includes(":")
-  ? `[${config.server.host}]`
-  : config.server.host;
 export default defineConfig({
   plugins: [vue()],
   optimizeDeps: { entries: ["index.html"] },
   server: {
-    host: config.frontend.host,
-    port: config.frontend.port,
+    host: "127.0.0.1",
+    port: 5173,
     strictPort: true,
     fs: {
       deny: ["**/config.json", "**/.env*", "**/data-local/**", "**/*.sqlite3"],
     },
-    proxy: {
-      "/api": {
-        target: `http://${apiHost}:${config.server.port}`,
-        changeOrigin: true,
-      },
-    },
   },
   preview: {
-    host: config.frontend.host,
-    port: config.frontend.port,
+    host: "127.0.0.1",
+    port: 5173,
     strictPort: true,
   },
   build: { outDir: "dist" },

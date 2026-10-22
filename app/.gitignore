@@ -1,5 +1,9 @@
 .venv/
 frontend/node_modules/
+server/target/
+legacy-export/
+ocr-models/
+*.legacy.json
 *.tsbuildinfo
 __pycache__/
 *.py[cod]
