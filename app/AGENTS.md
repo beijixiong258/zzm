@@ -1,6 +1,7 @@
 # 项目协作约定
 
 - 前端为 Vue 3 + TypeScript；业务后端为 Spring Boot + Spring AI + MyBatis-Plus，数据库使用 MySQL。文件格式解析在 Java 进程内完成；PDFBox 处理 PDF，POI 处理 Office，千问通过硅基流动读取图像。Python 仅用于可选的旧数据库导出，不参与当前请求链路。
+- 本项目固定使用 Java 17；编译目标、开发启动和容器构建及运行均使用 JDK/JRE 17，不自动改用其他 Java 主版本。
 - 当前开发分支为 `cys`。首页支持“中文”和“English”，默认中文。界面语言与课程内容、AI 教学语言分别管理。
 - 前端入口：`frontend/src/main.ts`、`frontend/src/vue/ClassroomApp.vue`；接口契约：`frontend/src/classroom-api.ts`；Java 代码：`server/src/main/java/cn/aicademiya`。
 - 调度入口在 config/BackgroundJobs；MaterialService 管理材料状态，DocumentParser 只做格式处理，AiService 管理提示与结果，integration/QwenClient 负责模型协议、重试及响应完整性。解析失败或截断的材料不能用于生成或发布任务。

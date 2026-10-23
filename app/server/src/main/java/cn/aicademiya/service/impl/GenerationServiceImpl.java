@@ -5,7 +5,7 @@ import cn.aicademiya.entity.*;
 import cn.aicademiya.mapper.GenerationJobMapper;
 import cn.aicademiya.service.*;
 import cn.hutool.json.*;
-import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -44,9 +44,16 @@ public class GenerationServiceImpl extends ServiceImpl<GenerationJobMapper, Gene
         if (lambdaQuery().eq(GenerationJob::getSessionId, sessionId).in(GenerationJob::getStatus, "queued", "running").count() > 0) throw error(409, "Generation is already running");
         List<String> ids = JSONUtil.toList(session.getMaterialIdsJson(), String.class);
         List<CourseMaterial> selected = materials.selected(session.getCourseId(), ids);
-        if (selected.isEmpty()) throw error(422, "Select processed materials with readable content");
+        if ("import".equals(input.getKind()) && selected.isEmpty()) throw error(422, "Select processed materials with readable content");
+        if ("revise".equals(input.getKind()) && Objects.toString(input.getInstruction(), "").isBlank()) throw error(422, "Describe the revision you want");
         materials.requireProcessed(selected);
-        if ("import".equals(input.getKind()) && !ids.contains(input.getSourceMaterialId())) throw error(422, "Select the worksheet material to import");
+        if (input.getSourceMaterialIds().isEmpty() && input.getSourceMaterialId() != null) input.setSourceMaterialIds(List.of(input.getSourceMaterialId()));
+        if ("import".equals(input.getKind()) && (input.getSourceMaterialIds().isEmpty() || !ids.containsAll(input.getSourceMaterialIds()))) throw error(422, "Choose one or more selected materials to extract questions from");
+        Course course = courses.getById(session.getCourseId());
+        var messages = "revise".equals(input.getKind())
+            ? ai.revisionMessages(session, course, selected, input.getInstruction())
+            : ai.generationMessages(session, course, selected, "import".equals(input.getKind()) ? input.getSourceMaterialIds() : List.of());
+        ai.requireGenerationBudget(messages, selected);
         if (!sessions.updateById(session)) throw error(409, "Task changed. Reload before generating.");
         GenerationJob job = new GenerationJob(); job.setSessionId(sessionId); job.setOwnerId(user.getId()); job.setKind(input.getKind());
         job.setExpectedRevision(session.getRevision()); job.setStatus("queued"); job.setStage("queued");
@@ -70,13 +77,14 @@ public class GenerationServiceImpl extends ServiceImpl<GenerationJobMapper, Gene
             generated.getQuestions().forEach(q -> { if (existingIds.contains(q.getId())) q.setId(cn.hutool.core.util.IdUtil.fastSimpleUUID()); });
             current.getQuestions().addAll(generated.getQuestions());
             if (current.getLearningGoals().isEmpty()) current.setLearningGoals(generated.getLearningGoals());
-            if (current.getLearningPlan().isEmpty()) current.setLearningPlan(generated.getLearningPlan());
+            if (current.getHandout().isBlank()) current.setHandout(generated.getHandout()); if (current.getOpeningMessage().isBlank()) current.setOpeningMessage(generated.getOpeningMessage()); if (current.getLearningPlan().isEmpty()) current.setLearningPlan(generated.getLearningPlan());
             if (current.getAiConfig() == null || current.getAiConfig().getTeachingApproach() == null) current.setAiConfig(generated.getAiConfig());
             generated = current;
         }
         sessions.validateContent(generated, JSONUtil.toList(session.getMaterialIdsJson(), String.class), false);
         session.setContentJson(JSONUtil.toJsonStr(generated)); session.setLearningGoals(String.join("\n", generated.getLearningGoals()));
-        if (session.getDescription().isBlank()) session.setDescription(Objects.toString(generated.getDescription(), ""));
+        if (!"import".equals(job.getKind()) || session.getDescription().isBlank())
+            session.setDescription(Objects.toString(generated.getDescription(), ""));
         if (!sessions.updateById(session)) throw error(409, "Task changed. Generated result was retained.");
         lambdaUpdate().eq(GenerationJob::getId, id).eq(GenerationJob::getStatus, "succeeded").set(GenerationJob::getStatus, "applied").set(GenerationJob::getUpdatedAt, LocalDateTime.now(ZoneOffset.UTC)).update();
         return session;
@@ -85,6 +93,9 @@ public class GenerationServiceImpl extends ServiceImpl<GenerationJobMapper, Gene
         Map<String, Object> result = new LinkedHashMap<>(); result.put("id", job.getId()); result.put("sessionId", job.getSessionId());
         result.put("status", job.getStatus()); result.put("stage", job.getStage()); result.put("errorMessage", job.getErrorMessage());
         result.put("expectedRevision", job.getExpectedRevision()); result.put("createdAt", job.getCreatedAt());
+        var usage = job.getUsageJson() == null ? new JSONObject() : JSONUtil.parseObj(job.getUsageJson());
+        result.put("progressCharacters", usage.getInt("charactersReceived", 0));
+        result.put("usage", usage.containsKey("window") ? usage : null);
         result.put("result", job.getResultJson() == null ? null : JSONUtil.parseObj(job.getResultJson())); return result;
     }
     @Override public void recoverProcessing() {
@@ -95,7 +106,7 @@ public class GenerationServiceImpl extends ServiceImpl<GenerationJobMapper, Gene
         List<GenerationJob> jobs = lambdaQuery().eq(GenerationJob::getStatus, "queued").orderByAsc(GenerationJob::getCreatedAt)
             .page(new com.baomidou.mybatisplus.extension.plugins.pagination.Page<GenerationJob>(1, 1, false)).getRecords();
         if (jobs.isEmpty()) return;
-        GenerationJob job = jobs.getFirst();
+        GenerationJob job = jobs.get(0);
         if (!lambdaUpdate().eq(GenerationJob::getId, job.getId()).eq(GenerationJob::getStatus, "queued").set(GenerationJob::getStatus, "running").set(GenerationJob::getStage, "planning").update()) return;
         try {
             AccountUser owner = accounts.getById(job.getOwnerId());
@@ -106,9 +117,22 @@ public class GenerationServiceImpl extends ServiceImpl<GenerationJobMapper, Gene
             Requests.Generation input = JSONUtil.toBean(job.getRequestJson(), Requests.Generation.class);
             List<CourseMaterial> selected = materials.selected(session.getCourseId(), ids);
             materials.requireProcessed(selected);
-            TaskContent content = ai.generate(session, courses.getById(session.getCourseId()), selected, "import".equals(job.getKind()), input.getSourceMaterialId());
-            lambdaUpdate().eq(GenerationJob::getId, job.getId()).set(GenerationJob::getStage, "validating").update();
+            lambdaUpdate().eq(GenerationJob::getId, job.getId()).set(GenerationJob::getStage, "drafting").update();
+            long[] nextProgress = {0};
+            java.util.function.IntConsumer progress = characters -> {
+                long now = System.nanoTime();
+                if (characters > 0 && now < nextProgress[0]) return;
+                nextProgress[0] = now + java.util.concurrent.TimeUnit.SECONDS.toNanos(2);
+                lambdaUpdate().eq(GenerationJob::getId, job.getId()).eq(GenerationJob::getStatus, "running")
+                    .set(GenerationJob::getUsageJson, JSONUtil.toJsonStr(Map.of("charactersReceived", characters))).update();
+            };
+            var generated = "revise".equals(job.getKind())
+                ? ai.revise(session, courses.getById(session.getCourseId()), selected, input.getInstruction(), progress)
+                : ai.generate(session, courses.getById(session.getCourseId()), selected, "import".equals(job.getKind()), input.getSourceMaterialIds(), progress);
+            TaskContent content = generated.content();
+            lambdaUpdate().eq(GenerationJob::getId, job.getId()).set(GenerationJob::getUsageJson, JSONUtil.toJsonStr(generated.usage())).set(GenerationJob::getStage, "validating").update();
             sessions.validateContent(content, ids, !"import".equals(job.getKind()));
+            if (!"import".equals(job.getKind()) && (content.getHandout().isBlank() || content.getOpeningMessage().isBlank())) throw error(502, "AI did not return a complete handout and opening message. Retry generation.");
             lambdaUpdate().eq(GenerationJob::getId, job.getId()).set(GenerationJob::getStatus, "succeeded").set(GenerationJob::getStage, "ready")
                 .set(GenerationJob::getResultJson, JSONUtil.toJsonStr(content)).set(GenerationJob::getUpdatedAt, LocalDateTime.now(ZoneOffset.UTC)).update();
         } catch (Exception exception) {

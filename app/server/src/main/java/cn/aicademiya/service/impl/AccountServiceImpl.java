@@ -7,7 +7,7 @@ import cn.aicademiya.entity.*;
 import cn.aicademiya.mapper.*;
 import cn.aicademiya.service.AccountService;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
-import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
 import jakarta.servlet.http.*;
 import lombok.RequiredArgsConstructor;
 import org.bouncycastle.crypto.generators.SCrypt;
@@ -30,7 +30,7 @@ public class AccountServiceImpl extends ServiceImpl<AccountUserMapper, AccountUs
     private final BCryptPasswordEncoder encoder = new BCryptPasswordEncoder();
 
     @Override public Map<String, Object> bootstrap() {
-        return Map.of("needsSetup", count() == 0, "defaultLocale", "zh-CN", "demoEnabled", properties.isDemoEnabled(),
+        return Map.of("needsSetup", !lambdaQuery().eq(AccountUser::getRole, "admin").eq(AccountUser::getArchived, false).exists(), "defaultLocale", "zh-CN", "demoEnabled", properties.isDemoEnabled(),
             "demoAccounts", properties.isDemoEnabled()
                 ? lambdaQuery().eq(AccountUser::getDemo, true).eq(AccountUser::getArchived, false).list().stream().map(this::publicUser).toList()
                 : List.of());
@@ -64,11 +64,11 @@ public class AccountServiceImpl extends ServiceImpl<AccountUserMapper, AccountUs
         if (!"admin".equals(user.getRole())) throw error(403, "Administrator access required");
     }
     @Override public Map<String, Object> publicUser(AccountUser user) {
-        return Map.of("id", user.getId(), "name", user.getName(), "email", user.getEmail(), "role", user.getRole(),
+        return Map.of("id", user.getId(), "name", user.getName(), "email", Objects.toString(user.getEmail(), ""), "username", Objects.toString(user.getUsername(), ""), "invitationEnabled", Boolean.TRUE.equals(user.getInvitationEnabled()), "demo", Boolean.TRUE.equals(user.getDemo()), "role", user.getRole(),
             "mustChangePassword", Boolean.TRUE.equals(user.getMustChangePassword()), "archived", Boolean.TRUE.equals(user.getArchived()));
     }
     @Override public AccountUser create(Requests.Account input, String role) {
-        return createMany(List.of(input), role).getFirst();
+        return createMany(List.of(input), role).get(0);
     }
     @Override public List<AccountUser> createMany(List<Requests.Account> input, String role) {
         List<AccountUser> users = input.stream().map(value -> newAccount(value, role)).toList();
@@ -83,7 +83,7 @@ public class AccountServiceImpl extends ServiceImpl<AccountUserMapper, AccountUs
         return user;
     }
     @Override @Transactional public AccountUser setup(Requests.Account input) {
-        if (count() != 0) throw error(409, "Initial setup is already complete");
+        if (lambdaQuery().eq(AccountUser::getRole, "admin").eq(AccountUser::getArchived, false).exists()) throw error(409, "Initial setup is already complete");
         if (input.getPassword() == null || input.getPassword().length() < 8) throw error(422, "Password must contain at least 8 characters");
         AccountUser user = new AccountUser();
         user.setId("initialAdmin"); user.setName(input.getName().trim());
@@ -94,7 +94,44 @@ public class AccountServiceImpl extends ServiceImpl<AccountUserMapper, AccountUs
     @Override public AccountUser login(Requests.Login input, HttpServletResponse response) {
         AccountUser user = lambdaQuery().eq(AccountUser::getEmail, input.getEmail().trim().toLowerCase(Locale.ROOT)).one();
         if (user == null || Boolean.TRUE.equals(user.getArchived()) || !matches(input.getPassword(), user.getPasswordHash())) throw error(401, "Email or password is incorrect");
+        if (input.getRole() != null && !input.getRole().equals(user.getRole())) throw error(403, "This account does not match the selected role.");
         issue(user, response); return user;
+    }
+    @Override public AccountUser studentLogin(Requests.StudentLogin input, HttpServletResponse response) {
+        AccountUser user = lambdaQuery().eq(AccountUser::getUsername, input.getUsername().trim().toLowerCase(Locale.ROOT)).one();
+        if (user == null || !"student".equals(user.getRole()) || Boolean.TRUE.equals(user.getArchived())
+            || !Boolean.TRUE.equals(user.getInvitationEnabled()) || !matches(input.getInvitationCode().trim(), user.getInvitationHash()))
+            throw error(401, "Username or invitation code is incorrect");
+        issue(user, response); return user;
+    }
+    @Override @Transactional public Map<String, Object> createInvitedStudent(Requests.StudentInvitation input) {
+        String username = input.getUsername().trim().toLowerCase(Locale.ROOT);
+        if (lambdaQuery().eq(AccountUser::getUsername, username).exists()) throw error(409, "This username is already in use");
+        AccountUser user = new AccountUser(); user.setName(input.getName().trim()); user.setUsername(username);
+        user.setRole("student"); user.setArchived(false); user.setDemo(false); user.setMustChangePassword(false);
+        user.setInvitationEnabled(false); save(user); return invitation(user.getId(), true);
+    }
+    @Override public Map<String, Object> invitation(String userId, boolean enabled) {
+        AccountUser user = getById(userId);
+        if (user == null || !"student".equals(user.getRole()) || user.getUsername() == null) throw error(422, "This student does not have a username-based account");
+        byte[] bytes = new byte[15]; new java.security.SecureRandom().nextBytes(bytes);
+        String code = enabled ? Base64.getUrlEncoder().withoutPadding().encodeToString(bytes) : "";
+        lambdaUpdate().eq(AccountUser::getId, userId).set(AccountUser::getInvitationEnabled, enabled)
+            .set(AccountUser::getInvitationHash, enabled ? encoder.encode(code) : null).update();
+        sessions.delete(Wrappers.<AuthSession>lambdaQuery().eq(AuthSession::getUserId, userId));
+        user.setInvitationEnabled(enabled);
+        Map<String, Object> result = new LinkedHashMap<>(publicUser(user)); result.put("invitationCode", code); return result;
+    }
+    @Override @Transactional public void ensureDemoAccounts() {
+        if (!properties.isDemoEnabled()) return;
+        for (String role : List.of("teacher", "student")) {
+            String id = "teacher".equals(role) ? "demoTeacher" : "demoStudent";
+            if (getById(id) != null) continue;
+            AccountUser user = new AccountUser(); user.setId(id); user.setRole(role);
+            user.setName("teacher".equals(role) ? "演示教师" : "演示学生");
+            user.setDemo(true); user.setArchived(false); user.setMustChangePassword(false); user.setInvitationEnabled(false);
+            save(user);
+        }
     }
     @Override public AccountUser demo(String id, HttpServletResponse response) {
         if (!properties.isDemoEnabled()) throw error(404, "Demo sign-in is disabled");

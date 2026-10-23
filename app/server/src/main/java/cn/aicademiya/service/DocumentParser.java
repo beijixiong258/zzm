@@ -4,13 +4,6 @@ import cn.aicademiya.config.AppProperties;
 import cn.aicademiya.dto.DocumentExtraction;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.pdfbox.Loader;
-import org.apache.pdfbox.contentstream.operator.Operator;
-import org.apache.pdfbox.pdfparser.PDFStreamParser;
-import org.apache.pdfbox.pdmodel.PDDocument;
-import org.apache.pdfbox.pdmodel.PDPage;
-import org.apache.pdfbox.rendering.PDFRenderer;
-import org.apache.pdfbox.text.PDFTextStripper;
 import org.apache.poi.hwpf.HWPFDocument;
 import org.apache.poi.hwpf.extractor.WordExtractor;
 import org.apache.poi.openxml4j.opc.OPCPackage;
@@ -56,14 +49,17 @@ import java.util.zip.ZipFile;
 public class DocumentParser {
     private final AppProperties properties;
     private final AiService ai;
+    private final ContextBudget budget;
+    private final PdfInputReader pdf;
 
     public DocumentExtraction parse(Path source, String fileName, Consumer<DocumentExtraction.Report> progress) {
+        String extension = fileName.substring(fileName.lastIndexOf('.') + 1).toLowerCase(Locale.ROOT);
+        if ("pdf".equals(extension)) return pdf.prepare(source, progress);
         Context context = new Context(progress, Math.max(1, properties.getDocumentMaxUnits()),
             Math.max(1000, properties.getDocumentMaxCharacters()));
-        String extension = fileName.substring(fileName.lastIndexOf('.') + 1).toLowerCase(Locale.ROOT);
         try {
             switch (extension) {
-                case "pdf" -> pdf(source, context);
+                case "epub" -> epub(source, context);
                 case "docx" -> docx(source, context);
                 case "doc" -> doc(source, context);
                 case "pptx", "ppt" -> slides(source, context);
@@ -86,60 +82,69 @@ public class DocumentParser {
             log.warn("Document format processing failed ({})", exception.getClass().getSimpleName());
             context.fail("Document", "The document could not be fully opened. Check for encryption, damage or unsupported embedded content.");
         }
-        return context.finish();
+        DocumentExtraction result = context.finish();
+        result.getReport().setTextCharacters(result.getText().length());
+        result.getReport().setTextTokensEstimated(budget.estimate(result.getText()));
+        result.getReport().setTextTokensUpperBound(budget.upperBound(result.getText()));
+        return result;
     }
 
-    private void pdf(Path source, Context context) throws IOException {
-        try (PDDocument document = Loader.loadPDF(source.toFile())) {
-            if (!document.getCurrentAccessPermission().canExtractContent()) {
-                throw new IOException("PDF extraction is restricted");
+    private void epub(Path source, Context context) throws Exception {
+        try (ZipFile archive = new ZipFile(source.toFile())) {
+            var container = epubXml(archive, "META-INF/container.xml");
+            var rootFiles = container.getElementsByTagNameNS("*", "rootfile");
+            if (rootFiles.getLength() == 0) throw new IOException("EPUB package is missing");
+            String packagePath = ((org.w3c.dom.Element) rootFiles.item(0)).getAttribute("full-path");
+            var packageXml = epubXml(archive, packagePath); String base = packagePath.contains("/") ? packagePath.substring(0, packagePath.lastIndexOf('/') + 1) : "";
+            Map<String,String> chapters = new HashMap<>(); List<String> pictures = new ArrayList<>();
+            var items = packageXml.getElementsByTagNameNS("*", "item");
+            for (int i=0;i<items.getLength();i++) {
+                var item = (org.w3c.dom.Element)items.item(i); String type = item.getAttribute("media-type");
+                String name = java.net.URI.create(base + item.getAttribute("href")).normalize().getPath();
+                if (name.startsWith("/") || name.startsWith("../")) throw new IOException("Invalid EPUB path");
+                if (type.contains("xhtml") || type.equals("text/html")) chapters.put(item.getAttribute("id"), name);
+                if (type.startsWith("image/")) pictures.add(name);
             }
-            context.total(document.getNumberOfPages());
-            PDFRenderer renderer = new PDFRenderer(document);
-            renderer.setSubsamplingAllowed(true);
-            PDFTextStripper stripper = new PDFTextStripper();
-            stripper.setSortByPosition(true);
-            for (int index = 0; index < document.getNumberOfPages() && context.available(); index++) {
-                int pageIndex = index;
-                String label = "Page " + (index + 1);
-                unit(context, label, () -> {
-                    stripper.setStartPage(pageIndex + 1);
-                    stripper.setEndPage(pageIndex + 1);
-                    String text = stripper.getText(document);
-                    PDPage page = document.getPage(pageIndex);
-                    if (!needsVision(page, text)) return text;
-                    double edge = Math.max(page.getCropBox().getWidth(), page.getCropBox().getHeight());
-                    if (!Double.isFinite(edge) || edge <= 0) throw new IOException("Invalid PDF page size");
-                    float dpi = (float) Math.min(144, imageMaxEdge() * 72.0 / edge);
-                    try {
-                        return visual(context, label, renderer.renderImageWithDPI(pageIndex, dpi), text);
-                    } catch (Exception exception) {
-                        context.append(label + " — text", text);
-                        throw exception;
-                    }
+            var order = packageXml.getElementsByTagNameNS("*", "itemref"); context.total(order.getLength() + pictures.size());
+            for (int i=0;i<order.getLength() && context.available();i++) {
+                String chapter = chapters.get(((org.w3c.dom.Element)order.item(i)).getAttribute("idref"));
+                unit(context, "Chapter " + (i+1), () -> {
+                    if(chapter == null) throw new IOException("Unsupported EPUB chapter");
+                    var document = epubXml(archive, chapter); StringBuilder text = new StringBuilder(); appendEpub(document.getDocumentElement(), text); return text.toString();
                 });
             }
+            for (int i=0;i<pictures.size() && context.available();i++) {
+                String name = pictures.get(i), label = "Image " + (i+1);
+                unit(context, label, () -> image(context, label, epubBytes(archive,name), name.endsWith(".webp") ? "image/webp" : ""));
+            }
+            if(!pictures.isEmpty()) context.note("EPUB text and images are extracted separately; compare their placement with the original.");
         }
     }
-
-    private boolean needsVision(PDPage page, String text) throws IOException {
-        // Text extraction alone cannot preserve diagrams, outlined glyphs or formula layout.
-        if (text.strip().length() < 80 || text.indexOf('\uFFFD') >= 0
-            || text.matches("(?s).*[=∑∫√∂≤≥∞∈⊂⊆].*")) return true;
-        if (page.getResources() != null && page.getResources().getXObjectNames().iterator().hasNext()) return true;
-        for (Object token : new PDFStreamParser(page).parse()) {
-            if (token instanceof Operator operator && Set.of("S", "s", "f", "F", "f*", "B", "B*", "b", "b*", "sh").contains(operator.getName())) return true;
-        }
-        return false;
+    private byte[] epubBytes(ZipFile archive, String name) throws IOException {
+        var entry = archive.getEntry(name); if(entry == null) throw new IOException("EPUB entry is missing");
+        try(InputStream input = archive.getInputStream(entry)) { byte[] data=input.readNBytes(16*1024*1024+1); if(data.length > 16*1024*1024) throw new IOException("EPUB entry exceeds the processing limit"); return data; }
     }
-
+    private org.w3c.dom.Document epubXml(ZipFile archive, String name) throws Exception {
+        DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance(); factory.setNamespaceAware(true);
+        factory.setFeature("http://xml.org/sax/features/external-general-entities",false); factory.setFeature("http://xml.org/sax/features/external-parameter-entities",false);
+        factory.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd",false); factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD,""); factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_SCHEMA,"");
+        return factory.newDocumentBuilder().parse(new ByteArrayInputStream(epubBytes(archive,name)));
+    }
+    private void appendEpub(Node node, StringBuilder text) {
+        String name=Objects.toString(node.getLocalName(), "").toLowerCase(Locale.ROOT);
+        if(Set.of("script","style","head").contains(name)) return;
+        if(node.getNodeType()==Node.TEXT_NODE) text.append(node.getNodeValue());
+        for(Node child=node.getFirstChild();child!=null;child=child.getNextSibling()) appendEpub(child,text);
+        if(Set.of("p","div","br","h1","h2","h3","li","tr").contains(name)) text.append('\n');
+        if(Set.of("td","th").contains(name)) text.append('\t');
+    }
     private void docx(Path source, Context context) throws Exception {
         try (OPCPackage archive = OPCPackage.open(source.toFile(), PackageAccess.READ);
              XWPFDocument document = new XWPFDocument(archive)) {
             var pictures = document.getAllPackagePictures();
             context.total(1 + pictures.size());
-            context.report.setVisualReviewRequired(true);
-            context.note("Office text, tables and images are extracted separately; compare their placement with the original.");
+            context.report.setVisualReviewRequired(!pictures.isEmpty());
+            if (!pictures.isEmpty()) context.note("Office text, tables and images are extracted separately; compare their placement with the original.");
             unit(context, "Document text", () -> new XWPFWordExtractor(document).getText());
             for (int index = 0; index < pictures.size() && context.available(); index++) {
                 var picture = pictures.get(index);
@@ -351,12 +356,13 @@ public class DocumentParser {
     }
 
     private String visual(Context context, String label, BufferedImage image, String extractedText) throws Exception {
-        BufferedImage rgb = new BufferedImage(image.getWidth(), image.getHeight(), BufferedImage.TYPE_INT_RGB);
+        java.awt.Rectangle bounds = new java.awt.Rectangle(0, 0, image.getWidth(), image.getHeight());
+        BufferedImage rgb = new BufferedImage(bounds.width, bounds.height, BufferedImage.TYPE_INT_RGB);
         Graphics2D graphics = rgb.createGraphics();
         try {
             graphics.setColor(Color.WHITE);
             graphics.fillRect(0, 0, rgb.getWidth(), rgb.getHeight());
-            graphics.drawImage(image, 0, 0, null);
+            graphics.drawImage(image, -bounds.x, -bounds.y, null);
         } finally {
             graphics.dispose();
             image.flush();
@@ -381,9 +387,12 @@ public class DocumentParser {
 
     private String recognize(Context context, String label, byte[] image, String mimeType, String extractedText) {
         var reading = ai.readVisual(label, image, mimeType, extractedText);
+        context.report.setVisionInputTokensEstimated(context.report.getVisionInputTokensEstimated() + reading.getEstimatedImageTokens());
+        context.report.setVisionPromptTokensActual(context.report.getVisionPromptTokensActual() + reading.getInputTokens());
         context.report.setVisualReviewRequired(true);
         context.report.setVisionUnits(context.report.getVisionUnits() + 1);
-        if (!reading.isReadable() || !reading.getIssues().isEmpty()) {
+        reading.getIssues().forEach(issue -> context.note(label + ": " + issue));
+        if (!reading.isReadable()) {
             context.append(label + " — partial", reading.getText());
             throw new IllegalStateException("Image content is incomplete");
         }
@@ -410,6 +419,8 @@ public class DocumentParser {
     private void unit(Context context, String label, Callable<String> reader) {
         if (!context.available()) return;
         context.attempted++;
+        context.report.setCurrentUnit(label);
+        context.progress.accept(context.report);
         try {
             if (Thread.currentThread().isInterrupted()) throw new InterruptedException();
             context.append(label, reader.call());
@@ -422,6 +433,7 @@ public class DocumentParser {
             log.warn("Document unit {} could not be read ({})", label, exception.getClass().getSimpleName());
             context.fail(label, "Some document units could not be read. Check the original and retry processing.");
         }
+        context.report.setTextCharacters(context.text.length()); context.report.setTextTokensEstimated(budget.estimate(context.text.toString())); context.report.setTextTokensUpperBound(budget.upperBound(context.text.toString()));
         context.progress.accept(context.report);
     }
 
@@ -434,7 +446,6 @@ public class DocumentParser {
         private final int maxCharacters;
         private int attempted;
         private int consecutiveFailures;
-
         private Context(Consumer<DocumentExtraction.Report> progress, int maxUnits, int maxCharacters) {
             this.progress = progress;
             this.maxUnits = maxUnits;
@@ -468,13 +479,14 @@ public class DocumentParser {
             note(note);
         }
         private DocumentExtraction finish() {
+            report.setCurrentUnit("");
             result.setText(text.toString().strip());
             if (result.getText().isBlank()) {
                 result.setStatus("failed");
                 result.setWarning("No readable content was extracted. Check the original file and retry.");
             } else if (!report.getFailedUnits().isEmpty() || report.isTruncated() || report.getUnitsProcessed() < report.getUnitsTotal()) {
-                result.setStatus("needsReview");
-                result.setWarning("Document processing is incomplete. Retry failed units or upload smaller files before generating a task.");
+                result.setStatus("incomplete");
+                result.setWarning("Document processing is incomplete. Reprocess the file or upload smaller files before generating a task.");
             } else {
                 result.setStatus(report.isVisualReviewRequired() ? "needsReview" : "ready");
                 result.setWarning(report.isVisualReviewRequired() ? "Check figures, handwriting and layout against the original." : "");

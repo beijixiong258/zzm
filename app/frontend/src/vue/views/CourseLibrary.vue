@@ -2,6 +2,8 @@
 import { computed, onBeforeUnmount, ref } from "vue";
 import { t } from "../../i18n";
 import { call, key, type Material } from "../../classroom-api";
+import { navigate } from "../classroom-state";
+import FileUploader from "../components/FileUploader.vue";
 import MaterialTree from "../components/MaterialTree.vue";
 import CourseMaterialPreview from "../components/CourseMaterialPreview.vue";
 const props = defineProps<{ courseId: string }>();
@@ -9,15 +11,16 @@ const materials = ref<Material[]>([]),
   selectedId = ref(""),
   showArchived = ref(false),
   busy = ref(false),
-  error = ref(""),
-  progress = ref("");
+  error = ref("");
 const title = ref(""),
   visibility = ref<"student" | "teacher">("student");
+const uploadVisibility = ref<"student" | "teacher">("student");
 const selected = computed(() =>
   materials.value.find((m) => m.id === selectedId.value),
 );
 let timer: ReturnType<typeof setTimeout> | undefined,
   disposed = false;
+let materialLoadError = "";
 async function load() {
   clearTimeout(timer);
   try {
@@ -33,8 +36,12 @@ async function load() {
       timer = setTimeout(() => {
         void load();
       }, 3000);
+    if (error.value === materialLoadError) error.value = "";
+    materialLoadError = "";
   } catch (e) {
-    error.value = (e as Error).message;
+    materialLoadError = (e as Error).message;
+    error.value = materialLoadError;
+    if (!disposed) timer = setTimeout(() => void load(), 5000);
   }
 }
 function select(material: Material) {
@@ -53,28 +60,6 @@ async function action(fn: () => Promise<void>) {
   } finally {
     busy.value = false;
   }
-}
-async function upload(event: Event) {
-  const input = event.target as HTMLInputElement;
-  const files = [...(input.files || [])];
-  await action(async () => {
-    for (let index = 0; index < files.length; index++) {
-      const file = files[index];
-      progress.value = `${index + 1}/${files.length} · ${file.name}`;
-      const body = new FormData();
-      body.set("file", file);
-      body.set("relativePath", file.webkitRelativePath || file.name);
-      body.set("visibility", "student");
-      const created = await call<Material>(
-        `/courses/${key(props.courseId)}/materials`,
-        "POST",
-        body,
-      );
-      select(created);
-    }
-  });
-  progress.value = "";
-  input.value = "";
 }
 async function save() {
   await action(async () => {
@@ -113,7 +98,13 @@ onBeforeUnmount(() => {
 void load();
 </script>
 <template>
-  <header class="page-heading">
+  <nav class="page-return-bar" :aria-label="t('Back')">
+    <button @click="navigate({ page: 'course', courseId })">
+      ← {{ t("Back to course") }}
+    </button>
+    <span class="muted">{{ t("Course materials") }}</span>
+  </nav>
+  <header class="page-heading compact-heading">
     <div>
       <p class="eyebrow">{{ t("COURSE LIBRARY") }}</p>
       <h1>{{ t("Course materials") }}</h1>
@@ -123,29 +114,24 @@ void load();
         }}
       </p>
     </div>
-    <div class="row">
-      <label class="button primary"
-        >＋ {{ t("Upload files")
-        }}<input
-          type="file"
-          accept=".pdf,.docx,.doc,.pptx,.ppt,.xlsx,.xls,.txt,.md,.png,.jpg,.jpeg,.webp"
-          multiple
-          hidden
-          :disabled="busy"
-          @change="upload" /></label
-      ><label class="button"
-        >＋ {{ t("Upload folder")
-        }}<input
-          type="file"
-          accept=".pdf,.docx,.doc,.pptx,.ppt,.xlsx,.xls,.txt,.md,.png,.jpg,.jpeg,.webp"
-          multiple
-          webkitdirectory
-          hidden
-          :disabled="busy"
-          @change="upload"
-      /></label>
-    </div>
   </header>
+  <section class="panel library-upload">
+    <div class="form-stack">
+      <label
+        >{{ t("Visibility for new uploads")
+        }}<select v-model="uploadVisibility">
+          <option value="student">{{ t("Students and teachers") }}</option>
+          <option value="teacher">{{ t("Teachers and AI only") }}</option>
+        </select></label
+      >
+      <FileUploader
+        :endpoint="`/courses/${key(courseId)}/materials`"
+        :visibility="uploadVisibility"
+        @uploaded="select"
+        @settled="load"
+      />
+    </div>
+  </section>
   <p class="muted">
     {{
       t(
@@ -154,7 +140,6 @@ void load();
     }}
   </p>
   <p v-if="error" class="error" role="alert">{{ error }}</p>
-  <p v-if="progress" role="status">{{ t("Uploading {0}", [progress]) }}</p>
   <div class="library-layout">
     <aside class="panel">
       <label class="check-label"
@@ -182,7 +167,12 @@ void load();
               <option value="teacher">{{ t("Teachers and AI only") }}</option>
             </select></label
           ><button :disabled="busy">{{ t("Save") }}</button
-          ><button type="button" :disabled="busy" @click="archive">
+          ><button
+            type="button"
+            :class="{ 'warning-action': !selected.archived }"
+            :disabled="busy"
+            @click="archive"
+          >
             {{ t(selected.archived ? "Restore" : "Archive") }}</button
           ><button
             v-if="

@@ -3,6 +3,7 @@ import { computed, ref } from "vue";
 import { t } from "../../i18n";
 import {
   call,
+  fileUrl,
   dateText,
   key,
   statusText,
@@ -15,6 +16,7 @@ import {
 } from "../../classroom-api";
 import TaskContent from "../components/TaskContent.vue";
 import RichText from "../components/RichText.vue";
+import RecordHistory from "../components/RecordHistory.vue";
 const props = defineProps<{ taskId: string }>();
 const task = ref<Task | null>(null),
   versions = ref<Version[]>([]),
@@ -90,6 +92,22 @@ async function review(status: string) {
     busy.value = false;
   }
 }
+async function approve(requestId: string, text: string) {
+  if (!selected.value?.record) return;
+  busy.value = true;
+  error.value = "";
+  try {
+    selected.value.record = await call<LearningRecord>(
+      `/records/${key(selected.value.record.id)}/feedback/${key(requestId)}/approve`,
+      "POST",
+      { text },
+    );
+  } catch (e) {
+    error.value = (e as Error).message;
+  } finally {
+    busy.value = false;
+  }
+}
 void load();
 </script>
 <template>
@@ -123,9 +141,16 @@ void load();
     </div>
   </header>
   <p v-if="error" class="error" role="alert">{{ error }}</p>
-  <div class="overview-grid">
-    <div v-for="(count, status) in counters" :key="status" class="panel stat">
-      <span>{{ statusText(status) }}</span
+  <div class="overview-grid progress-overview">
+    <div
+      v-for="(count, status) in counters"
+      :key="status"
+      class="panel stat"
+      :data-status="status"
+    >
+      <span class="status-label" :data-status="status">{{
+        statusText(status)
+      }}</span
       ><strong>{{ count }}</strong>
     </div>
   </div>
@@ -158,10 +183,12 @@ void load();
               ><small>{{ student.email }}</small>
             </td>
             <td>
-              <span class="badge" :class="student.status">{{
+              <span class="badge status-label" :data-status="student.status">{{
                 statusText(student.status)
               }}</span
               ><small
+                class="status-label"
+                :data-status="student.submissionStatus"
                 v-if="
                   ['submitted', 'needsRevision'].includes(
                     student.submissionStatus,
@@ -200,6 +227,11 @@ void load();
           :answers="selected.record.answers"
           readonly
         />
+        <RecordHistory
+          :record="selected.record"
+          :questions="selected.task.content.questions"
+          kind="answer"
+        />
         <details class="reference-review">
           <summary>{{ t("Teacher reference answers") }}</summary>
           <div
@@ -226,14 +258,72 @@ void load();
           <small
             >{{ t(message.role === "user" ? "Student" : "AI tutor") }} ·
             {{ dateText(message.createdAt) }}</small
-          ><RichText :text="message.content" />
+          ><template v-if="message.pendingReview"
+            ><p class="notice">
+              {{ t("AI feedback is awaiting teacher review.") }}
+            </p>
+            <textarea
+              v-model="message.content"
+              rows="6"
+              :aria-label="t('Review AI feedback')"
+            /><button
+              :disabled="busy"
+              @click="approve(message.requestId!, message.content)"
+            >
+              {{ t("Approve and release feedback") }}
+            </button></template
+          ><RichText v-else :text="message.content" />
+          <div v-for="id in message.attachmentIds || []" :key="id">
+            <span
+              v-if="selected.record.removedAttachments?.[id]"
+              class="muted"
+              >{{
+                t("Removed attachment: {0}", [
+                  selected.record.removedAttachments[id],
+                ])
+              }}</span
+            >
+            <a v-else :href="fileUrl(id)" target="_blank" rel="noopener">{{
+              selected.attachments?.find((a) => a.id === id)?.title ||
+              t("Attachment")
+            }}</a>
+          </div>
         </article>
+        <RecordHistory
+          :record="selected.record"
+          :questions="selected.task.content.questions"
+          kind="conversation"
+        />
+        <RecordHistory
+          v-if="selected.record.messagesTruncated"
+          :record="selected.record"
+          :questions="selected.task.content.questions"
+          kind="current"
+        />
+        <RecordHistory
+          :record="selected.record"
+          :questions="selected.task.content.questions"
+          kind="attachment"
+        />
+        <section v-if="selected.attachments?.length">
+          <h3>{{ t("Student attachments") }}</h3>
+          <div v-for="file in selected.attachments" :key="file.id">
+            <a :href="fileUrl(file.id)" target="_blank" rel="noopener">{{
+              file.title
+            }}</a>
+            · {{ statusText(file.status)
+            }}<small v-if="file.questionId">
+              · {{ t("Question attachment") }}</small
+            >
+          </div>
+        </section>
         <div class="form-stack teacher-feedback">
           <label
             >{{ t("Teacher feedback") }}<textarea v-model="note" rows="4" />
           </label>
           <div class="row wrap">
             <button
+              class="warning-action"
               :disabled="
                 busy ||
                 !['submitted', 'confirmed', 'needsRevision'].includes(
@@ -244,7 +334,7 @@ void load();
             >
               {{ t("Request revision") }}</button
             ><button
-              class="primary"
+              class="success-action"
               :disabled="
                 busy ||
                 !['submitted', 'confirmed', 'needsRevision'].includes(

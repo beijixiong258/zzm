@@ -7,7 +7,7 @@ import cn.aicademiya.service.*;
 import cn.hutool.core.util.IdUtil;
 import cn.hutool.json.*;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
-import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -49,6 +49,27 @@ public class SessionServiceImpl extends ServiceImpl<TeachingSessionMapper, Teach
         TeachingSession session = new TeachingSession(); session.setCourseId(courseId); session.setRevision(0L); session.setArchived(false);
         fill(session, input); save(session); return session;
     }
+    @Override @Transactional public TeachingSession copy(String id, String courseId, AccountUser user) {
+        TeachingSession original = require(id, user, true); courses.requireAccess(courseId, user, true);
+        Requests.SessionInput input = JSONUtil.toBean(JSONUtil.toJsonStr(view(original, true)), Requests.SessionInput.class);
+        Map<String,String> replacements = new HashMap<>();
+        for (CourseMaterial source : materials.selected(original.getCourseId(), input.getMaterialIds())) {
+            if (courseId.equals(original.getCourseId())) { replacements.put(source.getId(), source.getId()); continue; }
+            CourseMaterial material = JSONUtil.toBean(JSONUtil.toJsonStr(source), CourseMaterial.class);
+            material.setId(IdUtil.fastSimpleUUID()); material.setCourseId(courseId); material.setCreatedAt(LocalDateTime.now(ZoneOffset.UTC));
+            materials.save(material); replacements.put(source.getId(), material.getId());
+        }
+        input.setMaterialIds(input.getMaterialIds().stream().map(replacements::get).toList());
+        for (var question : input.getContent().getQuestions()) {
+            question.setId(IdUtil.fastSimpleUUID());
+            question.setSourceMaterialIds(question.getSourceMaterialIds().stream().map(replacements::get).toList());
+            question.setImageMaterialIds(question.getImageMaterialIds().stream().map(replacements::get).toList());
+        }
+        input.getContent().setIllustrationMaterialIds(input.getContent().getIllustrationMaterialIds().stream().map(replacements::get).toList());
+        TeachingSession result = create(courseId, input, user);
+        // Copies are fresh drafts; published versions, student records and simulations are never copied.
+        return result;
+    }
     @Override @Transactional public TeachingSession edit(String id, Requests.SessionInput input, AccountUser user) {
         TeachingSession session = require(id, user, true);
         if (!session.getRevision().equals(input.getRevision())) throw error(409, "Task changed. Reload before saving.");
@@ -76,7 +97,7 @@ public class SessionServiceImpl extends ServiceImpl<TeachingSessionMapper, Teach
         List<String> ids = JSONUtil.toList(session.getMaterialIdsJson(), String.class);
         result.put("materialIds", ids); result.put("content", JSONUtil.toBean(session.getContentJson(), TaskContent.class));
         result.put("materials", ids.isEmpty() ? List.of() : materials.listByIds(ids).stream().map(materials::view).toList());
-        Course course = courses.getById(session.getCourseId()); result.put("courseInstructions", course.getSystemInstructions());
+        Course course = courses.getById(session.getCourseId()); result.put("courseInstructions", course.getSystemInstructions()); result.put("courseInformation", Objects.toString(course.getCourseInformation(), "")); result.put("studentProfile", Objects.toString(course.getStudentProfile(), ""));
         return teacher ? result : studentProjection(result);
     }
     @Override public SessionVersion version(String sessionId, String versionId) {
@@ -130,11 +151,31 @@ public class SessionServiceImpl extends ServiceImpl<TeachingSessionMapper, Teach
     @Override public TaskContent validateContent(TaskContent content, List<String> materialIds, boolean publishing) {
         if (content == null || content.getQuestions() == null || content.getLearningGoals() == null || content.getLearningPlan() == null) throw error(422, "Task content is incomplete");
         if (content.getQuestions().size() > 100 || content.getLearningPlan().size() > 30 || content.getLearningGoals().size() > 30) throw error(422, "Task content exceeds the size limit");
+        if (content.getHandout() == null) content.setHandout("");
+        if (content.getOpeningMessage() == null) content.setOpeningMessage("");
+        if (content.getRubric() == null) content.setRubric("");
+        if (content.getHandout().length() > 180000 || content.getOpeningMessage().length() > 20000 || content.getRubric().length() > 20000) throw error(422, "Task content exceeds the size limit");
+        if (!Set.of("guided", "autonomous").contains(content.getTeachingMode()) || !Set.of("immediate", "teacherReview").contains(content.getFeedbackMode())) throw error(422, "Invalid teaching or feedback mode");
+        if (content.getDiagrams() == null) content.setDiagrams(new ArrayList<>());
+        if (content.getDiagrams().size() > 10) throw error(422, "Too many diagrams");
+        for (var diagram : content.getDiagrams()) {
+            if (diagram == null || diagram.getNodes() == null || diagram.getEdges() == null || diagram.getNodes().size() > 80 || diagram.getEdges().size() > 160) throw error(422, "Invalid diagram");
+            if (diagram.getId() == null || diagram.getId().isBlank()) diagram.setId(IdUtil.fastSimpleUUID());
+            if (diagram.getTitle() == null) diagram.setTitle("");
+            if (diagram.getTitle().length() > 300) throw error(422, "Invalid diagram");
+            Set<String> nodeIds = new HashSet<>();
+            for (var node : diagram.getNodes()) {
+                if (node == null || node.getId() == null || !nodeIds.add(node.getId()) || node.getText() == null || node.getText().length() > 2000 || node.getX() == null || node.getY() == null || node.getX() < 0 || node.getY() < 0 || node.getX() > 4000 || node.getY() > 4000) throw error(422, "Invalid diagram node");
+            }
+            for (var edge : diagram.getEdges()) if (edge == null || !nodeIds.contains(edge.getFrom()) || !nodeIds.contains(edge.getTo())) throw error(422, "Invalid diagram connection");
+        }
         Set<String> seen = new HashSet<>();
         Set<String> publicImages = new HashSet<>();
         if (!materialIds.isEmpty()) materials.listByIds(materialIds).stream()
             .filter(m -> "student".equals(m.getVisibility()) && m.getMimeType().startsWith("image/"))
             .forEach(m -> publicImages.add(m.getId()));
+        if (content.getIllustrationMaterialIds() == null) content.setIllustrationMaterialIds(new ArrayList<>());
+        if (!publicImages.containsAll(content.getIllustrationMaterialIds())) throw error(422, "Lesson illustrations must be selected images visible to students");
         for (TaskContent.Question question : content.getQuestions()) {
             if (question == null) throw error(422, "Question data is incomplete");
             if (question.getId() == null || question.getId().isBlank()) question.setId(IdUtil.fastSimpleUUID());
@@ -147,32 +188,33 @@ public class SessionServiceImpl extends ServiceImpl<TeachingSessionMapper, Teach
             if (!materialIds.containsAll(question.getSourceMaterialIds()) || !materialIds.containsAll(question.getImageMaterialIds())) throw error(422, "Question references must use selected materials");
             if (!publicImages.containsAll(question.getImageMaterialIds())) throw error(422, "Question illustrations must be images visible to students");
             if (publishing) {
-                if (question.getReferenceAnswer() == null || question.getReferenceAnswer().isBlank()) throw error(422, "Every question needs a reference answer before publishing");
+
                 if (Set.of("singleChoice", "multipleChoice", "trueFalse").contains(question.getType())) {
                     if (question.getOptions().size() < 2 || question.getOptions().stream().anyMatch(String::isBlank) || new HashSet<>(question.getOptions()).size() != question.getOptions().size()) throw error(422, "Choice questions need distinct non-empty options");
-                    List<String> answers = "multipleChoice".equals(question.getType()) ? question.getReferenceAnswer().lines().toList() : List.of(question.getReferenceAnswer());
+                    String reference = Objects.toString(question.getReferenceAnswer(), ""); List<String> answers = reference.isBlank() ? List.of() : "multipleChoice".equals(question.getType()) ? reference.lines().toList() : List.of(reference);
                     if (!question.getOptions().containsAll(answers)) throw error(422, "The correct answer must match an option");
                 }
                 if ("fillInBlank".equals(question.getType()) && (question.getAnswerSlots() == null || question.getAnswerSlots() < 1 || question.getAnswerSlots() > 20)) throw error(422, "Invalid number of blanks");
                 if ("imageMatching".equals(question.getType()) && question.getImageMaterialIds().isEmpty()) throw error(422, "Image matching questions need illustrations");
             }
         }
-        if (publishing && (content.getLearningGoals().isEmpty() || content.getLearningPlan().isEmpty())) throw error(422, "Generate learning goals and a teaching plan before publishing");
+        if (publishing && !"autonomous".equals(content.getTeachingMode()) && (content.getLearningGoals().isEmpty() || content.getLearningPlan().isEmpty())) throw error(422, "Generate learning goals and a teaching plan before publishing");
         if (content.getLearningGoals().stream().anyMatch(g -> g == null || g.isBlank() || g.length() > 10000)
             || content.getLearningPlan().stream().anyMatch(step -> step == null || step.getTitle() == null || step.getTitle().isBlank() || step.getDescription() == null)) throw error(422, "Learning goals and plan steps must contain meaningful text");
-        if (publishing) {
-            TaskContent.AiConfig config = content.getAiConfig();
-            if (config == null || java.util.stream.Stream.of(config.getTeachingApproach(), config.getFeedbackStrategy(), config.getResponseDetail(), config.getTone()).anyMatch(value -> value == null || value.isBlank()))
-                throw error(422, "Generate the AI teaching configuration before publishing");
-        }
+        if (content.getAiConfig() == null) content.setAiConfig(new TaskContent.AiConfig());
+        TaskContent.AiConfig config = content.getAiConfig();
+        if (config.getTeachingApproach() == null || config.getTeachingApproach().isBlank()) config.setTeachingApproach("Follow the teacher's instructions and adapt to the learner's responses.");
+        if (config.getFeedbackStrategy() == null || config.getFeedbackStrategy().isBlank()) config.setFeedbackStrategy("Give constructive formative feedback; use the supplied rubric when available.");
+        if (config.getResponseDetail() == null || config.getResponseDetail().isBlank()) config.setResponseDetail("Match the learner's needs.");
+        if (config.getTone() == null || config.getTone().isBlank()) config.setTone("Clear, supportive and precise.");
         return content;
     }
     @Override public Map<String, Object> studentProjection(Map<String, Object> snapshot) {
         JSONObject result = JSONUtil.parseObj(JSONUtil.toJsonStr(snapshot));
-        for (String key : List.of("additionalInstructions", "courseInstructions")) result.remove(key);
+        for (String key : List.of("additionalInstructions", "courseInstructions", "courseInformation", "studentProfile")) result.remove(key);
         JSONObject content = result.getJSONObject("content");
         if (content != null) {
-            content.remove("aiConfig");
+            content.remove("aiConfig"); content.remove("rubric");
             JSONArray questions = content.getJSONArray("questions");
             if (questions != null) questions.forEach(value -> { JSONObject q = (JSONObject) value; q.remove("referenceAnswer"); q.remove("explanation"); });
         }

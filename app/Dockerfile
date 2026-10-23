@@ -1,11 +1,11 @@
-FROM maven:3.9-eclipse-temurin-21 AS build
+FROM maven:3.9-eclipse-temurin-17 AS build
 WORKDIR /build
 COPY server/pom.xml ./
 RUN mvn -q dependency:go-offline
 COPY server/src ./src
 RUN mvn -q -DskipTests package
 
-FROM eclipse-temurin:21-jre
+FROM eclipse-temurin:17-jre
 RUN apt-get update && apt-get install -y --no-install-recommends fontconfig fonts-noto-cjk && rm -rf /var/lib/apt/lists/*
 ENV JAVA_TOOL_OPTIONS="-Djava.awt.headless=true"
 WORKDIR /app

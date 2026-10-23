@@ -19,6 +19,7 @@ public class AuthController {
     }
     @PostMapping("/auth/setup") public Object setup(@Valid @RequestBody Requests.Account input) { return accounts.publicUser(accounts.setup(input)); }
     @PostMapping("/auth/login") public Object login(@Valid @RequestBody Requests.Login input, HttpServletResponse response) { return accounts.publicUser(accounts.login(input, response)); }
+    @PostMapping("/auth/student-login") public Object studentLogin(@Valid @RequestBody Requests.StudentLogin input, HttpServletResponse response) { return accounts.publicUser(accounts.studentLogin(input, response)); }
     @PostMapping("/auth/demo/{id}") public Object demo(@PathVariable String id, HttpServletResponse response) { return accounts.publicUser(accounts.demo(id, response)); }
     @GetMapping("/auth/me") public Object me(HttpServletRequest request) { return accounts.publicUser(accounts.current(request)); }
     @PostMapping("/auth/logout") public void logout(HttpServletRequest request, HttpServletResponse response) { accounts.logout(request, response); }

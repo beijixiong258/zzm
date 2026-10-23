@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
 import { t } from "../../i18n";
 import { call, key, type ChatMessage, type Course } from "../../classroom-api";
 import {
@@ -7,6 +7,7 @@ import {
   navigate,
   refreshCourses,
   staff,
+  user,
   tasks,
 } from "../classroom-state";
 import RichText from "../components/RichText.vue";
@@ -23,7 +24,43 @@ const form = ref({
   title: "",
   code: "",
   description: "",
+  courseInformation: "",
+  studentProfile: "",
   systemInstructions: "",
+});
+const draftNotice = ref("");
+const courseDialog = ref<HTMLFormElement | null>(null);
+function courseDraftKey() {
+  return (
+    "aicademiya.course-draft." + user.value?.id + "." + (editing.value || "new")
+  );
+}
+function persistCourseDraft() {
+  if (!showCourse.value) return;
+  try {
+    localStorage.setItem(courseDraftKey(), JSON.stringify(form.value));
+    draftNotice.value = t(
+      "Draft saved on this device. You can close this window and continue later.",
+    );
+  } catch {
+    draftNotice.value = t(
+      "This browser could not save the draft. Keep this window open until you save the course.",
+    );
+  }
+}
+watch(form, persistCourseDraft, { deep: true, flush: "sync" });
+function closeCourse() {
+  if (busy.value) return;
+  persistCourseDraft();
+  showCourse.value = false;
+}
+function courseKeydown(event: KeyboardEvent) {
+  if (event.key === "Escape" && showCourse.value) closeCourse();
+}
+window.addEventListener("keydown", courseKeydown);
+onBeforeUnmount(() => {
+  persistCourseDraft();
+  window.removeEventListener("keydown", courseKeydown);
 });
 const prompt = ref(""),
   messages = ref<ChatMessage[]>([]),
@@ -42,9 +79,27 @@ function edit(value?: Course) {
     title: value?.title || "",
     code: value?.code || "",
     description: value?.description || "",
+    courseInformation: value?.courseInformation || "",
+    studentProfile: value?.studentProfile || "",
     systemInstructions: value?.systemInstructions || "",
   };
+  draftNotice.value = "";
+  try {
+    const saved = JSON.parse(localStorage.getItem(courseDraftKey()) || "null");
+    if (
+      saved &&
+      Object.keys(form.value).every((name) => typeof saved[name] === "string")
+    ) {
+      form.value = { ...form.value, ...saved };
+      draftNotice.value = t("Your unfinished course draft has been restored.");
+    }
+  } catch {
+    /* A damaged local draft must not prevent opening the form. */
+  }
   showCourse.value = true;
+  void nextTick(() =>
+    courseDialog.value?.querySelector<HTMLInputElement>("input")?.focus(),
+  );
 }
 async function action(fn: () => Promise<void>) {
   busy.value = true;
@@ -64,8 +119,13 @@ async function saveCourse() {
       editing.value ? "PUT" : "POST",
       form.value,
     );
-    await refreshCourses();
+    try {
+      localStorage.removeItem(courseDraftKey());
+    } catch {
+      /* Saving on the server succeeded. */
+    }
     showCourse.value = false;
+    await refreshCourses();
     navigate({ page: "course", courseId: saved.id });
   });
 }
@@ -116,7 +176,7 @@ async function ask() {
       {
         message,
         requestId: crypto.randomUUID(),
-        history: messages.value.slice(-30),
+        history: messages.value,
         courseId: course.value?.id || null,
       },
     );
@@ -237,6 +297,7 @@ async function join() {
     ><button
       v-if="staff"
       class="text-button"
+      :class="{ 'warning-action': !course.archived }"
       :disabled="busy"
       @click="archiveCourse(course)"
     >
@@ -259,7 +320,12 @@ async function join() {
     >
       <div class="row spread">
         <span class="course-code">{{ item.code }}</span
-        ><span v-if="item.archived" class="badge">{{ t("Archived") }}</span>
+        ><span
+          v-if="item.archived"
+          class="badge status-label"
+          data-status="archived"
+          >{{ t("Archived") }}</span
+        >
       </div>
       <h3>{{ item.title }}</h3>
       <p class="muted">{{ item.description }}</p>
@@ -285,15 +351,25 @@ async function join() {
       <div class="grow">
         <div class="row wrap">
           <h3>{{ task.title }}</h3>
-          <span class="badge">{{
-            t(
+          <span
+            class="badge status-label"
+            :data-status="
               task.archived
-                ? "Archived"
+                ? 'archived'
                 : task.publishedVersionId
-                  ? "Published"
-                  : "Draft",
-            )
-          }}</span>
+                  ? 'published'
+                  : 'draft'
+            "
+            >{{
+              t(
+                task.archived
+                  ? "Archived"
+                  : task.publishedVersionId
+                    ? "Published"
+                    : "Draft",
+              )
+            }}</span
+          >
         </div>
         <p class="muted">{{ task.description }}</p>
         <small>{{
@@ -322,6 +398,7 @@ async function join() {
         ><button
           v-if="staff"
           class="text-button"
+          :class="{ 'warning-action': !task.archived }"
           :disabled="busy"
           @click="archiveTask(task.id, task.archived)"
         >
@@ -339,19 +416,31 @@ async function join() {
       }}
     </p>
   </div>
-  <div
-    v-if="showCourse"
-    class="modal-backdrop"
-    @click.self="showCourse = false"
-  >
+  <div v-if="showCourse" class="modal-backdrop" @click.self="closeCourse">
     <form
-      class="modal form-stack"
+      ref="courseDialog"
+      class="modal form-stack course-dialog"
       role="dialog"
       aria-modal="true"
       :aria-label="t('Course settings')"
       @submit.prevent="saveCourse"
     >
-      <h2>{{ t(editing ? "Course settings" : "Create course") }}</h2>
+      <header class="course-dialog-toolbar">
+        <button type="button" :disabled="busy" @click="closeCourse">
+          ← {{ t("Back") }}
+        </button>
+        <h2>{{ t(editing ? "Course settings" : "Create course") }}</h2>
+        <button
+          type="button"
+          :disabled="busy"
+          :aria-label="t('Close')"
+          @click="closeCourse"
+        >
+          ×
+        </button>
+      </header>
+      <p v-if="draftNotice" class="muted" role="status">{{ draftNotice }}</p>
+      <p v-if="error" class="error" role="alert">{{ error }}</p>
       <label
         >{{ t("Course name")
         }}<input v-model="form.title" required maxlength="300" /></label
@@ -362,13 +451,39 @@ async function join() {
         >{{ t("Description")
         }}<textarea v-model="form.description" rows="3" /></label
       ><label
-        >{{ t("Course-wide teaching instructions")
+        >{{ t("Course information")
+        }}<textarea
+          v-model="form.courseInformation"
+          rows="4"
+          maxlength="20000"
+          :placeholder="
+            t(
+              'Describe the course background, subject area, learning objectives, and teaching context.',
+            )
+          "
+        />
+      </label>
+      <label
+        >{{ t("Student profile")
+        }}<textarea
+          v-model="form.studentProfile"
+          rows="4"
+          maxlength="20000"
+          :placeholder="
+            t(
+              'Describe the students’ level, prior knowledge, language proficiency, learning needs, and any relevant accommodations.',
+            )
+          "
+        />
+      </label>
+      <label
+        >{{ t("General instructions for the AI tutor")
         }}<textarea
           v-model="form.systemInstructions"
           rows="5"
           :placeholder="
             t(
-              'Set common teaching principles, student context and boundaries for all tasks in this course.',
+              'Explain how the AI tutor should teach, guide discussion, provide feedback, and support students throughout the course.',
             )
           "
         /><small>{{
@@ -376,7 +491,7 @@ async function join() {
         }}</small></label
       >
       <div class="row end">
-        <button type="button" @click="showCourse = false">
+        <button type="button" @click="closeCourse">
           {{ t("Cancel") }}</button
         ><button class="primary" :disabled="busy">{{ t("Save") }}</button>
       </div>

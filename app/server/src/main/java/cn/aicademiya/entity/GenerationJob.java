@@ -15,6 +15,7 @@ public class GenerationJob {
     private Long expectedRevision;
     private String requestJson;
     private String resultJson;
+    private String usageJson;
     private String errorMessage;
     private java.time.LocalDateTime createdAt;
     private java.time.LocalDateTime updatedAt;

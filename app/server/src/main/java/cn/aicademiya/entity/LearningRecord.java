@@ -10,8 +10,12 @@ public class LearningRecord {
     private String sessionId;
     private String userId;
     private String versionId;
+    private Boolean preview;
+    private String snapshotJson;
     private String status;
     private String answersJson;
+    private String answerHistoryJson;
+    private String conversationHistoryJson;
     private String messagesJson;
     private String legacyJson;
     @Version

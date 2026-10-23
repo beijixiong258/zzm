@@ -2,7 +2,8 @@ param(
     [ValidateSet('backend', 'frontend', 'docker')]
     [string]$Component = 'backend',
     [switch]$Check,
-    [switch]$NoBrowser
+    [switch]$NoBrowser,
+    [switch]$NoDemo
 )
 $ErrorActionPreference = 'Stop'
 Set-Location -LiteralPath $PSScriptRoot
@@ -15,6 +16,8 @@ if ($Check) {
 }
 switch ($Component) {
     'backend' {
+        if ($NoDemo) { $env:AICADEMIYA_DEMO_ENABLED = 'false' }
+        elseif ([string]::IsNullOrWhiteSpace($env:AICADEMIYA_DEMO_ENABLED)) { $env:AICADEMIYA_DEMO_ENABLED = 'true' }
         Push-Location -LiteralPath (Join-Path $PSScriptRoot 'server')
         try { & mvn.cmd spring-boot:run } finally { Pop-Location }
     }

@@ -24,6 +24,12 @@ public class CourseController {
     @PostMapping("/courses/join") public void join(@RequestParam String code, HttpServletRequest request) { courses.join(code, accounts.current(request)); }
     @GetMapping("/courses/{id}/members") public Object members(@PathVariable String id, HttpServletRequest request) { return courses.members(id, accounts.current(request)); }
     @PostMapping("/courses/{id}/members") public void add(@PathVariable String id, @Valid @RequestBody Requests.Account input, HttpServletRequest request) { courses.addMember(id, input, accounts.current(request)); }
+    @PostMapping("/courses/{id}/student-invitations") public Object invite(@PathVariable String id, @Valid @RequestBody Requests.StudentInvitation input, HttpServletRequest request) {
+        return courses.inviteStudent(id, input, accounts.current(request));
+    }
+    @PostMapping("/courses/{id}/student-invitations/{studentId}") public Object invitation(@PathVariable String id, @PathVariable String studentId, @RequestParam boolean enabled, HttpServletRequest request) {
+        return courses.changeInvitation(id, studentId, enabled, accounts.current(request));
+    }
     @PostMapping("/courses/{id}/members/batch") public void addBatch(@PathVariable String id, @Valid @RequestBody Requests.AccountBatch input, HttpServletRequest request) { courses.addMembers(id, input.getMembers(), accounts.current(request)); }
     @PostMapping("/courses/{id}/members/{userId}/archive") public void archiveMember(@PathVariable String id, @PathVariable String userId, @RequestParam boolean archived, HttpServletRequest request) {
         courses.archiveMember(id, userId, archived, accounts.current(request));

@@ -2,12 +2,13 @@ package cn.aicademiya.service;
 
 import cn.aicademiya.dto.*;
 import cn.aicademiya.entity.*;
-import com.baomidou.mybatisplus.extension.service.IService;
+import com.baomidou.mybatisplus.spring.service.IService;
 import java.util.*;
 
 public interface SessionService extends IService<TeachingSession> {
     TeachingSession require(String id, AccountUser user, boolean teacher);
     List<Map<String, Object>> listCourse(String courseId, AccountUser user);
+    TeachingSession copy(String id, String courseId, AccountUser user);
     TeachingSession create(String courseId, Requests.SessionInput input, AccountUser user);
     TeachingSession edit(String id, Requests.SessionInput input, AccountUser user);
     Map<String, Object> view(TeachingSession session, boolean teacher);

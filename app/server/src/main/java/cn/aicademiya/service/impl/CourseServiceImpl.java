@@ -6,7 +6,7 @@ import cn.aicademiya.mapper.*;
 import cn.aicademiya.service.*;
 import cn.hutool.core.util.IdUtil;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
-import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,22 +33,29 @@ public class CourseServiceImpl extends ServiceImpl<CourseMapper, Course> impleme
         List<String> ids = members.selectList(Wrappers.<CourseMember>lambdaQuery().eq(CourseMember::getUserId, user.getId())
             .eq(CourseMember::getArchived, false)).stream().map(CourseMember::getCourseId).toList();
         if (ids.isEmpty()) return List.of();
-        return lambdaQuery().in(Course::getId, ids).eq("student".equals(user.getRole()), Course::getArchived, false)
+        return lambdaQuery().eq(Course::getWorkspace, false).in(Course::getId, ids).eq("student".equals(user.getRole()), Course::getArchived, false)
             .orderByAsc(Course::getTitle).list().stream().map(c -> view(c, user)).toList();
     }
     @Override @Transactional public Course create(Requests.CourseInput input, AccountUser user) {
         accounts.requireStaff(user);
         Course course = new Course(); fill(course, input); course.setOwnerId(user.getId());
-        course.setJoinCode(IdUtil.fastSimpleUUID().substring(0, 12)); course.setArchived(false); save(course);
+        course.setJoinCode(IdUtil.fastSimpleUUID().substring(0, 12)); course.setArchived(false); course.setWorkspace(false); save(course);
         CourseMember member = new CourseMember(); member.setCourseId(course.getId()); member.setUserId(user.getId());
         member.setRole("teacher"); member.setArchived(false); members.insert(member); return course;
+    }
+    @Override @Transactional public synchronized Course workbench(AccountUser user) {
+        accounts.requireStaff(user);
+        Course existing = lambdaQuery().eq(Course::getOwnerId, user.getId()).eq(Course::getWorkspace, true).last("LIMIT 1").one();
+        if (existing != null) return existing;
+        Requests.CourseInput input = new Requests.CourseInput(); input.setTitle("Teacher workbench"); input.setCode("WORKBENCH");
+        Course course = create(input, user); course.setWorkspace(true); updateById(course); return course;
     }
     @Override public Course edit(String id, Requests.CourseInput input, AccountUser user) {
         Course course = requireAccess(id, user, true); fill(course, input); updateById(course); return course;
     }
     private void fill(Course course, Requests.CourseInput input) {
         course.setTitle(input.getTitle().trim()); course.setCode(input.getCode().trim());
-        course.setDescription(input.getDescription()); course.setSystemInstructions(input.getSystemInstructions());
+        course.setDescription(input.getDescription()); course.setSystemInstructions(input.getSystemInstructions()); course.setCourseInformation(input.getCourseInformation()); course.setStudentProfile(input.getStudentProfile());
     }
     @Override public void archive(String id, boolean archived, AccountUser user) {
         requireAccess(id, user, true); lambdaUpdate().eq(Course::getId, id).set(Course::getArchived, archived).update();
@@ -57,8 +64,9 @@ public class CourseServiceImpl extends ServiceImpl<CourseMapper, Course> impleme
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("id", course.getId()); result.put("code", course.getCode()); result.put("title", course.getTitle());
         result.put("description", course.getDescription()); result.put("archived", course.getArchived());
+        result.put("workspace", Boolean.TRUE.equals(course.getWorkspace()));
         if (!"student".equals(user.getRole())) {
-            result.put("systemInstructions", course.getSystemInstructions()); result.put("joinCode", course.getJoinCode());
+            result.put("courseInformation", Objects.toString(course.getCourseInformation(), "")); result.put("studentProfile", Objects.toString(course.getStudentProfile(), "")); result.put("systemInstructions", course.getSystemInstructions()); result.put("joinCode", course.getJoinCode());
         }
         return result;
     }
@@ -118,10 +126,23 @@ public class CourseServiceImpl extends ServiceImpl<CourseMapper, Course> impleme
         if (archived && course.getOwnerId().equals(userId)) throw error(422, "The course owner must remain a member");
         members.update(Wrappers.<CourseMember>lambdaUpdate().eq(CourseMember::getCourseId, id).eq(CourseMember::getUserId, userId).set(CourseMember::getArchived, archived));
     }
+    @Override @Transactional public Map<String, Object> inviteStudent(String courseId, Requests.StudentInvitation input, AccountUser user) {
+        requireAccess(courseId, user, true);
+        Map<String, Object> result = accounts.createInvitedStudent(input);
+        CourseMember member = new CourseMember(); member.setCourseId(courseId); member.setUserId(result.get("id").toString());
+        member.setRole("student"); member.setArchived(false); members.insert(member); return result;
+    }
+    @Override @Transactional public Map<String, Object> changeInvitation(String courseId, String studentId, boolean enabled, AccountUser user) {
+        requireAccess(courseId, user, true);
+        if (members.selectCount(Wrappers.<CourseMember>lambdaQuery().eq(CourseMember::getCourseId, courseId)
+            .eq(CourseMember::getUserId, studentId).eq(CourseMember::getRole, "student").eq(CourseMember::getArchived, false)) == 0)
+            throw error(404, "Student is not an active member of this course");
+        return accounts.invitation(studentId, enabled);
+    }
     @Override @Transactional public void join(String code, AccountUser user) {
         if (!"student".equals(user.getRole()) || Boolean.TRUE.equals(user.getMustChangePassword())) throw error(403, "Student access required");
         Course course = lambdaQuery().eq(Course::getJoinCode, code.trim()).eq(Course::getArchived, false).one();
-        if (course == null) throw error(404, "Invitation code is invalid");
+        if (course == null || Boolean.TRUE.equals(course.getWorkspace())) throw error(404, "Course join code is invalid");
         CourseMember member = members.selectOne(Wrappers.<CourseMember>lambdaQuery().eq(CourseMember::getCourseId, course.getId()).eq(CourseMember::getUserId, user.getId()));
         if (member != null) {
             if (Boolean.TRUE.equals(member.getArchived())) throw error(403, "Ask your teacher to restore your course membership");

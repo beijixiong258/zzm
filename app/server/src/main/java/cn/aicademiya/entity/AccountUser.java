@@ -10,6 +10,9 @@ public class AccountUser {
     private String name;
     private String email;
     private String role;
+    private String username;
+    private String invitationHash;
+    private Boolean invitationEnabled;
     private String passwordHash;
     private Boolean archived;
     private Boolean mustChangePassword;

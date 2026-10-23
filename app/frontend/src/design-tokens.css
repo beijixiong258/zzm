@@ -1,22 +1,39 @@
 /* One shared vocabulary for controls, content and semantic states. */
 :root {
-  --font-ui: "Segoe UI", Arial, "PingFang SC", "Microsoft YaHei", sans-serif;
-  --font-display: Georgia, "Noto Serif SC", serif;
+  --font-ui: "Segoe UI", "PingFang SC", "Microsoft YaHei", Arial, sans-serif;
+  --font-display:
+    Georgia, "Noto Serif SC", "Source Han Serif SC", "Songti SC", "SimSun",
+    serif;
   --ink: #23352e;
   --muted: #52645b;
   --teal: #1f5d50;
   --teal-dark: #16483e;
   --blue: #355c98;
   --blue-soft: #eef3fc;
+  --blue-line: #bdcfe9;
+  --neutral: #646e79;
+  --neutral-soft: #f3f4f5;
+  --neutral-line: #d9dde2;
+  --success: #2f7048;
+  --success-dark: #245b39;
+  --success-soft: #edf6ef;
+  --success-line: #bcd8c5;
   --warning: #80570d;
   --warning-soft: #fff5dc;
+  --warning-line: #e7d2a1;
   --danger: #ad3636;
   --danger-soft: #fff2f2;
+  --danger-line: #e8bebe;
+  --danger-hover: #fbe5e5;
   --canvas: #f6f7f3;
   --paper: #ffffff;
   --soft: #edf3ee;
   --sand: #efebdf;
   --line: #dce4df;
   --control: #87978d;
+  --sidebar: #eef3ef;
+  --focus: #5f9685;
+  --shadow-panel: 0 2px 5px #23352e03, 0 12px 30px #23352e04;
+  --shadow-raised: 0 6px 22px #23352e0d;
   --radius: 12px;
 }

@@ -11,7 +11,10 @@ public class Course {
     private String title;
     private String description;
     private String ownerId;
+    private String courseInformation;
+    private String studentProfile;
     private String systemInstructions;
     private String joinCode;
     private Boolean archived;
+    private Boolean workspace;
 }

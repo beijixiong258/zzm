@@ -2,6 +2,7 @@
 import { t } from "../../i18n";
 import { fileUrl, questionTypes, type Task } from "../../classroom-api";
 import RichText from "./RichText.vue";
+import DiagramEditor from "./DiagramEditor.vue";
 defineProps<{
   task: Task;
   answers?: Record<string, string>;
@@ -24,6 +25,25 @@ function multiple(id: string, option: string, checked: boolean, answer = "") {
     </div>
     <h2>{{ task.title || t("Untitled task") }}</h2>
     <RichText :text="task.description || task.content.description" />
+    <section v-if="task.content.openingMessage" class="lesson-opening">
+      <RichText :text="task.content.openingMessage" />
+    </section>
+    <section v-if="task.content.handout" class="lesson-handout">
+      <RichText :text="task.content.handout" />
+    </section>
+    <img
+      v-for="id in task.content.illustrationMaterialIds || []"
+      :key="id"
+      :src="fileUrl(id, task.versionId)"
+      :alt="t('Lesson illustration')"
+      class="question-image"
+    />
+    <DiagramEditor
+      v-for="diagram in task.content.diagrams || []"
+      :key="diagram.id"
+      :model-value="diagram"
+      readonly
+    />
     <section v-if="task.content.learningGoals.length">
       <h3>{{ t("Learning goals") }}</h3>
       <ul>

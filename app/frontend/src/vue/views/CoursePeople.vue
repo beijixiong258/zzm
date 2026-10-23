@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref } from "vue";
+import ProgressStatus from "../components/ProgressStatus.vue";
 import { t } from "../../i18n";
 import { call, key, type Member } from "../../classroom-api";
 const props = defineProps<{ courseId: string }>();
@@ -7,11 +8,17 @@ const people = ref<Member[]>([]),
   error = ref(""),
   busy = ref(false),
   showForm = ref(false);
+const showInvitation = ref(false),
+  invitationForm = ref({ name: "", username: "" });
+const invitation = ref<{ username: string; invitationCode: string } | null>(
+  null,
+);
 const form = ref({ name: "", email: "", password: "", role: "student" });
 const importRows = ref<
   { name: string; email: string; password: string; role: string }[]
 >([]);
-const importPassword = ref("");
+const importPassword = ref(""),
+  readingImport = ref(false);
 function parseCsv(source: string) {
   const rows: string[][] = [];
   let row: string[] = [],
@@ -44,6 +51,7 @@ async function readImport(event: Event) {
   const input = event.target as HTMLInputElement,
     file = input.files?.[0];
   if (!file) return;
+  readingImport.value = true;
   error.value = "";
   try {
     if (file.size > 1024 * 1024)
@@ -73,6 +81,7 @@ async function readImport(event: Event) {
     error.value = (e as Error).message;
   } finally {
     input.value = "";
+    readingImport.value = false;
   }
 }
 async function commitImport() {
@@ -114,6 +123,35 @@ async function add() {
     form.value = { name: "", email: "", password: "", role: "student" };
   });
 }
+async function createInvitation() {
+  await action(async () => {
+    invitation.value = await call(
+      `/courses/${key(props.courseId)}/student-invitations`,
+      "POST",
+      invitationForm.value,
+    );
+    showInvitation.value = false;
+    invitationForm.value = { name: "", username: "" };
+  });
+}
+async function resetInvitation(person: Member, enabled: boolean) {
+  if (
+    !window.confirm(
+      t(
+        enabled
+          ? "Generate a new invitation code? The old code and existing sessions will be invalidated."
+          : "Disable this invitation code and sign this student out?",
+      ),
+    )
+  )
+    return;
+  await action(async () => {
+    invitation.value = await call(
+      `/courses/${key(props.courseId)}/student-invitations/${key(person.id)}?enabled=${enabled}`,
+      "POST",
+    );
+  });
+}
 async function archive(person: Member) {
   if (
     !window.confirm(
@@ -144,6 +182,9 @@ void load().catch((e) => (error.value = e.message));
       </p>
     </div>
     <div class="row">
+      <button @click="showInvitation = true">
+        {{ t("Create student invitation") }}
+      </button>
       <label class="button"
         >{{ t("Import student CSV")
         }}<input
@@ -157,13 +198,72 @@ void load().catch((e) => (error.value = e.message));
       </button>
     </div>
   </header>
+  <ProgressStatus v-if="readingImport" :label="t('Reading roster…')" />
   <p v-if="error" class="error" role="alert">{{ error }}</p>
+  <section
+    v-if="invitation?.invitationCode"
+    class="panel invitation-result"
+    role="status"
+  >
+    <strong>{{ t("Personal student invitation") }}</strong>
+    <p>
+      {{ t("Username") }}: <code>{{ invitation.username }}</code>
+    </p>
+    <p>
+      {{ t("Invitation code") }}: <code>{{ invitation.invitationCode }}</code>
+    </p>
+    <p>
+      {{
+        t(
+          "Copy this code now and give it to this student privately. It will not be shown again; you can reset it later.",
+        )
+      }}
+    </p>
+    <button @click="invitation = null">{{ t("Close") }}</button>
+  </section>
+  <div
+    v-if="showInvitation"
+    class="modal-backdrop"
+    @click.self="showInvitation = false"
+  >
+    <form
+      class="modal form-stack"
+      role="dialog"
+      aria-modal="true"
+      :aria-label="t('Create student invitation')"
+      @submit.prevent="createInvitation"
+    >
+      <h2>{{ t("Create student invitation") }}</h2>
+      <label
+        >{{ t("Name")
+        }}<input v-model="invitationForm.name" required maxlength="100"
+      /></label>
+      <label
+        >{{ t("Username")
+        }}<input
+          v-model="invitationForm.username"
+          required
+          pattern="[A-Za-z0-9_.-]{3,64}"
+          maxlength="64"
+        /><small>{{
+          t("Use 3–64 letters, numbers, dots, underscores or hyphens.")
+        }}</small></label
+      >
+      <div class="row end">
+        <button type="button" @click="showInvitation = false">
+          {{ t("Cancel") }}</button
+        ><button class="primary" :disabled="busy">
+          {{ t("Create invitation") }}
+        </button>
+      </div>
+    </form>
+  </div>
   <section class="panel table-wrap">
     <table>
       <thead>
         <tr>
           <th>{{ t("Name") }}</th>
-          <th>{{ t("Email") }}</th>
+          <th>{{ t("Email or username") }}</th>
           <th>{{ t("Role") }}</th>
           <th>{{ t("Status") }}</th>
           <th>{{ t("Actions") }}</th>
@@ -172,13 +272,35 @@ void load().catch((e) => (error.value = e.message));
       <tbody>
         <tr v-for="person in people" :key="person.id">
           <td>{{ person.name }}</td>
-          <td>{{ person.email }}</td>
+          <td>{{ person.email || person.username }}</td>
           <td>
             {{ t(person.membershipRole === "student" ? "Student" : "Teacher") }}
           </td>
-          <td>{{ t(person.membershipArchived ? "Archived" : "Active") }}</td>
           <td>
-            <button :disabled="busy" @click="archive(person)">
+            <span
+              class="badge status-label"
+              :data-status="person.membershipArchived ? 'archived' : 'active'"
+              >{{ t(person.membershipArchived ? "Archived" : "Active") }}</span
+            >
+          </td>
+          <td>
+            <template v-if="person.username && !person.membershipArchived">
+              <button :disabled="busy" @click="resetInvitation(person, true)">
+                {{ t("Reset invitation") }}
+              </button>
+              <button
+                v-if="person.invitationEnabled"
+                :disabled="busy"
+                @click="resetInvitation(person, false)"
+              >
+                {{ t("Disable invitation") }}
+              </button>
+            </template>
+            <button
+              :class="{ 'warning-action': !person.membershipArchived }"
+              :disabled="busy"
+              @click="archive(person)"
+            >
               {{ t(person.membershipArchived ? "Restore" : "Archive") }}
             </button>
           </td>
@@ -247,6 +369,7 @@ void load().catch((e) => (error.value = e.message));
       @submit.prevent="commitImport"
     >
       <h2>{{ t("Review student import") }}</h2>
+      <ProgressStatus v-if="busy" :label="t('Importing students…')" />
       <p class="muted">
         {{
           t(
@@ -259,7 +382,7 @@ void load().catch((e) => (error.value = e.message));
           <thead>
             <tr>
               <th>{{ t("Name") }}</th>
-              <th>{{ t("Email") }}</th>
+              <th>{{ t("Email or username") }}</th>
             </tr>
           </thead>
           <tbody>
@@ -287,6 +410,7 @@ void load().catch((e) => (error.value = e.message));
           minlength="8"
           autocomplete="new-password"
       /></label>
+      <ProgressStatus v-if="readingImport" :label="t('Reading roster…')" />
       <p v-if="error" class="error" role="alert">{{ error }}</p>
       <div class="row end">
         <button type="button" @click="importRows = []">{{ t("Cancel") }}</button

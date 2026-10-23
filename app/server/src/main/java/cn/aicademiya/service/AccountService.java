@@ -1,6 +1,6 @@
 package cn.aicademiya.service;
 
-import com.baomidou.mybatisplus.extension.service.IService;
+import com.baomidou.mybatisplus.spring.service.IService;
 import cn.aicademiya.dto.Requests;
 import cn.aicademiya.entity.AccountUser;
 import jakarta.servlet.http.HttpServletRequest;
@@ -8,6 +8,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.util.Map;
 
 public interface AccountService extends IService<AccountUser> {
+    void ensureDemoAccounts();
     Map<String, Object> bootstrap();
     java.util.List<Map<String, Object>> listAccounts(AccountUser operator);
     Map<String, Object> createAccount(Requests.Account input, AccountUser operator);
@@ -19,6 +20,9 @@ public interface AccountService extends IService<AccountUser> {
     java.util.List<AccountUser> createMany(java.util.List<Requests.Account> input, String role);
     AccountUser setup(Requests.Account input);
     AccountUser login(Requests.Login input, HttpServletResponse response);
+    AccountUser studentLogin(Requests.StudentLogin input, HttpServletResponse response);
+    Map<String, Object> createInvitedStudent(Requests.StudentInvitation input);
+    Map<String, Object> invitation(String userId, boolean enabled);
     AccountUser demo(String id, HttpServletResponse response);
     void logout(HttpServletRequest request, HttpServletResponse response);
     void changePassword(AccountUser user, Requests.Password input, HttpServletResponse response);

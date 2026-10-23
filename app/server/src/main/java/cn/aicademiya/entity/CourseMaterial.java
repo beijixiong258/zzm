@@ -8,6 +8,9 @@ public class CourseMaterial {
     @TableId(type = IdType.ASSIGN_UUID)
     private String id;
     private String courseId;
+    private String ownerId;
+    private String recordId;
+    private String questionId;
     private String title;
     private String fileName;
     private String relativePath;
@@ -19,5 +22,9 @@ public class CourseMaterial {
     private String visibility;
     private String errorMessage;
     private Boolean archived;
+    private Long fileSize;
+    private java.time.LocalDateTime fileRemovedAt;
+    private String removedBy;
+    private String trashPath;
     private java.time.LocalDateTime createdAt;
 }

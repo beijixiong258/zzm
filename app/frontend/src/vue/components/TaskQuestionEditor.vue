@@ -163,6 +163,7 @@ function remove(index: number) {
               :aria-label="t('Option {0}', [optionIndex + 1])"
             /><button
               type="button"
+              class="danger"
               :aria-label="t('Remove option')"
               @click="question.options.splice(optionIndex, 1)"
             >

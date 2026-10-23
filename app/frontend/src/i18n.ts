@@ -96,5 +96,5 @@ export function systemText(value: string): string {
 }
 
 export function dateLocale() {
-  return locale.value === "zh-CN" ? "zh-CN" : "en-GB";
+  return locale.value === "zh-CN" ? "zh-CN" : "en-US";
 }

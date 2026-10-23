@@ -11,6 +11,7 @@ import {
   type Material,
   type Task,
   type Version,
+  type ContextUsage,
 } from "../../classroom-api";
 import {
   dirty,
@@ -18,11 +19,20 @@ import {
   refreshCourses,
   retainTaskAddress,
 } from "../classroom-state";
+import FileUploader from "../components/FileUploader.vue";
+import AiConnection from "../components/AiConnection.vue";
+import ContextMeter from "../components/ContextMeter.vue";
+import StudentTask from "./StudentTask.vue";
 import TaskContent from "../components/TaskContent.vue";
-import TaskQuestionEditor from "../components/TaskQuestionEditor.vue";
+import ProgressStatus from "../components/ProgressStatus.vue";
 import MaterialTree from "../components/MaterialTree.vue";
 import CourseMaterialPreview from "../components/CourseMaterialPreview.vue";
-const props = defineProps<{ courseId: string; taskId: string }>();
+const props = defineProps<{
+  courseId: string;
+  taskId: string;
+  workbench?: boolean;
+  initialMode?: string;
+}>();
 const draft = ref<Task>(blankTask(props.courseId)),
   baseline = ref(""),
   materials = ref<Material[]>([]),
@@ -33,12 +43,19 @@ const busy = ref(false),
   loading = ref(true),
   job = ref<Job | null>(null),
   selectedMaterial = ref<Material | null>(null);
-const importSource = ref(""),
-  showImport = ref(false),
-  uploaded = ref("");
+const importSources = ref<string[]>([]);
+const pendingUploads = ref(0);
+const uploadVisibility = ref<"student" | "teacher">("student");
+const usage = ref<ContextUsage | null>(null),
+  checkingContext = ref(false),
+  previewKey = ref(0);
+let materialTimer: ReturnType<typeof setTimeout> | undefined,
+  contextTimer: ReturnType<typeof setTimeout> | undefined,
+  contextSequence = 0;
 let timer: ReturnType<typeof setTimeout> | undefined;
 let disposed = false;
 let polling = false;
+let materialLoadError = "";
 const active = computed(
   () => job.value && ["queued", "running"].includes(job.value.status),
 );
@@ -64,9 +81,79 @@ function accept(value: Task) {
   dirty.value = false;
 }
 async function loadMaterials() {
-  materials.value = await call<Material[]>(
-    `/courses/${key(props.courseId)}/materials`,
-  );
+  clearTimeout(materialTimer);
+  try {
+    materials.value = await call<Material[]>(
+      `/courses/${key(props.courseId)}/materials`,
+    );
+    if (error.value === materialLoadError) error.value = "";
+    materialLoadError = "";
+  } catch (e) {
+    materialLoadError = (e as Error).message;
+    if (!disposed)
+      materialTimer = setTimeout(
+        () => void loadMaterials().catch(() => {}),
+        5000,
+      );
+    throw e;
+  }
+  if (
+    !disposed &&
+    materials.value.some(
+      (m) => !m.archived && ["queued", "processing"].includes(m.status),
+    )
+  )
+    materialTimer = setTimeout(
+      () => void loadMaterials().catch((e) => (error.value = e.message)),
+      2500,
+    );
+  if (selectedMaterial.value)
+    selectedMaterial.value =
+      materials.value.find((m) => m.id === selectedMaterial.value?.id) || null;
+  void checkContext();
+}
+async function checkContext() {
+  const sequence = ++contextSequence;
+  if (!draft.value.title.trim() || disposed) return;
+  checkingContext.value = true;
+  try {
+    const next = await call<ContextUsage>(
+      `/courses/${key(props.courseId)}/context-budget`,
+      "POST",
+      draft.value,
+    );
+    if (sequence === contextSequence) usage.value = next;
+  } catch {
+    if (sequence === contextSequence) usage.value = null;
+  } finally {
+    if (sequence === contextSequence) checkingContext.value = false;
+  }
+}
+watch(
+  draft,
+  () => {
+    clearTimeout(contextTimer);
+    contextTimer = setTimeout(() => void checkContext(), 700);
+  },
+  { deep: true },
+);
+function uploaded(material: Material) {
+  materials.value.push(material);
+  chooseMaterial(material.id, true);
+  void loadMaterials();
+}
+async function retryMaterial() {
+  if (!selectedMaterial.value) return;
+  await action(async () => {
+    await call(`/materials/${key(selectedMaterial.value!.id)}/retry`, "POST");
+    await loadMaterials();
+  });
+}
+async function simulate() {
+  await action(async () => {
+    await saveDraft();
+    previewKey.value++;
+  });
 }
 async function load() {
   try {
@@ -85,7 +172,17 @@ async function load() {
         ["queued", "running", "succeeded"].includes(job.value.status)
       )
         schedulePoll();
-    } else accept(blankTask(props.courseId));
+    } else {
+      const task = blankTask(props.courseId);
+      if (props.initialMode === "tutor")
+        task.content.teachingMode = "autonomous";
+      if (props.initialMode === "worksheet") task.sessionType = "assignment";
+      if (props.initialMode === "reading")
+        task.additionalInstructions = t(
+          "Create a guided reading resource with key concepts, examples and reflection questions.",
+        );
+      accept(task);
+    }
   } catch (e) {
     error.value = (e as Error).message;
   } finally {
@@ -127,12 +224,16 @@ async function save() {
   });
 }
 async function generate(kind = "generate") {
+  if (pendingUploads.value) return;
+  importSources.value = importSources.value.filter((id) =>
+    draft.value.materialIds.includes(id),
+  );
   if (
     kind === "generate" &&
     draft.value.content.questions.length &&
     !window.confirm(
       t(
-        "Regenerate the learning plan and questions? The saved published version will remain available.",
+        "Generate a new lesson from these materials? The published version will remain available.",
       ),
     )
   )
@@ -145,11 +246,11 @@ async function generate(kind = "generate") {
       {
         revision: draft.value.revision,
         kind,
-        sourceMaterialId: importSource.value || null,
+        sourceMaterialIds: importSources.value,
+        instruction: draft.value.additionalInstructions,
       },
     );
     accept(await call<Task>(`/sessions/${key(draft.value.id)}`));
-    showImport.value = false;
     schedulePoll();
   });
 }
@@ -177,13 +278,17 @@ async function poll() {
       }
       accept(await call<Task>(`/generations/${key(next.id)}/apply`, "POST"));
       job.value.status = "applied";
+      previewKey.value++;
       success.value = t(
         "AI content is ready. Review the student preview before publishing.",
       );
       await refreshCourses();
     } else if (["queued", "running"].includes(next.status)) schedulePoll();
   } catch (e) {
-    if (!disposed) error.value = (e as Error).message;
+    if (!disposed) {
+      error.value = (e as Error).message;
+      schedulePoll();
+    }
   } finally {
     polling = false;
   }
@@ -228,117 +333,106 @@ function chooseMaterial(id: string, checked: boolean) {
       (value) => value !== id,
     );
 }
-async function upload(event: Event) {
-  const input = event.target as HTMLInputElement;
-  const files = [...(input.files || [])];
-  await action(async () => {
-    for (const file of files) {
-      uploaded.value = file.name;
-      const body = new FormData();
-      body.set("file", file);
-      body.set("relativePath", file.webkitRelativePath || file.name);
-      body.set("visibility", "student");
-      const material = await call<Material>(
-        `/courses/${key(props.courseId)}/materials`,
-        "POST",
-        body,
-      );
-      draft.value.materialIds.push(material.id);
-    }
-    await loadMaterials();
-    success.value = t(
-      "Materials uploaded. Refresh their status after processing.",
-    );
-  });
-  uploaded.value = "";
-  input.value = "";
-}
 onBeforeUnmount(() => {
   disposed = true;
   clearTimeout(timer);
+  clearTimeout(materialTimer);
+  clearTimeout(contextTimer);
+  contextSequence++;
   dirty.value = false;
 });
 void load();
 </script>
 <template>
-  <div class="page-heading">
+  <nav v-if="!workbench" class="page-return-bar" :aria-label="t('Back')">
+    <button @click="navigate({ page: 'course', courseId })">
+      ← {{ t("Back to course") }}
+    </button>
+    <span class="muted">{{ t("Create and preview") }}</span>
+  </nav>
+  <header class="page-heading compact-heading">
     <div>
-      <p class="eyebrow">{{ t("CREATE A LEARNING EXPERIENCE") }}</p>
       <h1>{{ draft.id ? t("Edit task") : t("Create task") }}</h1>
       <p class="muted">
         {{
           t(
-            "Choose materials and describe what matters. AI prepares the teaching plan and questions.",
+            "Choose materials, add instructions, and let AI prepare the lesson. Try it as a student on the right.",
           )
         }}
       </p>
     </div>
-    <div class="row">
+    <div class="row wrap">
       <button
-        v-if="draft.id"
+        v-if="draft.id && !workbench"
         @click="navigate({ page: 'monitor', courseId, taskId: draft.id })"
       >
-        {{ t("Student progress") }}</button
-      ><button :disabled="busy || active || loading" @click="save">
-        {{ t("Save draft") }}</button
-      ><button
+        {{ t("Student progress") }}
+      </button>
+      <button :disabled="busy || active || loading" @click="save">
+        {{ t("Save draft") }}
+      </button>
+      <button
+        v-if="!workbench"
         class="primary"
-        :disabled="busy || active || loading"
+        :disabled="busy || active || loading || !draft.content.handout"
         @click="publish"
       >
         {{ t("Publish task") }}
       </button>
     </div>
-  </div>
-  <p v-if="error" role="alert" class="error">{{ error }}</p>
-  <p v-if="success" role="status" class="success">{{ success }}</p>
-  <p v-if="loading" class="empty">{{ t("Loading…") }}</p>
+  </header>
+  <p v-if="error" role="alert" class="error">{{ systemText(error) }}</p>
+  <p v-if="success" role="status" class="success">{{ systemText(success) }}</p>
+  <ProgressStatus v-if="loading" :label="t('Loading…')" />
   <div v-else class="authoring-layout">
     <div class="authoring-form">
       <fieldset :disabled="busy || !!active" class="panel form-stack">
+        <h2>{{ t("Task setup") }}</h2>
+        <label
+          >{{ t("Task name")
+          }}<input v-model="draft.title" maxlength="300" required
+        /></label>
         <div class="form-grid">
           <label
-            >{{ t("Task name")
-            }}<input v-model="draft.title" maxlength="300" required /></label
-          ><label
             >{{ t("Task type")
             }}<select v-model="draft.sessionType">
               <option value="tutor">{{ t("AI tutor") }}</option>
               <option value="assignment">{{ t("Assignment") }}</option>
             </select></label
           >
+          <label
+            >{{ t("Teaching language")
+            }}<select v-model="draft.teachingLanguage">
+              <option value="zh-CN">中文</option>
+              <option value="en">English</option>
+            </select></label
+          >
         </div>
-        <label
-          >{{ t("Task description")
-          }}<textarea
-            v-model="draft.description"
-            rows="2"
-            :placeholder="
-              t('Optional — AI can draft this from your materials.')
-            "
-          />
-        </label>
-        <label
-          >{{ t("Teaching language")
-          }}<select v-model="draft.teachingLanguage">
-            <option value="zh-CN">中文</option>
-            <option value="en">English</option>
-          </select></label
-        >
-        <label
-          >{{ t("Topic or tutoring scope")
-          }}<textarea
-            v-model="draft.topic"
-            rows="3"
-            :placeholder="
-              t(
-                'For example: understand formative assessment and apply it to a classroom activity. Leave blank for AI to infer the topic.',
-              )
-            "
-          />
-        </label>
+        <details class="additional-fields">
+          <summary>{{ t("Tutoring settings") }}</summary>
+          <div class="form-grid">
+            <label
+              >{{ t("Teaching mode")
+              }}<select v-model="draft.content.teachingMode">
+                <option value="guided">{{ t("Guided learning") }}</option>
+                <option value="autonomous">{{ t("Adaptive tutor") }}</option>
+              </select></label
+            >
+            <label
+              >{{ t("AI feedback")
+              }}<select v-model="draft.content.feedbackMode">
+                <option value="immediate">{{ t("Show immediately") }}</option>
+                <option value="teacherReview">
+                  {{ t("Teacher review before release") }}
+                </option>
+              </select></label
+            >
+          </div>
+        </details>
+      </fieldset>
+      <fieldset :disabled="busy || !!active" class="panel form-stack">
         <div class="row spread">
-          <h3>{{ t("Task materials") }}</h3>
+          <h2>{{ t("Task materials") }}</h2>
           <button
             type="button"
             @click="loadMaterials().catch((e) => (error = e.message))"
@@ -346,23 +440,20 @@ void load();
             {{ t("Refresh status") }}
           </button>
         </div>
-        <div class="upload-actions">
-          <label class="button"
-            >＋ {{ t("Upload files")
-            }}<input type="file" multiple hidden @change="upload" /></label
-          ><label class="button"
-            >＋ {{ t("Upload folder")
-            }}<input
-              type="file"
-              multiple
-              webkitdirectory
-              hidden
-              @change="upload"
-          /></label>
-        </div>
-        <p v-if="uploaded" class="muted">
-          {{ t("Uploading {0}", [uploaded]) }}
-        </p>
+        <label
+          >{{ t("Visibility for new uploads")
+          }}<select v-model="uploadVisibility">
+            <option value="student">{{ t("Students and teachers") }}</option>
+            <option value="teacher">{{ t("Teachers and AI only") }}</option>
+          </select></label
+        >
+        <FileUploader
+          :endpoint="'/courses/' + key(courseId) + '/materials'"
+          :visibility="uploadVisibility"
+          @pending="pendingUploads = $event"
+          @uploaded="uploaded"
+          @settled="loadMaterials"
+        />
         <MaterialTree
           :materials="materials.filter((m) => !m.archived)"
           selectable
@@ -373,107 +464,118 @@ void load();
         <p v-if="!materials.length" class="empty">
           {{ t("Upload course materials to begin.") }}
         </p>
-        <details class="additional-fields">
-          <summary>{{ t("Additional requirements (optional)") }}</summary>
-          <label
-            >{{ t("Learning goals")
-            }}<textarea
-              v-model="draft.learningGoals"
-              rows="4"
-              :placeholder="
-                t(
-                  'What should students understand or be able to do? AI fills this in when left blank.',
-                )
-              "
-            /><small>{{
-              t("Visible to students and used by the AI tutor.")
-            }}</small></label
-          >
-          <label
-            >{{ t("Additional teaching instructions")
-            }}<textarea
-              v-model="draft.additionalInstructions"
-              rows="4"
-              :placeholder="
-                t(
-                  'Add any requirements specific to this task. Course-wide teaching instructions are inherited automatically.',
-                )
-              "
-            /><small>{{
-              t(
-                "For the AI tutor only; students will not see these instructions.",
-              )
-            }}</small></label
-          >
-        </details>
-        <div class="row wrap">
-          <button
-            type="button"
-            class="primary"
-            :disabled="!selected.length"
-            @click="generate()"
-          >
-            ✦ {{ t("Generate with AI") }}</button
-          ><button
-            type="button"
-            :disabled="!selected.length"
-            @click="showImport = !showImport"
-          >
-            {{ t("Import existing worksheet") }}
-          </button>
-        </div>
-        <div v-if="showImport" class="inset form-stack">
-          <label
-            >{{ t("Worksheet material")
-            }}<select v-model="importSource">
-              <option value="">{{ t("Choose a material") }}</option>
-              <option
-                v-for="material in selected"
-                :key="material.id"
-                :value="material.id"
-              >
-                {{ material.title }}
-              </option>
-            </select></label
-          >
+        <details>
+          <summary>{{ t("How documents are read") }}</summary>
           <p class="muted">
             {{
               t(
-                "Extracts existing questions and supplied answers, then appends them to the draft. Missing answers can be edited before publishing.",
+                "PDFs with a complete usable text layer are extracted locally. Otherwise, the entire PDF is sent as page images in order, without OCR. Each AI request is limited to 40,000 input tokens, including materials, prompts and chat history.",
               )
             }}
           </p>
+        </details>
+        <details class="additional-fields">
+          <summary>{{ t("Import existing worksheet") }}</summary>
+          <div class="inset form-stack">
+            <strong>{{ t("Worksheet source materials") }}</strong>
+            <label
+              v-for="material in selected"
+              :key="material.id"
+              class="check-label"
+            >
+              <input
+                v-model="importSources"
+                type="checkbox"
+                :value="material.id"
+                :disabled="!['ready', 'needsReview'].includes(material.status)"
+              />{{ material.title }}
+            </label>
+            <button
+              type="button"
+              :disabled="
+                pendingUploads > 0 ||
+                !importSources.length ||
+                usage?.allowed === false ||
+                !!usage?.pendingMaterials?.length ||
+                !!usage?.incompleteMaterials?.length
+              "
+              @click="generate('import')"
+            >
+              {{ t("Extract worksheet questions") }}
+            </button>
+          </div>
+        </details>
+      </fieldset>
+      <fieldset :disabled="busy || !!active" class="panel form-stack">
+        <h2>{{ t("Additional instructions for AI") }}</h2>
+        <label class="prompt-label">
+          <span class="muted">{{
+            t(
+              "Tell AI what to teach or what to change. This is the only place you need to write instructions for this task.",
+            )
+          }}</span>
+          <textarea
+            v-model="draft.additionalInstructions"
+            rows="6"
+            maxlength="10000"
+            :aria-label="t('Additional instructions for AI')"
+            :placeholder="
+              t(
+                'For example: explain formative assessment for first-year students, include a classroom example, and finish with three reflection questions. To revise, describe what should change.',
+              )
+            "
+          />
+          <small>{{
+            t(
+              "Course instructions are inherited automatically. These notes are not shown to students.",
+            )
+          }}</small>
+        </label>
+        <ContextMeter :usage="usage" :loading="checkingContext" />
+        <p v-if="usage?.revisionBudget?.allowed === false" class="notice">
+          {{
+            t(
+              "The revision is not ready to send: check that all materials are processed and that the current lesson, materials and instructions fit within the 40,000-token input limit.",
+            )
+          }}
+        </p>
+        <div class="row wrap">
           <button
+            class="primary"
             type="button"
-            :disabled="!importSource"
-            @click="generate('import')"
+            :disabled="
+              pendingUploads > 0 ||
+              !draft.title.trim() ||
+              usage?.allowed === false ||
+              !!usage?.pendingMaterials?.length ||
+              !!usage?.incompleteMaterials?.length
+            "
+            @click="generate()"
           >
-            {{ t("Extract worksheet questions") }}
+            {{
+              t(draft.content.handout ? "Regenerate lesson" : "Generate lesson")
+            }}
+          </button>
+          <button
+            v-if="draft.content.handout"
+            type="button"
+            :disabled="
+              pendingUploads > 0 ||
+              !draft.additionalInstructions?.trim() ||
+              usage?.revisionBudget?.allowed === false ||
+              !!usage?.pendingMaterials?.length ||
+              !!usage?.incompleteMaterials?.length
+            "
+            @click="generate('revise')"
+          >
+            {{ t("Revise with these instructions") }}
           </button>
         </div>
+        <details>
+          <summary>{{ t("AI connection and context") }}</summary>
+          <AiConnection />
+        </details>
       </fieldset>
-      <div v-if="job" class="panel generation-state" role="status">
-        <strong>{{ statusText(job.status) }}</strong
-        ><span>{{ statusText(job.stage) }}</span>
-        <p v-if="job.errorMessage" class="error">
-          {{ systemText(job.errorMessage) }}
-        </p>
-        <button
-          v-if="['queued', 'running', 'succeeded'].includes(job.status)"
-          :disabled="busy"
-          @click="poll"
-        >
-          {{ t("Refresh generation status") }}
-        </button>
-      </div>
-      <div class="panel">
-        <TaskQuestionEditor
-          :questions="draft.content.questions"
-          :materials="selected"
-          :teaching-language="draft.teachingLanguage"
-          :disabled="busy || !!active"
-        />
-      </div>
       <details v-if="versions.length" class="panel">
         <summary>{{ t("Published versions") }}</summary>
         <div
@@ -491,9 +593,74 @@ void load();
     <aside class="student-preview panel">
       <div class="preview-heading">
         <strong>{{ t("Student preview") }}</strong
-        ><span class="badge">{{ t("Task content") }}</span>
+        ><span class="badge">{{ t("AI-generated lesson") }}</span>
       </div>
-      <TaskContent :task="preview" preview readonly />
+      <div
+        v-if="job && job.status !== 'applied'"
+        class="preview-controls generation-state"
+      >
+        <ProgressStatus
+          v-if="active || job.status === 'succeeded'"
+          :label="statusText(job.stage)"
+          :detail="
+            job.progressCharacters
+              ? t(
+                  'Received {0} characters. The complete lesson will appear after validation.',
+                  [job.progressCharacters],
+                )
+              : t(
+                  'Waiting for AI output. Progress updates automatically; you can leave this page and return later.',
+                )
+          "
+        />
+        <strong v-else class="status-label" :data-status="job.status">{{
+          statusText(job.status)
+        }}</strong>
+        <p v-if="job.errorMessage" class="error">
+          {{ systemText(job.errorMessage) }}
+        </p>
+        <button
+          v-if="['queued', 'running', 'succeeded'].includes(job.status)"
+          :disabled="busy"
+          @click="poll"
+        >
+          {{ t("Refresh generation status") }}
+        </button>
+      </div>
+      <div v-if="draft.content.handout && dirty" class="preview-controls">
+        <button :disabled="busy || !!active" @click="simulate">
+          {{ t("Save and refresh preview") }}
+        </button>
+        <p class="notice">
+          {{
+            t(
+              "The simulation uses the saved draft. Save your changes to refresh it.",
+            )
+          }}
+        </p>
+      </div>
+      <StudentTask
+        v-if="draft.id && draft.content.handout"
+        :key="draft.id + '-' + previewKey"
+        :task-id="draft.id"
+        preview
+      />
+      <TaskContent
+        v-else-if="draft.content.handout"
+        :task="preview"
+        preview
+        readonly
+      />
+      <div v-else class="preview-placeholder">
+        <h2>{{ t("Your lesson will appear here") }}</h2>
+        <p>
+          {{
+            t(
+              "Add materials and generate a lesson. AI will prepare the welcome message, explanations, examples and practice for your students.",
+            )
+          }}
+        </p>
+      </div>
     </aside>
   </div>
   <div
@@ -507,13 +674,22 @@ void load();
       :aria-label="t('Material preview')"
       class="modal wide"
     >
+      <header class="page-return-bar">
+        <button @click="selectedMaterial = null">
+          ← {{ t("Back to task") }}
+        </button>
+        <button :aria-label="t('Close')" @click="selectedMaterial = null">
+          ×
+        </button>
+      </header>
+      <CourseMaterialPreview :material="selectedMaterial" />
       <button
-        class="modal-close"
-        :aria-label="t('Close')"
-        @click="selectedMaterial = null"
+        v-if="!['queued', 'processing'].includes(selectedMaterial.status)"
+        :disabled="busy"
+        @click="retryMaterial"
       >
-        ×</button
-      ><CourseMaterialPreview :material="selectedMaterial" />
+        {{ t("Reprocess material") }}
+      </button>
     </section>
   </div>
 </template>

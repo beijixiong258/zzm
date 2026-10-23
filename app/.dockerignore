@@ -8,6 +8,7 @@ data-local
 local-materials
 local-demo
 legacy-export
+legacy
 ocr-models
 *.tsbuildinfo
 frontend/tests/artifacts

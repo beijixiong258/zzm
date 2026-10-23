@@ -2,7 +2,7 @@ package cn.aicademiya.service;
 
 import cn.aicademiya.dto.Requests;
 import cn.aicademiya.entity.*;
-import com.baomidou.mybatisplus.extension.service.IService;
+import com.baomidou.mybatisplus.spring.service.IService;
 import java.util.Map;
 
 public interface GenerationService extends IService<GenerationJob> {

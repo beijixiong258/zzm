@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import MaterialProgress from "./MaterialProgress.vue";
 import { t } from "../../i18n";
 import { statusText, type Material } from "../../classroom-api";
 const props = defineProps<{
@@ -74,7 +75,10 @@ const files = computed(() =>
       />
       <button type="button" @click="emit('select', material)">
         <span>{{ material.title }}</span
-        ><small>{{ statusText(material.status) }}</small>
+        ><small class="status-label" :data-status="material.status">{{
+          statusText(material.status)
+        }}</small>
+        <MaterialProgress :material="material" />
       </button>
     </li>
   </ul>

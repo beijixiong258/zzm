@@ -13,6 +13,9 @@ import org.springframework.web.bind.annotation.*;
 public class SessionController {
     private final SessionService sessions;
     private final AccountService accounts;
+    private final CourseService courses;
+    @PostMapping("/workbench") public Object workbench(HttpServletRequest request) { var user = accounts.current(request); return courses.view(courses.workbench(user), user); }
+    @PostMapping("/sessions/{id}/copy") public Object copy(@PathVariable String id, @RequestParam String courseId, HttpServletRequest request) { return sessions.view(sessions.copy(id, courseId, accounts.current(request)), true); }
     @GetMapping("/courses/{id}/sessions") public Object list(@PathVariable String id, HttpServletRequest request) { return sessions.listCourse(id, accounts.current(request)); }
     @PostMapping("/courses/{id}/sessions") public Object create(@PathVariable String id, @Valid @RequestBody Requests.SessionInput input, HttpServletRequest request) {
         return sessions.view(sessions.create(id, input, accounts.current(request)), true);

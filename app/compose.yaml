@@ -31,6 +31,7 @@ services:
       MYSQL_PASSWORD: ${MYSQL_PASSWORD}
       AICADEMIYA_CONFIG: /config/config.json
       AICADEMIYA_UPLOAD_DIR: /data/uploads
+      AICADEMIYA_TRASH_DIR: /data/recycle
       AICADEMIYA_DOCUMENT_MAX_UNITS: ${AICADEMIYA_DOCUMENT_MAX_UNITS:-300}
       AICADEMIYA_DOCUMENT_MAX_CHARACTERS: ${AICADEMIYA_DOCUMENT_MAX_CHARACTERS:-300000}
       AICADEMIYA_DOCUMENT_IMAGE_MAX_EDGE: ${AICADEMIYA_DOCUMENT_IMAGE_MAX_EDGE:-2000}
@@ -42,6 +43,7 @@ services:
       AICADEMIYA_AI_API_KEY: ${AICADEMIYA_AI_API_KEY:-}
     volumes:
       - uploads:/data/uploads
+      - recycle:/data/recycle
       - ./config.json:/config/config.json:ro
   frontend:
     build: ./frontend
@@ -53,3 +55,4 @@ services:
 volumes:
   mysql-data:
   uploads:
+  recycle:

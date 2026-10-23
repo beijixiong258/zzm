@@ -10,9 +10,32 @@ public class TaskContent {
     private List<String> learningGoals = new ArrayList<>();
     private List<LearningStep> learningPlan = new ArrayList<>();
     private String openingMessage = "";
+    private String handout = "";
+    private String teachingMode = "guided";
+    private String feedbackMode = "immediate";
+    private String rubric = "";
+    private List<String> illustrationMaterialIds = new ArrayList<>();
+    private List<Diagram> diagrams = new ArrayList<>();
     private List<Question> questions = new ArrayList<>();
     private AiConfig aiConfig = new AiConfig();
 
+    @Data public static class Diagram {
+        private String id;
+        private String title;
+        private List<DiagramNode> nodes = new ArrayList<>();
+        private List<DiagramEdge> edges = new ArrayList<>();
+    }
+    @Data public static class DiagramNode {
+        private String id;
+        private String text;
+        private Integer x = 0;
+        private Integer y = 0;
+    }
+    @Data public static class DiagramEdge {
+        private String from;
+        private String to;
+        private String label = "";
+    }
     @Data public static class LearningStep {
         private String title;
         private String description;
