@@ -1,5 +1,8 @@
 {
   "Processing complete": "Processing complete",
+  "Processing complete · AI input limit exceeded": "Processing complete · AI input limit exceeded",
+  "Estimated use: {0} tokens / limit: {1}": "Estimated use: {0} tokens / limit: {1}",
+  "Material only. Text uses a conservative upper bound; PDF images use an estimate. Prompts and other selected materials use additional capacity.": "Material only. Text uses a conservative upper bound; PDF images use an estimate. Prompts and other selected materials use additional capacity.",
   "If needed, compare figures, handwriting and layout with the original.": "If needed, compare figures, handwriting and layout with the original.",
   "This file exceeds the processing limit. Split it and upload all parts before using it with AI.": "This file exceeds the processing limit. Split it and upload all parts before using it with AI.",
   "Input budget": "Input budget",

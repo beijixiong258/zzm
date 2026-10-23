@@ -1,5 +1,8 @@
 {
   "Processing complete": "处理完成",
+  "Processing complete · AI input limit exceeded": "处理完成 · 超出 AI 输入容量",
+  "Estimated use: {0} tokens / limit: {1}": "预计占用 {0} token / 上限 {1}",
+  "Material only. Text uses a conservative upper bound; PDF images use an estimate. Prompts and other selected materials use additional capacity.": "此处仅统计当前材料：文字采用保守上界，PDF 图片采用估算值。提示词及其他所选材料还会占用输入容量。",
   "If needed, compare figures, handwriting and layout with the original.": "如有需要，可对照原文核对图表、手写内容和版面信息。",
   "This file exceeds the processing limit. Split it and upload all parts before using it with AI.": "此文件超过处理范围限制。请拆分并上传各部分后，再用于 AI。",
   "Input budget": "输入容量",

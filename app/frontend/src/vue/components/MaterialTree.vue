@@ -15,6 +15,34 @@ const emit = defineEmits<{
   check: [id: string, checked: boolean];
 }>();
 const prefix = computed(() => props.prefix || "");
+const inputTokenLimit = 40000;
+function materialInputTokens(material: Material): number | null {
+  const report = material.extractionReport;
+  if (
+    !["ready", "needsReview"].includes(material.status) ||
+    !report ||
+    report.truncated ||
+    !report.failedUnits ||
+    report.failedUnits.length ||
+    !(report.unitsTotal > 0) ||
+    report.unitsProcessed !== report.unitsTotal
+  )
+    return null;
+  const isPdf =
+    material.mimeType === "application/pdf" ||
+    material.fileName.toLowerCase().endsWith(".pdf");
+  if (isPdf && !["text", "images"].includes(report.pdfInputMode || ""))
+    return null;
+  // Match the request gate: native/extracted text uses its conservative upper bound;
+  // PDF page images use the prepared image estimate, without legacy OCR usage.
+  const tokens =
+    isPdf && report.pdfInputMode === "images"
+      ? report.imageInputTokensEstimated
+      : report.textTokensUpperBound;
+  return typeof tokens === "number" && Number.isFinite(tokens) && tokens >= 0
+    ? Math.ceil(tokens)
+    : null;
+}
 const folders = computed(() =>
   [
     ...new Set(
@@ -28,10 +56,21 @@ const folders = computed(() =>
   ].sort(),
 );
 const files = computed(() =>
-  props.materials.filter(
-    (m) =>
-      !(m.relativePath || m.fileName).slice(prefix.value.length).includes("/"),
-  ),
+  props.materials
+    .filter(
+      (m) =>
+        !(m.relativePath || m.fileName)
+          .slice(prefix.value.length)
+          .includes("/"),
+    )
+    .map((material) => {
+      const inputTokens = materialInputTokens(material);
+      return {
+        material,
+        inputTokens,
+        exceedsInputLimit: inputTokens != null && inputTokens > inputTokenLimit,
+      };
+    }),
 );
 </script>
 <template>
@@ -55,7 +94,7 @@ const files = computed(() =>
       </details>
     </li>
     <li
-      v-for="material in files"
+      v-for="{ material, inputTokens, exceedsInputLimit } in files"
       :key="material.id"
       class="tree-file"
       :class="{ selected: selected === material.id }"
@@ -74,10 +113,35 @@ const files = computed(() =>
         "
       />
       <button type="button" @click="emit('select', material)">
-        <span>{{ material.title }}</span
-        ><small class="status-label" :data-status="material.status">{{
-          statusText(material.status)
-        }}</small>
+        <span>{{ material.title }}</span>
+        <span class="material-status-row">
+          <small
+            class="status-label"
+            :data-status="
+              exceedsInputLimit ? 'inputLimitExceeded' : material.status
+            "
+            >{{
+              exceedsInputLimit
+                ? t("Processing complete · AI input limit exceeded")
+                : statusText(material.status)
+            }}</small
+          >
+          <small
+            v-if="exceedsInputLimit"
+            class="material-token-usage"
+            :title="
+              t(
+                'Material only. Text uses a conservative upper bound; PDF images use an estimate. Prompts and other selected materials use additional capacity.',
+              )
+            "
+            >{{
+              t("Estimated use: {0} tokens / limit: {1}", [
+                inputTokens?.toLocaleString(),
+                inputTokenLimit.toLocaleString(),
+              ])
+            }}</small
+          >
+        </span>
         <MaterialProgress :material="material" />
       </button>
     </li>

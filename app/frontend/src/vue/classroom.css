@@ -282,6 +282,7 @@ small {
   --status-fill: var(--success);
 }
 [data-status="submitted"],
+[data-status="inputLimitExceeded"],
 [data-status="needsRevision"] {
   --status-color: var(--warning);
   --status-surface: var(--warning-soft);
@@ -960,6 +961,19 @@ footer {
 }
 .tree-file .status-label {
   font-size: 11px;
+  text-align: left;
+}
+.material-status-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 10px;
+  min-width: 0;
+}
+.material-token-usage {
+  color: var(--warning);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
   text-align: left;
 }
 .material-preview iframe {
