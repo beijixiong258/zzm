@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, onBeforeUnmount, ref } from "vue";
 import { t } from "../../i18n";
 import {
   call,
@@ -25,8 +25,13 @@ const task = ref<Task | null>(null),
   selected = ref<Workspace | null>(null);
 const error = ref(""),
   busy = ref(false),
+  loading = ref(true),
+  inspecting = ref(false),
   filter = ref(""),
   note = ref("");
+let rosterSequence = 0,
+  recordSequence = 0,
+  disposed = false;
 const visible = computed(() =>
   students.value.filter(
     (s) =>
@@ -39,41 +44,88 @@ const counters = computed(() => ({
   inProgress: students.value.filter((s) => s.status === "inProgress").length,
   completed: students.value.filter((s) => s.status === "completed").length,
 }));
+function closeRecord() {
+  if (busy.value) return;
+  recordSequence++;
+  inspecting.value = false;
+  selected.value = null;
+  note.value = "";
+}
+function isCurrentRecord(
+  workspace: Workspace,
+  recordId: string,
+  sequence: number,
+) {
+  return (
+    !disposed &&
+    sequence === recordSequence &&
+    selected.value === workspace &&
+    workspace.record?.id === recordId
+  );
+}
 async function refresh() {
+  if (busy.value) return;
+  const sequence = ++rosterSequence;
+  const requestedVersion = versionId.value;
+  closeRecord();
+  students.value = [];
+  loading.value = true;
   error.value = "";
   try {
-    students.value = await call<StudentRow[]>(
-      `/sessions/${key(props.taskId)}/students${versionParam(versionId.value)}`,
+    const rows = await call<StudentRow[]>(
+      `/sessions/${key(props.taskId)}/students${versionParam(requestedVersion)}`,
     );
-    selected.value = null;
+    if (!disposed && sequence === rosterSequence) students.value = rows;
   } catch (e) {
-    error.value = (e as Error).message;
+    if (!disposed && sequence === rosterSequence)
+      error.value = (e as Error).message;
+  } finally {
+    if (!disposed && sequence === rosterSequence) loading.value = false;
   }
 }
 async function load() {
   try {
-    task.value = await call<Task>(`/sessions/${key(props.taskId)}`);
-    versions.value = await call<Version[]>(
-      `/sessions/${key(props.taskId)}/versions`,
-    );
-    versionId.value = task.value.publishedVersionId || "";
+    const [loadedTask, loadedVersions] = await Promise.all([
+      call<Task>(`/sessions/${key(props.taskId)}`),
+      call<Version[]>(`/sessions/${key(props.taskId)}/versions`),
+    ]);
+    if (disposed) return;
+    task.value = loadedTask;
+    versions.value = loadedVersions;
+    versionId.value = loadedTask.publishedVersionId || "";
     await refresh();
   } catch (e) {
-    error.value = (e as Error).message;
+    if (!disposed) error.value = (e as Error).message;
+  } finally {
+    if (!disposed) loading.value = false;
   }
 }
 async function inspect(id: string) {
+  if (busy.value || loading.value) return;
+  const sequence = ++recordSequence;
+  selected.value = null;
+  note.value = "";
+  inspecting.value = true;
   error.value = "";
   try {
-    selected.value = await call<Workspace>(`/records/${key(id)}/observe`);
-    note.value = selected.value.record?.teacherNote || "";
+    const workspace = await call<Workspace>(`/records/${key(id)}/observe`);
+    if (disposed || sequence !== recordSequence) return;
+    selected.value = workspace;
+    note.value = workspace.record?.teacherNote || "";
   } catch (e) {
-    error.value = (e as Error).message;
+    if (!disposed && sequence === recordSequence)
+      error.value = (e as Error).message;
+  } finally {
+    if (!disposed && sequence === recordSequence) inspecting.value = false;
   }
 }
 async function review(status: string) {
-  const record = selected.value?.record;
-  if (!record) return;
+  const workspace = selected.value;
+  const record = workspace?.record;
+  if (busy.value || loading.value || inspecting.value || !workspace || !record)
+    return;
+  const sequence = recordSequence;
+  const requestedVersion = versionId.value;
   busy.value = true;
   error.value = "";
   try {
@@ -82,32 +134,47 @@ async function review(status: string) {
       "POST",
       { revision: record.revision, status, teacherNote: note.value },
     );
-    if (selected.value) selected.value.record = saved;
-    students.value = await call<StudentRow[]>(
-      `/sessions/${key(props.taskId)}/students${versionParam(versionId.value)}`,
+    if (!isCurrentRecord(workspace, record.id, sequence)) return;
+    workspace.record = saved;
+    const rows = await call<StudentRow[]>(
+      `/sessions/${key(props.taskId)}/students${versionParam(requestedVersion)}`,
     );
+    if (isCurrentRecord(workspace, record.id, sequence)) students.value = rows;
   } catch (e) {
-    error.value = (e as Error).message;
+    if (isCurrentRecord(workspace, record.id, sequence))
+      error.value = (e as Error).message;
   } finally {
-    busy.value = false;
+    if (!disposed) busy.value = false;
   }
 }
 async function approve(requestId: string, text: string) {
-  if (!selected.value?.record) return;
+  const workspace = selected.value;
+  const record = workspace?.record;
+  if (busy.value || loading.value || inspecting.value || !workspace || !record)
+    return;
+  const sequence = recordSequence;
   busy.value = true;
   error.value = "";
   try {
-    selected.value.record = await call<LearningRecord>(
-      `/records/${key(selected.value.record.id)}/feedback/${key(requestId)}/approve`,
+    const saved = await call<LearningRecord>(
+      `/records/${key(record.id)}/feedback/${key(requestId)}/approve`,
       "POST",
       { text },
     );
+    if (isCurrentRecord(workspace, record.id, sequence))
+      workspace.record = saved;
   } catch (e) {
-    error.value = (e as Error).message;
+    if (isCurrentRecord(workspace, record.id, sequence))
+      error.value = (e as Error).message;
   } finally {
-    busy.value = false;
+    if (!disposed) busy.value = false;
   }
 }
+onBeforeUnmount(() => {
+  disposed = true;
+  rosterSequence++;
+  recordSequence++;
+});
 void load();
 </script>
 <template>
@@ -120,7 +187,11 @@ void load();
     <div class="row">
       <label
         >{{ t("Task version")
-        }}<select v-model="versionId" @change="refresh">
+        }}<select
+          v-model="versionId"
+          :disabled="busy || loading"
+          @change="refresh"
+        >
           <option v-if="!versions.length" value="">
             {{ t("Not published") }}
           </option>
@@ -137,10 +208,13 @@ void load();
             }}
           </option>
         </select></label
-      ><button @click="refresh">{{ t("Refresh") }}</button>
+      ><button :disabled="busy || loading" @click="refresh">
+        {{ t("Refresh") }}
+      </button>
     </div>
   </header>
   <p v-if="error" class="error" role="alert">{{ error }}</p>
+  <p v-if="loading" class="muted" role="status">{{ t("Loading…") }}</p>
   <div class="overview-grid progress-overview">
     <div
       v-for="(count, status) in counters"
@@ -201,7 +275,7 @@ void load();
             <td>{{ dateText(student.lastActive) }}</td>
             <td>
               <button
-                :disabled="!student.recordId"
+                :disabled="busy || loading || !student.recordId"
                 @click="inspect(student.recordId!)"
               >
                 {{ t("View answers and conversation") }}
@@ -211,16 +285,19 @@ void load();
         </tbody>
       </table>
     </div>
-    <p v-if="!students.length" class="empty">
+    <p v-if="!loading && !students.length" class="empty">
       {{ t("Add students to this course to see their participation.") }}
     </p>
   </section>
-  <section v-if="selected?.record" class="review-section">
+  <section v-if="selected?.record || inspecting" class="review-section">
     <div class="page-heading">
       <h2>{{ t("Learning record") }}</h2>
-      <button @click="selected = null">{{ t("Close record") }}</button>
+      <button :disabled="busy" @click="closeRecord">
+        {{ t("Close record") }}
+      </button>
     </div>
-    <div class="learning-layout">
+    <p v-if="inspecting" class="muted" role="status">{{ t("Loading…") }}</p>
+    <div v-if="selected?.record" class="learning-layout">
       <div class="panel">
         <TaskContent
           :task="selected.task"
@@ -264,6 +341,7 @@ void load();
             </p>
             <textarea
               v-model="message.content"
+              :disabled="busy"
               rows="6"
               :aria-label="t('Review AI feedback')"
             /><button
@@ -319,7 +397,8 @@ void load();
         </section>
         <div class="form-stack teacher-feedback">
           <label
-            >{{ t("Teacher feedback") }}<textarea v-model="note" rows="4" />
+            >{{ t("Teacher feedback")
+            }}<textarea v-model="note" rows="4" :disabled="busy" />
           </label>
           <div class="row wrap">
             <button
