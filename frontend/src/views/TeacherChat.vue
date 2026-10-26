@@ -261,30 +261,33 @@ async function configure(reply: TeacherReply) {
                   />
                 </dd>
               </dl>
-              <button class="primary" type="submit">
-                {{ t(saving ? "Saving…" : "Save course configuration") }}
-              </button>
+              <div class="row wrap end configuration-actions">
+                <button class="primary" type="submit">
+                  {{ t(saving ? "Saving…" : "Save course configuration") }}
+                </button>
+                <template v-if="currentId">
+                  <button
+                    type="button"
+                    @click="navigate({ page: 'task', courseId: currentId })"
+                  >
+                    ＋ {{ t("New task conversation") }}
+                  </button>
+                  <button
+                    type="button"
+                    @click="
+                      navigate({ page: 'materials', courseId: currentId })
+                    "
+                  >
+                    {{ t("File management") }}
+                  </button>
+                </template>
+              </div>
             </fieldset>
             <p v-if="saved" class="success" role="status">
               {{ t("Course configuration saved.") }}
             </p>
             <p v-if="error" class="error" role="alert">{{ error }}</p>
           </form>
-          <div v-if="currentId" class="row wrap">
-            <button
-              class="primary"
-              :disabled="chatting || saving"
-              @click="navigate({ page: 'task', courseId: currentId })"
-            >
-              ＋ {{ t("New task conversation") }}
-            </button>
-            <button
-              :disabled="chatting || saving"
-              @click="navigate({ page: 'materials', courseId: currentId })"
-            >
-              {{ t("File management") }}
-            </button>
-          </div>
           <div v-if="courseTasks.length" class="conversation-task-links">
             <button
               v-for="task in courseTasks"
