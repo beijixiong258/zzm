@@ -106,11 +106,7 @@ async function configure(reply: TeacherReply) {
     ].includes(reply.action) &&
     !currentId.value
   )
-    return (
-      outcome +
-      "\n" +
-      t("Create the course first by telling AI its name and code.")
-    );
+    return outcome + "\n" + t("Save a course name and code before continuing.");
   if (reply.action === "members") {
     members.value = await call<Member[]>(
       `/courses/${key(currentId.value)}/members`,
@@ -145,13 +141,21 @@ async function configure(reply: TeacherReply) {
     );
   } else if (reply.action === "newTask")
     outcome +=
-      "\n" + t("Use New task conversation below to configure the task.");
+      "\n" +
+      t(
+        dirty.value
+          ? "Save the course configuration before starting a new task conversation."
+          : "Use New task conversation in the course header to configure the task.",
+      );
   else if (reply.action === "progress")
     outcome +=
       "\n" + t("Open a task conversation to view its student progress.");
   else if (["files", "selectFiles"].includes(reply.action))
     outcome +=
-      "\n" + t("Use File management below to organize the course materials.");
+      "\n" +
+      t(
+        "Use File management in the course header to organize the course materials.",
+      );
   return outcome.trim();
 }
 </script>
@@ -162,13 +166,28 @@ async function configure(reply: TeacherReply) {
         <p class="eyebrow">{{ t("Teaching conversation") }}</p>
         <strong>{{ form.title || t("New course conversation") }}</strong>
       </div>
-      <button
-        v-if="currentId"
-        :disabled="chatting || saving"
-        @click="navigate({ page: 'materials', courseId: currentId })"
-      >
-        {{ t("File management") }}
-      </button>
+      <div v-if="currentId" class="row wrap">
+        <button
+          class="primary"
+          :disabled="chatting || saving || dirty"
+          :title="
+            dirty
+              ? t(
+                  'Save the course configuration before starting a new task conversation.',
+                )
+              : undefined
+          "
+          @click="navigate({ page: 'task', courseId: currentId })"
+        >
+          ＋ {{ t("New task conversation") }}
+        </button>
+        <button
+          :disabled="chatting || saving"
+          @click="navigate({ page: 'materials', courseId: currentId })"
+        >
+          {{ t("File management") }}
+        </button>
+      </div>
     </header>
     <TeacherConversation
       :conversation-key="conversationKey"
@@ -262,25 +281,16 @@ async function configure(reply: TeacherReply) {
                 </dd>
               </dl>
               <div class="row wrap end configuration-actions">
+                <small v-if="!currentId || dirty" class="muted">
+                  {{
+                    t(
+                      "Save the course configuration before starting a new task conversation.",
+                    )
+                  }}
+                </small>
                 <button class="primary" type="submit">
                   {{ t(saving ? "Saving…" : "Save course configuration") }}
                 </button>
-                <template v-if="currentId">
-                  <button
-                    type="button"
-                    @click="navigate({ page: 'task', courseId: currentId })"
-                  >
-                    ＋ {{ t("New task conversation") }}
-                  </button>
-                  <button
-                    type="button"
-                    @click="
-                      navigate({ page: 'materials', courseId: currentId })
-                    "
-                  >
-                    {{ t("File management") }}
-                  </button>
-                </template>
               </div>
             </fieldset>
             <p v-if="saved" class="success" role="status">

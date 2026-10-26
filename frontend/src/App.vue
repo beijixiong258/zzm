@@ -12,6 +12,7 @@ import {
 import {
   bootstrap,
   courses,
+  dirty,
   initialize,
   navigate,
   refreshCourses,
@@ -426,6 +427,9 @@ void boot();
             {{ t(staff ? "Course conversation" : "Course overview") }}</button
           ><template v-if="staff"
             ><button
+              :disabled="
+                route.page === 'course' && route.courseId === item.id && dirty
+              "
               @click="
                 navigate({ page: 'task', courseId: item.id });
                 menuOpen = false;
