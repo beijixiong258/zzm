@@ -24,6 +24,6 @@ Vue 3 + TypeScript + Vite，应用版本沿用 0.1.0。开发服务器默认 517
 
 任务先保存再生成，生成结果通过修订号检查后应用，教师确认后发布。学生材料与学习记录绑定明确发布版本；复制资源不携带学生记录。任务文档仅导出 Markdown，学生版排除参考答案、评价标准和教师私有材料。
 
-历史前端阶段脚本与验证产物分别归入 `app/legacy/frontend/tools/` 和 `app/legacy/frontend/artifacts/`。当前 `build:brand` 使用的 `app/frontend/tests/brand-assets.mjs` 保留原位；前端入口、依赖、静态资源和构建目录路径保持不变。
+历史前端阶段脚本源码保存在 `app/legacy/frontend/tools/`，验证产物已移入指定垃圾桶。`app/frontend/tests/brand-assets.mjs` 是 `build:brand` 使用的图标生成工具，保留原位。正式静态资源保存在 `public/`；`node_modules/` 和 `dist/` 由安装、构建命令重新生成，不随源码保留。
 
 开发启动、环境变量、已知限制及验证记录统一见[根目录 README](../../README.md)。2026-10-23 的功能修复已完成前端类型检查和相关接口、浏览器验证；随后进行的目录整理仅核对文件清单、路径引用和前后端运行状态，没有重新编译或执行全量测试。

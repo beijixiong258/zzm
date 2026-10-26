@@ -139,24 +139,18 @@ pwsh.exe -File .\start.ps1 -Component frontend
 
 首次安装前端依赖时，可在 `app` 执行 `pwsh.exe -File .\setup.ps1`；该脚本在本地配置不存在时从 `config.defaults.json` 创建 `config.json`，并安装前端依赖。全新数据库可先使用演示入口，也可从管理员入口创建首位管理员。启动本身不会清空已有课程和账号；2026-10-23 的数据库重置按用户单独要求执行，不属于日常启动流程。
 
-### 预构建运行包
+### 源码与构建产物
 
-[releases/AIcademiya-0.1.0.zip](releases/AIcademiya-0.1.0.zip) 包含当前 Java／Vue 源码、前端 `dist`、后端可执行 JAR、配置模板、示例材料及项目说明，版本仍为 **0.1.0**。运行已构建内容只需 Java 17、Node.js 和 MySQL，不需要 Maven 或 `node_modules`。
+当前工作目录保留源码、正式静态资源、测试源码及其固定样例、构建配置和文档，版本仍为 **0.1.0**。预构建 ZIP、前端 `dist`、后端 `target`、本地依赖与开发缓存已移入指定垃圾桶，仓库不再保留预构建运行包。
 
-解压后，在包的根目录打开 PowerShell 7。按上文设置 `JAVA_HOME`、`MYSQL_USER`、`MYSQL_PASSWORD` 和 `MYSQL_URL`，准备 `app/config.json` 或 AI 环境变量，再启动后端：
+开发前先按上文执行 `setup.ps1` 安装前端依赖，并准备本地 `config.json` 和 MySQL 连接参数，再使用 `start.ps1` 启动。需要生产构建时，可在项目根目录的 PowerShell 7 中手动执行：
 
 ```powershell
-if (!(Test-Path -LiteralPath .\app\config.json)) {
-    Copy-Item -LiteralPath .\app\config.defaults.json -Destination .\app\config.json
-}
-$env:AICADEMIYA_DEMO_ENABLED = 'true'
-Set-Location -LiteralPath .\app\server
-& "$env:JAVA_HOME\bin\java.exe" -jar .\target\aicademiya-server-0.1.0.jar
+mvn.cmd -f .\app\server\pom.xml -DskipTests package
+npm.cmd --prefix .\app\frontend run build
 ```
 
-另开一个位于解压根目录的 PowerShell 7 窗口，执行 `node.exe .\app\frontend\static-server.mjs`，随后访问 `http://127.0.0.1:5173`。AI 密钥须在本机配置后才能生成讲义或进行对话，具体配置来源见下表。
-
-运行包不包含本地业务数据、上传记录、私人 `config.json`／`.env`、依赖缓存、IDE 配置、Git 历史或 `app/legacy` 历史产物。仓库中的旧代码整理记录仍保留在源代码分支；运行包只携带当前应用所需内容。
+生成后端 `app/server/target/aicademiya-server-0.1.0.jar` 和前端 `app/frontend/dist` 后，可分别使用 Java 17 与 `node.exe .\app\frontend\static-server.mjs` 运行。构建产物不提交到源码仓库；本次目录清理未执行上述构建命令。
 
 ### 配置来源
 
@@ -210,7 +204,6 @@ docker compose up -d --build
 zzm/
 ├─ README.md                         当前统一项目说明
 ├─ docs/                             文档导航及前端开发说明
-├─ examples/session-3/               用户提供的 PDF 与 DOCX 示例
 └─ app/
    ├─ frontend/
    │  ├─ src/                       Vue 界面、双语文案与 API 契约
@@ -224,24 +217,19 @@ zzm/
    │  ├─ backend/                   旧 Python 后端及其测试
    │  ├─ runtime_v2/                历史部署配置与启动脚本
    │  ├─ tools/                     历史阶段工具与实验代码
-   │  ├─ artifacts/                 历史阶段产物
-   │  └─ frontend/
-   │     ├─ tools/                  历史前端阶段脚本
-   │     └─ artifacts/              历史前端验证产物
-   ├─ data-local/                   本地数据库文件与当前上传材料
-   ├─ local-demo/、local-materials/  旧数据目录与本地材料，保留原位置
-   ├─ config.json                   本地配置，不进入 Git
+   │  └─ frontend/tools/            历史前端阶段脚本源码
+   ├─ config.defaults.json          本地配置模板
    ├─ Dockerfile、compose.yaml       当前容器部署入口
    └─ start.ps1、setup.ps1           Windows 开发入口，保留同名 .cmd 包装脚本
 ```
 
-示例材料为 examples/session-3/ 下的 Session 3 Formative Assessment 2026_final.pdf（62 页）和 Session 3 Worksheet.docx。2026-10-23 的教师端实测使用旧 OCR 规则；2026-10-24 按新的原生文字／整份图片输入规则重新验证，结果分别记录在文末。
+原 examples/session-3/ 中的 PDF 与 DOCX 示例材料已按要求移入指定垃圾桶。2026-10-23 和 2026-10-24 使用这些材料得到的历史验证记录仍保留在文末。
 
 logo 的正式路径是 `app/frontend/public/aicademiya-mark-light.svg`，用于登录页、侧栏及启动状态。登录页通过 CSS 蒙版将同一图形呈现为深绿色，搭配浅绿色品牌区；侧栏和启动状态继续使用深绿色背景上的浅色图形。登录页在桌面端采用介绍区与登录卡片并排的布局，在窄屏上优先显示登录表单，收起装饰并缩减留白；保留中英文切换、邮箱密码登录和学生邀请码登录。根目录的同内容副本已移出工作位置。
 
-历史代码、脚本和产物统一保存在 app/legacy/，不参与当前 Java／Vue 应用启动，也不进入后端 Docker 构建上下文。app/tools/ 保留 export_legacy.py 和 Recycle-OrphanUploads.ps1，分别用于可选旧数据导出和孤儿上传原文件回收。旧数据目录保持原位；历史脚本中的旧环境参数和绝对路径需在复用前单独核对。
+历史代码、测试及脚本源码保存在 app/legacy/，不参与当前 Java／Vue 应用启动，也不进入后端 Docker 构建上下文；历史验证产物与缓存已移出。app/tools/ 保留 export_legacy.py 和 Recycle-OrphanUploads.ps1，分别用于可选旧数据导出和孤儿上传原文件回收。历史脚本中的旧环境参数和绝对路径需在复用前单独核对。
 
-既有课程、上传文件、本地配置、依赖、IDE 配置及构建目录保持原位，包括 `app/.venv/`、`app/frontend/node_modules/`、`app/frontend/dist/` 和 `app/server/target/`。已停用的需求草稿以及验证临时文件按约定移入 `C:\Users\user\Desktop\智能体回收站\垃圾桶`，不永久删除；随后按用户明确要求清空当前 MySQL 应用数据，旧上传目录移入垃圾桶，仅重新建立两个无密码的演示账号。
+2026-10-26 按用户要求，仅保留源码及必要项目资源：本地依赖、构建目录、运行包、历史验证产物、缓存，以及另行确认的原始材料、旧数据库文件、上传文件、本地 config.json 和 IDE 配置，均移入 `C:\Users\user\Desktop\智能体回收站\垃圾桶`，不永久删除。Git 历史和 Docker 中的 MySQL 持久数据未改动；本次清理没有运行编译、构建或测试。
 
 ## 可选旧数据导入
 
