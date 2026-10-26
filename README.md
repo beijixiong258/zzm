@@ -6,7 +6,7 @@ AIcademiya 面向教师备课、课程组织与学生学习，围绕 **Course（
 
 本文是当前应用的统一项目说明，已整合原有 README 和仍有参考价值的历史工具说明。已确认的产品范围、运行方式和验证结果统一在本文维护；协作约定见 [app/AGENTS.md](app/AGENTS.md)。
 
-> 2026-10-24 已按后续授权完成前端构建、Java 17 后端打包及新 PDF 流程的实际接口验证：取消 PDF OCR，执行 40,000 token 输入上限及 64,000 token 总上下文限制。62 页原始 PDF 完整转图并正确触发超限拦截，小样本完成真实 AI 生成与学生对话。具体覆盖范围和限制见文末当日验证记录，旧 OCR 测试不作为新流程的验证依据。
+> 最近运行验证（2026-10-26）：已使用当前源码构建 Docker 前后端，完成启动、网页访问及演示教师登录；本次验证容器已停止，5173、8001、3307 端口已核验释放。原本机配置中的硅基流动 API Key 仍保留，但临时容器使用了未接入密钥的默认配置，本次没有验证真实 AI 请求。具体范围见文末当日记录；历史记录不代表当前服务仍在运行或全量业务已验收。
 
 ## 已确定的产品范围
 
@@ -137,7 +137,11 @@ pwsh.exe -File .\start.ps1 -Component frontend
 
 登录后的角色决定可访问页面。Java API 位于 `http://localhost:8001/api`。前端直接请求后端，不通过开发代理。
 
-首次安装前端依赖时，可在 `app` 执行 `pwsh.exe -File .\setup.ps1`；该脚本在本地配置不存在时从 `config.defaults.json` 创建 `config.json`，并安装前端依赖。全新数据库可先使用演示入口，也可从管理员入口创建首位管理员。启动本身不会清空已有课程和账号；2026-10-23 的数据库重置按用户单独要求执行，不属于日常启动流程。
+首次安装前端依赖时，可在 `app` 执行 `pwsh.exe -File .\setup.ps1`；该脚本在本地配置不存在时从 `config.defaults.json` 创建 `config.json`，并安装前端依赖。模板中的 AI 密钥为空，脚本不会从其他目录找回已有配置；已有硅基流动配置需按下文接入实际运行进程。全新数据库可先使用演示入口，也可从管理员入口创建首位管理员。启动本身不会清空已有课程和账号；2026-10-23 的数据库重置按用户单独要求执行，不属于日常启动流程。
+
+### 检查结束后的关闭
+
+运行检查结束后，主动停止本次启动的前端、后端及专用测试数据库，并核验对应端口已经释放；仅在用户明确要求保留运行时例外。前台启动的进程在各自终端按 `Ctrl+C` 结束；后台启动的进程应按本次记录的 PID 或容器名停止，避免影响已有的其他服务。前后端默认检查 5173、8001；数据库检查本次实际使用的端口。
 
 ### 源码与构建产物
 
@@ -158,8 +162,8 @@ npm.cmd --prefix .\app\frontend run build
 | --- | --- |
 | MySQL 连接 | `MYSQL_URL`，默认本机 3306 的 `aicademiya` 数据库 |
 | MySQL 用户和密码 | `MYSQL_USER`、`MYSQL_PASSWORD`；源码用户名默认 `aicademiya`，本机按既有要求使用 `root` |
-| AI 配置 | 不进入 Git 的 `app/config.json` 中 `ai` 节 |
-| AI 覆盖项 | `AICADEMIYA_AI_API_KEY`、`AICADEMIYA_AI_BASE_URL`、`AICADEMIYA_AI_MODEL` |
+| AI 配置文件 | `AICADEMIYA_CONFIG` 指定 JSON 文件，AI 模块读取其中的 `ai` 节；默认 `../config.json` 相对于后端工作目录解析，通过 `start.ps1` 启动时对应 `app/config.json` |
+| AI 覆盖项 | `AICADEMIYA_AI_API_KEY`、`AICADEMIYA_AI_BASE_URL`、`AICADEMIYA_AI_MODEL`；非空环境变量优先，空值沿用配置文件 |
 | 上传存储 | `AICADEMIYA_UPLOAD_DIR`，默认 `app/data-local/uploads` |
 | 文件处理范围 | `AICADEMIYA_DOCUMENT_MAX_UNITS=300`、`AICADEMIYA_DOCUMENT_MAX_CHARACTERS=300000` |
 | 视觉输入最长边 | `AICADEMIYA_DOCUMENT_IMAGE_MAX_EDGE=2000`，代码约束在 1000—3000 之间 |
@@ -167,7 +171,11 @@ npm.cmd --prefix .\app\frontend run build
 | Cookie HTTPS | `AICADEMIYA_COOKIE_SECURE`，默认 `false` |
 | 演示快捷登录 | AICADEMIYA_DEMO_ENABLED；后端默认 false，本机 start.ps1 未显式覆盖时设为 true |
 
-当前模型名称及密钥沿用本地配置，文档不包含账号密码或 API 密钥。`config.defaults.json` 中部分旧 Python 配置项不由 Java 后端使用；Java 运行参数以 `application.yml`、环境变量和 `AppProperties` 为准，AI 模块读取 `ai` 节。
+当前模型名称及密钥沿用已有硅基流动配置，文档不包含账号密码或 API 密钥。`config.json` 和 `.env` 已由 Git 忽略规则排除；`config.defaults.json` 是密钥为空的模板。判断 AI 是否配置，应核对进程实际读取的文件、容器挂载和上述环境变量，只报告密钥是否存在，不显示密钥内容。
+
+2026-10-26 清理时，原本机 `app/config.json` 已按确认范围移入指定垃圾桶，随后只读核对确认其中的硅基流动 `ai.api_key` 仍非空。当天临时 Docker 环境挂载的是另行生成的默认配置，未接入原密钥。因此，临时环境的“未配置”状态不能作为原本机未配置密钥的结论。后续运行应接入已有配置；本次文档修订没有恢复、复制或改写该配置。
+
+`config.defaults.json` 中部分旧 Python 配置项不由 Java 后端使用；Java 运行参数以 `application.yml`、环境变量和 `AppProperties` 为准，AI 模块读取 `ai` 节。
 
 ### 历史与回收配置
 
@@ -190,13 +198,21 @@ app/tools/Recycle-OrphanUploads.ps1 用于 Windows 上传原文件的独立维�
 
 ## Docker
 
-`app/compose.yaml` 定义 MySQL、Java 后端、前端及持久卷。后端构建和运行镜像均使用 Java 17，端口仍为 8001／5173。用户需要部署时，在 `app` 将 `.env.example` 复制为 `.env` 并填写连接参数，准备 `config.json` 后手动执行：
+`app/compose.yaml` 定义 MySQL 8.4、Java 后端、前端及持久卷，发布端口分别为本机 3306、8001、5173。后端构建和运行镜像均使用 Java 17。需要部署时，在 `app` 将 `.env.example` 复制为 `.env` 并填写数据库连接参数，准备好包含已有 AI 配置的 `config.json` 后手动执行：
 
 ```powershell
 docker compose up -d --build
 ```
 
-该命令会构建并启动容器，本轮没有执行 Docker 验证。附件回收目录为 /data/recycle，使用独立 recycle 持久卷，不定时清空。镜像中的中文字体用于文档渲染；Markdown 导出不需要字体配置。域名或 HTTPS 部署应相应设置允许来源及 Cookie 参数。
+Compose 将 `app/config.json` 只读挂载到后端 `/config/config.json`。`.env` 中三个 AI 覆盖项为空时沿用该文件中的值，已有密钥无需重复填写；仅复制默认模板并不会接入原有密钥。Compose 的演示入口默认关闭，需要演示登录时在 `.env` 设置 `AICADEMIYA_DEMO_ENABLED=true`。
+
+通过本项目 Compose 启动的检查环境，可在同一 `app` 目录执行以下命令停止服务并释放端口，保留容器和数据卷：
+
+```powershell
+docker compose stop
+```
+
+单独创建的验证容器应按本次记录的容器名停止，不能依靠上述 Compose 命令代管。附件回收目录为 `/data/recycle`，使用独立 `recycle` 持久卷，不定时清空。镜像中的中文字体用于文档渲染；Markdown 导出不需要字体配置。域名或 HTTPS 部署应相应设置允许来源及 Cookie 参数。2026-10-26 的独立容器验证范围见文末，不等同于这套 Compose 配置的完整部署验收。
 
 ## 项目目录
 
@@ -233,11 +249,12 @@ logo 的正式路径是 `app/frontend/public/aicademiya-mark-light.svg`，用于
 
 ## 可选旧数据导入
 
-当前应用运行不需要 Python。`app/tools/export_legacy.py` 只读导出旧 SQLite 数据及相应文件，输出目录必须尚不存在：
+当前应用运行不需要 Python。`app/tools/export_legacy.py` 只读导出旧 SQLite 数据及相应文件，输出目录必须尚不存在。旧数据库已随清理移出原目录，使用该工具时应指定实际存在的源数据库路径：
 
 ```powershell
 Set-Location -LiteralPath 'C:\Users\user\Desktop\zzm\app'
-python .\tools\export_legacy.py --database .\data-local\aicademiya.sqlite3 --output .\legacy-export
+$legacyDatabasePath = Read-Host '已有 SQLite 数据库文件的绝对路径'
+python.exe .\tools\export_legacy.py --database $legacyDatabasePath --output .\legacy-export
 ```
 
 在首次启动 Java 后端前，将 `AICADEMIYA_LEGACY_IMPORT` 指向导出目录绝对路径。导入只允许空的 MySQL 应用数据库；完成后移除变量。这里是可选迁移说明，不表示本轮执行过导出或导入。
@@ -265,6 +282,10 @@ python .\tools\export_legacy.py --database .\data-local\aicademiya.sqlite3 --out
 教师私有指令、参考答案和解析通过学生投影排除。教师模拟调用与学生相同的作答、对话、附件和提交路径，但使用独立草稿快照与模拟标记。前端源码导航见 [前端开发说明](docs/guides/frontend-development.md)。
 
 需要继续核对的边界：图像识别准确性、复杂 Office／EPUB 图文对应、实际供应商 tokenizer 与估算差异，以及不同 Markdown 阅读器对公式和需登录材料链接的支持。无法读取的内容会呈现失败或不完整状态；未运行验证的内容不声称已通过验收。
+
+当前 `/api/health` 固定返回 `{"status":"ok"}`，只表明 HTTP 应用能够响应，没有检查数据库及 AI 服务。依赖可用性和业务结果需分别核对，不能仅凭该接口返回 200 判断全部功能正常。
+
+按用户要求，不新增测试类或测试脚本；需要验证时，在当次授权范围内进行实际运行、接口或界面操作检查。仅检查源码或修订文档时不自动编译、启动应用或调用模型。历史 Python 测试源码继续保留，不作为当前 Java／Vue 应用已通过验证的依据。
 
 ## 验证记录（2026-10-23）
 
@@ -315,3 +336,11 @@ python .\tools\export_legacy.py --database .\data-local\aicademiya.sqlite3 --out
 - 本轮临时课程、任务和材料已归档；四份上传副本、临时脚本、接口结果及截图统一放入 `C:\Users\user\Desktop\智能体回收站\垃圾桶\AIcademiya-验证上传-20261024`。原始示例、既有课程及私人配置未清空，前后端保留运行供继续使用。
 - Docker、全量历史回归、所有格式和所有扫描质量组合不在本轮覆盖范围。保守 token 估算与供应商实际 tokenizer 的差异仍以真实请求用量核对。
 - 同日补充材料列表容量提示：前端 TypeScript 检查及生产构建通过，15 项实际 Vue 组件渲染检查通过，覆盖原始 62 页 PDF、40,000／40,001 边界、中英文、嵌套目录、失败及不完整报告、旧 PDF 和非 PDF 材料。运行中后端接口确认原 PDF 为完整的图片模式报告，估算 93,496 token。浏览器自动操作出现超时和点击不生效，本次新增列表提示的浏览器点击与视觉复核未完成，不计为通过；本次未修改 Java、重新调用模型或新增测试业务数据。
+
+## 验证记录（2026-10-26）
+
+- 清理源码目录后，按当次运行授权，使用现有 Dockerfile 从当前源码构建前端与 Java 17 后端，应用版本保持 0.1.0。前端类型检查与生产构建通过；后端构建执行跳过 Maven 测试的打包命令，不能计为单元测试通过。
+- 新建独立 MySQL 8.0 容器及数据卷，宿主机端口为 3307；前后端端口为 5173、8001。该次使用单独创建的容器，未运行 `compose.yaml` 中 MySQL 8.4 的完整部署组合，也未替换原有数据库。
+- 实际网页请求返回 200，后端健康接口返回 `{"status":"ok"}`，MySQL 容器健康检查通过。浏览器完成演示教师登录并进入首页；新数据库尚未创建正式管理员。这些结果覆盖启动和登录，没有覆盖新环境下的完整师生业务流程。
+- 临时后端挂载密钥为空的默认配置，未调用真实模型。随后只读核对清理前的原始配置，确认硅基流动 API Key 仍存在；本次没有重新验证该密钥的接口连通性。
+- 检查结束后的三个容器 `aicademiya-frontend-runtime-20261026`、`aicademiya-backend-runtime-20261026`、`aicademiya-runtime-20261026` 均已停止，状态为 `exited`。5173、8001、3307 均实际完成独占绑定检查，并立即解除验证绑定，确认端口已释放。运行配置、日志及截图位于指定垃圾桶中的本次验证目录；项目工作目录没有重新生成本地依赖或构建产物。

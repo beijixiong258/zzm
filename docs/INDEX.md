@@ -1,6 +1,6 @@
 # 项目说明
 
-- [统一项目 README：产品范围、启动、材料处理、64K 容量、导出与验证记录](../README.md)
+- [统一项目 README：产品范围、启动与关闭、AI 配置、材料容量、导出与验证记录](../README.md)
 - [协作约定](../app/AGENTS.md)
 - [前端源码说明](guides/frontend-development.md)
 - [可选的旧 SQLite 数据导出工具](../app/tools/export_legacy.py)
