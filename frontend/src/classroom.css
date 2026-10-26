@@ -1978,24 +1978,24 @@ td button {
 .conversation-composer form textarea:focus {
   outline: 0;
 }
-.conversation-composer .file-uploader > .muted {
+.task-attachment-tools .file-uploader > .muted {
   font-size: 11px;
   margin: 8px 0;
 }
-.conversation-composer .file-uploader .button,
-.conversation-composer .file-uploader button {
+.task-attachment-tools .file-uploader .button,
+.task-attachment-tools .file-uploader button {
   font-size: 12px;
   padding: 7px 11px;
 }
-.conversation-composer .upload-queue {
+.task-attachment-tools .upload-queue {
   max-height: 140px;
   overflow: auto;
   font-size: 12px;
 }
 .task-attachment-tools {
   border-bottom: 1px solid var(--line);
-  padding-bottom: 8px;
-  margin-bottom: 8px;
+  padding-bottom: 20px;
+  margin: 20px 0;
 }
 .upload-visibility {
   font-size: 12px;

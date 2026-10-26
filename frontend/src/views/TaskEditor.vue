@@ -160,9 +160,6 @@ watch(
 function uploaded(material: Material) {
   if (!materials.value.some((item) => item.id === material.id))
     materials.value.push(material);
-  chooseMaterial(material.id, true);
-  if (choosingFiles.value && !selectionIds.value.includes(material.id))
-    selectionIds.value.push(material.id);
   void loadMaterials();
 }
 async function retryMaterial(material = selectedMaterial.value) {
@@ -226,17 +223,12 @@ async function saveDraft() {
   const path = draft.value.id
     ? `/sessions/${key(draft.value.id)}`
     : `/courses/${key(props.courseId)}/sessions`;
-  const sentIds = new Set(draft.value.materialIds);
   const result = await call<Task>(
     path,
     draft.value.id ? "PUT" : "POST",
     draft.value,
   );
-  const uploadedDuringSave = draft.value.materialIds.filter(
-    (id) => !sentIds.has(id),
-  );
   accept(result);
-  uploadedDuringSave.forEach((id) => chooseMaterial(id, true));
   retainTaskAddress(result.id);
   await refreshCourses();
   return result;
@@ -354,14 +346,6 @@ async function restore(versionId: string) {
     success.value = t("Version restored into the draft.");
   });
 }
-function chooseMaterial(id: string, checked: boolean) {
-  if (checked && !draft.value.materialIds.includes(id))
-    draft.value.materialIds.push(id);
-  if (!checked)
-    draft.value.materialIds = draft.value.materialIds.filter(
-      (value) => value !== id,
-    );
-}
 async function openFileSelection() {
   selectionIds.value = [...draft.value.materialIds];
   selectionChanges.clear();
@@ -385,7 +369,7 @@ function cancelSelection() {
 }
 function saveSelection() {
   const chosen = new Set(draft.value.materialIds);
-  // Apply only the user's changes, so uploads completing after opening are retained.
+  // Only explicit choices in file management change the task's attachments.
   for (const [id, checked] of selectionChanges) {
     if (checked) chosen.add(id);
     else chosen.delete(id);
@@ -495,7 +479,8 @@ async function configure(reply: TeacherReply, message: string) {
         "The task draft is retained here. Tell AI a task name to save it.",
       );
   }
-  if (reply.action === "selectFiles") await openFileSelection();
+  if (["selectFiles", "files"].includes(reply.action))
+    await openFileSelection();
   else if (reply.action === "import") showImportSources.value = true;
   else if (["generate", "revise"].includes(reply.action)) {
     if (pendingUploads.value)
@@ -516,9 +501,7 @@ async function configure(reply: TeacherReply, message: string) {
         "Review the preview, then use Publish task below to confirm publication.",
       );
   else if (reply.action === "progress") await viewProgress();
-  else if (
-    ["files", "members", "inviteStudent", "newTask"].includes(reply.action)
-  )
+  else if (["members", "inviteStudent", "newTask"].includes(reply.action))
     outcome +=
       "\n" +
       t(
@@ -557,7 +540,7 @@ void load();
           </button>
           <button
             :disabled="busy || chatBusy || !!active"
-            @click="navigate({ page: 'materials', courseId })"
+            @click="openFileSelection"
           >
             {{ t("File management") }}
           </button>
@@ -586,78 +569,84 @@ void load();
           )
         "
       >
-        <template #attachments>
-          <div class="task-attachment-tools">
-            <details class="upload-visibility">
-              <summary>
-                {{ t("Visibility for new uploads") }} ·
-                {{
-                  t(
-                    uploadVisibility === "student"
-                      ? "Students and teachers"
-                      : "Teachers and AI only",
-                  )
-                }}
-              </summary>
-              <label
-                >{{ t("Visibility")
-                }}<select
-                  v-model="uploadVisibility"
-                  :disabled="busy || chatBusy || !!active"
-                >
-                  <option value="student">
-                    {{ t("Students and teachers") }}
-                  </option>
-                  <option value="teacher">
-                    {{ t("Teachers and AI only") }}
-                  </option>
-                </select></label
-              >
-            </details>
-            <FileUploader
-              :endpoint="'/courses/' + key(courseId) + '/materials'"
-              :visibility="uploadVisibility"
-              :disabled="busy || chatBusy || !!active"
-              @pending="pendingUploads = $event"
-              @uploaded="uploaded"
-              @settled="loadMaterials"
-            >
-              <template #actions
-                ><button
-                  type="button"
-                  :disabled="busy || chatBusy || !!active"
-                  @click="openFileSelection"
-                >
-                  {{ t("Select files") }}
-                </button></template
-              >
-            </FileUploader>
-            <div v-if="selected.length" class="selected-materials">
-              <small>{{
-                t("Selected materials: {0}", [selected.length])
-              }}</small>
-              <button
-                v-for="material in selected"
-                :key="material.id"
-                type="button"
-                @click="selectedMaterial = material"
-              >
-                {{ material.title }}
-                <small>{{ statusText(material.status) }}</small>
-              </button>
-            </div>
-            <p v-else class="empty selected-empty">
-              {{
-                t(
-                  "No task materials selected. Upload files or choose existing course files.",
-                )
-              }}
-            </p>
-          </div>
-        </template>
         <template #results>
           <details class="conversation-result" open>
             <summary>{{ t("Current task configuration") }}</summary>
+            <div class="task-attachment-tools">
+              <strong>{{ t("Task attachments") }}</strong>
+              <p class="muted">
+                {{
+                  t(
+                    "Uploads are added to the course library. Open File management to choose the attachments for this task.",
+                  )
+                }}
+              </p>
+              <details class="upload-visibility">
+                <summary>
+                  {{ t("Visibility for new uploads") }} ·
+                  {{
+                    t(
+                      uploadVisibility === "student"
+                        ? "Students and teachers"
+                        : "Teachers and AI only",
+                    )
+                  }}
+                </summary>
+                <label
+                  >{{ t("Visibility")
+                  }}<select
+                    v-model="uploadVisibility"
+                    :disabled="busy || chatBusy || !!active"
+                  >
+                    <option value="student">
+                      {{ t("Students and teachers") }}
+                    </option>
+                    <option value="teacher">
+                      {{ t("Teachers and AI only") }}
+                    </option>
+                  </select></label
+                >
+              </details>
+              <FileUploader
+                :endpoint="'/courses/' + key(courseId) + '/materials'"
+                :visibility="uploadVisibility"
+                :disabled="busy || chatBusy || !!active"
+                @pending="pendingUploads = $event"
+                @uploaded="uploaded"
+                @settled="loadMaterials"
+              >
+                <template #actions
+                  ><button
+                    type="button"
+                    :disabled="busy || chatBusy || !!active"
+                    @click="openFileSelection"
+                  >
+                    {{ t("File management") }}
+                  </button></template
+                >
+              </FileUploader>
+              <div v-if="selected.length" class="selected-materials">
+                <small>{{
+                  t("Selected materials: {0}", [selected.length])
+                }}</small>
+                <button
+                  v-for="material in selected"
+                  :key="material.id"
+                  type="button"
+                  @click="selectedMaterial = material"
+                >
+                  {{ material.title }}
+                  <small>{{ statusText(material.status) }}</small>
+                </button>
+              </div>
+              <p v-else class="empty selected-empty">
+                {{
+                  t(
+                    "No task attachments selected. Open File management to select course files.",
+                  )
+                }}
+              </p>
+            </div>
             <p class="muted">
               {{
                 t(
@@ -934,7 +923,7 @@ void load();
     >
       <header class="conversation-heading">
         <button @click="cancelSelection">← {{ t("Back to task") }}</button>
-        <h1>{{ t("Select files") }}</h1>
+        <h1>{{ t("File management") }}</h1>
         <div class="row">
           <button @click="cancelSelection">{{ t("Cancel") }}</button
           ><button class="primary" @click="saveSelection">
@@ -945,14 +934,14 @@ void load();
       <p class="muted">
         {{
           t(
-            "Save confirms only this material selection. It does not save or create the task.",
+            "Select course files for this task, then save your selection. This does not save or create the task.",
           )
         }}
       </p>
       <p v-if="pendingUploads" class="notice">
         {{
           t(
-            "Uploads continue in the background. Newly uploaded materials stay selected.",
+            "Uploads continue in the background. Select completed uploads manually in File management.",
           )
         }}
         · {{ pendingUploads }}
@@ -1020,7 +1009,7 @@ void load();
       <p v-if="!selected.length" class="empty">
         {{
           t(
-            "No task materials selected. Upload files or choose existing course files.",
+            "No task attachments selected. Open File management to select course files.",
           )
         }}
       </p>

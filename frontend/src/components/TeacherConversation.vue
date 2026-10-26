@@ -139,7 +139,6 @@ function enter(event: KeyboardEvent) {
     <slot name="results" />
     <p v-if="error" class="error" role="alert">{{ error }}</p>
     <div class="conversation-composer">
-      <slot name="attachments" />
       <form @submit.prevent="send">
         <textarea
           v-model="prompt"
