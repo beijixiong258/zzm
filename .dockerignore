@@ -1,15 +1,11 @@
-.venv
 frontend/node_modules
 frontend/dist
-server/target
+target
 config.json
 config.*.json
 data-local
 local-materials
 local-demo
-legacy-export
-legacy
-ocr-models
 *.tsbuildinfo
 frontend/tests/artifacts
 artifacts
@@ -20,9 +16,6 @@ logs
 .env
 .env.*
 local-settings*.json
-__pycache__
-**/__pycache__
-.pytest_cache
 .git
 *.sqlite3
 *.sqlite3-*
@@ -32,3 +25,4 @@ __pycache__
 *.pem
 *.key
 *.p12
+/测试用材料不要删/

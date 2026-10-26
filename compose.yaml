@@ -1,3 +1,5 @@
+# Keep the existing Compose project and volume names after moving to the root.
+name: app
 services:
   mysql:
     image: mysql:8.4

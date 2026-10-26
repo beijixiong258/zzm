@@ -29,8 +29,8 @@ mybatis-plus:
   configuration:
     default-enum-type-handler: org.apache.ibatis.type.EnumTypeHandler
 app:
-  config-path: ${AICADEMIYA_CONFIG:../config.json}
-  upload-dir: ${AICADEMIYA_UPLOAD_DIR:../data-local/uploads}
+  config-path: ${AICADEMIYA_CONFIG:config.json}
+  upload-dir: ${AICADEMIYA_UPLOAD_DIR:data-local/uploads}
   document-max-units: ${AICADEMIYA_DOCUMENT_MAX_UNITS:300}
   document-max-characters: ${AICADEMIYA_DOCUMENT_MAX_CHARACTERS:300000}
   document-image-max-edge: ${AICADEMIYA_DOCUMENT_IMAGE_MAX_EDGE:2000}

@@ -38,15 +38,15 @@
 首次准备前端依赖：
 
 ```powershell
-Set-Location -LiteralPath 'C:\Users\user\Desktop\zzm\app'
+Set-Location -LiteralPath 'C:\Users\user\Desktop\zzm'
 pwsh.exe -File .\setup.ps1
 ```
 
 分别在两个 PowerShell 7 窗口启动后端和前端：
 
 ```powershell
-pwsh.exe -File 'C:\Users\user\Desktop\zzm\app\start.ps1' -Component backend
-pwsh.exe -File 'C:\Users\user\Desktop\zzm\app\start.ps1' -Component frontend
+pwsh.exe -File 'C:\Users\user\Desktop\zzm\start.ps1' -Component backend
+pwsh.exe -File 'C:\Users\user\Desktop\zzm\start.ps1' -Component frontend
 ```
 
 前端地址为 `http://127.0.0.1:5173`，后端 API 为 `http://127.0.0.1:8001/api`。开发前端直接请求后端，不经过开发代理。
@@ -54,61 +54,61 @@ pwsh.exe -File 'C:\Users\user\Desktop\zzm\app\start.ps1' -Component frontend
 也可使用项目现有 Docker Compose 配置：
 
 ```powershell
-pwsh.exe -File 'C:\Users\user\Desktop\zzm\app\start.ps1' -Component docker
+pwsh.exe -File 'C:\Users\user\Desktop\zzm\start.ps1' -Component docker
 ```
 
-该命令构建并启动 MySQL、后端和前端。Compose 映射数据库端口为 3306；现有本机 Java 配置连接 3307，两者按各自运行方式使用。不要在已有服务占用端口时重复启动另一套服务。
+该命令构建并启动 MySQL、后端和前端。Compose 项目名沿用原来的 `app`，目录迁移不改变原有 Compose 数据卷名称。Compose 映射数据库端口为 3306；现有本机 Java 配置连接 3307，两者按各自运行方式使用。不要在已有服务占用端口时重复启动另一套服务。
 
 前端类型检查与生产构建使用现有命令：
 
 ```powershell
-npm.cmd --prefix .\app\frontend run build
+npm.cmd --prefix .\frontend run build
 ```
 
-该命令依次执行 `vue-tsc --noEmit` 和 `vite build`，输出到 `app/frontend/dist`。生成后可用 `node.exe .\app\frontend\static-server.mjs` 启动静态服务。源码改动不会自动替换已运行容器中的构建产物。
+该命令依次执行 `vue-tsc --noEmit` 和 `vite build`，输出到 `frontend/dist`。生成后可用 `node.exe .\frontend\static-server.mjs` 启动静态服务。源码改动不会自动替换已运行容器中的构建产物。
 
 ## 本机配置
 
 | 配置                       | 位置与用途                                                                                                 |
 | -------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| MySQL 地址、账号和明文密码 | `app/server/src/main/resources/application.yaml` 的 `spring.datasource`                                    |
+| MySQL 地址、账号和明文密码 | `src/main/resources/application.yaml` 的 `spring.datasource`                                    |
 | Docker MySQL 初始化密码    | 同一 YAML 中的 `mysql.root-password`；启动脚本读取，不写入 `.env`，不更改已有库密码                        |
-| 硅基流动配置               | `app/.env` 中的 `AICADEMIYA_AI_API_KEY`、`AICADEMIYA_AI_BASE_URL`、`AICADEMIYA_AI_MODEL`，启动脚本自动加载 |
-| 模型其他参数               | `app/config.json` 的 `ai` 节；非空 AI 环境变量优先。可用 `AICADEMIYA_CONFIG` 指定配置路径                  |
-| 上传目录                   | `AICADEMIYA_UPLOAD_DIR`，本机默认 `app/data-local/uploads`                                                 |
+| 硅基流动配置               | `.env` 中的 `AICADEMIYA_AI_API_KEY`、`AICADEMIYA_AI_BASE_URL`、`AICADEMIYA_AI_MODEL`，启动脚本自动加载 |
+| 模型其他参数               | `config.json` 的 `ai` 节；非空 AI 环境变量优先。可用 `AICADEMIYA_CONFIG` 指定配置路径                  |
+| 上传目录                   | `AICADEMIYA_UPLOAD_DIR`，本机默认 `data-local/uploads`                                                 |
 | 文件回收目录               | `AICADEMIYA_TRASH_DIR`，本机默认用户桌面的 `智能体回收站/垃圾桶/AIcademiya`                                |
 | 演示数据                   | `AICADEMIYA_DEMO_ENABLED` 默认 `false`，启动脚本同样默认关闭                                               |
 
-`setup.ps1` 只在 `config.json` 不存在时从 `config.defaults.json` 初始化配置，不覆盖已有配置。Java 业务配置以 `application.yaml` 和 `AppProperties` 为准；默认 JSON 中保留的旧 Python 参数不参与当前业务链路。
+`setup.ps1` 只在 `config.json` 不存在时从 `config.defaults.json` 初始化配置，不覆盖已有配置。Java 业务配置以 `src/main/resources/application.yaml` 和 `AppProperties` 为准，模型模块读取 JSON 中的 `ai` 节。
 
 ## 目录
 
 ```text
 zzm/
+├─ pom.xml                         Maven 工程入口，Java 17
+├─ src/main/
+│  ├─ java/zzm/                    Java 后端
+│  └─ resources/application.yaml   Spring 与 MySQL 配置
+├─ frontend/
+│  ├─ src/
+│  │  ├─ App.vue、main.ts          应用入口、登录及页面切换
+│  │  ├─ views/                  教师对话、任务编辑、学生学习、文件管理
+│  │  ├─ components/             对话、弹窗、上传、材料树、讲义等复用组件
+│  │  ├─ classroom-state.ts      当前用户、课程和页面状态
+│  │  ├─ classroom-api.ts        接口类型及请求
+│  │  ├─ useCourseMaterials.ts   材料加载与处理状态轮询
+│  │  ├─ i18n.ts、locales/       中英界面文案
+│  │  └─ classroom.css、design-tokens.css
+│  ├─ public/                   正式静态资源
+│  ├─ tests/brand-assets.mjs     图标生成工具，由 build:brand 调用
+│  └─ Dockerfile、static-server.mjs、构建配置
+├─ start.*、setup.*、compose.yaml、Dockerfile
+├─ .env、config.json、config.defaults.json
 ├─ README.md
-├─ app/
-│  ├─ frontend/
-│  │  ├─ src/
-│  │  │  ├─ App.vue、main.ts          应用入口、登录及页面切换
-│  │  │  ├─ views/                  教师对话、任务编辑、学生学习、文件管理
-│  │  │  ├─ components/             对话、弹窗、上传、材料树、讲义等复用组件
-│  │  │  ├─ classroom-state.ts      当前用户、课程和页面状态
-│  │  │  ├─ classroom-api.ts        接口类型及请求
-│  │  │  ├─ useCourseMaterials.ts   材料加载与处理状态轮询
-│  │  │  ├─ i18n.ts、locales/       中英界面文案
-│  │  │  └─ classroom.css、design-tokens.css
-│  │  ├─ public/                   正式静态资源
-│  │  ├─ tests/brand-assets.mjs     图标生成工具，由 build:brand 调用
-│  │  └─ Dockerfile、static-server.mjs、构建配置
-│  ├─ server/                      Java 17 后端及 application.yaml
-│  ├─ tools/                       独立维护工具
-│  └─ start.*、setup.*、compose.yaml、Dockerfile、配置文件
-└─ 测试用材料不要删/                用户原始材料
+└─ 测试用材料不要删/              用户原始材料
 ```
 
-`app/tools/export_legacy.py` 是独立的旧 SQLite 数据导出工具，使用 Python 标准库，不依赖已移出的历史后端。指定 `--database`、`--output`，必要时传入 `--catalog`；导入仅面向空的 MySQL 应用库，日常启动不运行迁移。
-
-`app/tools/Recycle-OrphanUploads.ps1` 用于核对无数据库引用的上传文件，默认只列出结果；显式传入 `-Apply` 才移入垃圾桶。它使用 MySQL ODBC 驱动及当前 PowerShell 会话的数据库参数，执行前按实际数据库和上传目录设置。维护工具不在应用请求链路内。
+在 IDEA 中打开项目根目录并导入 `pom.xml` 即可。后端只使用 Java；旧 Python 导出工具及未被使用的独立维护脚本已移出项目。
 
 ## 协作约定
 
@@ -119,6 +119,6 @@ zzm/
 - 保持材料选择、题目导入来源、预览状态独立。保持已发布版本不可变，学习记录绑定明确版本；学生页面与教师学生预览均用公开内容投影，内部提示、参考答案和未审核反馈不展示给学生。
 - Windows 操作使用 PowerShell 7，不启动代理。核对 AI 配置以实际进程、容器挂载和环境变量为准，不用空配置覆盖现有配置，不在输出中展示密钥。
 - 编译、测试、启动以当次授权为准，不新增测试类或测试脚本，不运行无关的全量检查。临时启动的检查服务在检查后停止，用户要求保留的服务及原有服务除外。
-- 不自行修改版本号，不提交、推送 Git 或创建 PR。原课程材料、数据库和本机配置只按明确任务处理。
+- 后续开发统一使用 `master`，不再使用 `cys`。用户已要求本项目完成后直接提交并同步 GitHub，不创建 PR；新增提交留言仅使用实际提交时的北京时间，格式为 `YYYY-MM-DD HH:mm:ss`。不自行修改版本号。原课程材料、数据库和本机配置只按明确任务处理。
 - 删除、清理统一移入 `C:\Users\user\Desktop\智能体回收站\垃圾桶`，不永久删除、不清空垃圾桶，不另外创建备份。
-- 文档集中维护本 README，不保留历史验证流水，不再另建 docs 目录或交付报告。完成后交付实际改动、执行结果和未验证项，等待用户手动验收。
+- 文档集中维护本 README，不保留历史验证流水，不再另建 docs 目录或交付报告。完成后同步 GitHub，交付实际改动、验证结果、未验证项及可核验的提交地址，交互功能由用户手动验收。

@@ -30,15 +30,14 @@ switch ($Component) {
     'backend' {
         if ($NoDemo) { $env:AICADEMIYA_DEMO_ENABLED = 'false' }
         elseif ([string]::IsNullOrWhiteSpace($env:AICADEMIYA_DEMO_ENABLED)) { $env:AICADEMIYA_DEMO_ENABLED = 'false' }
-        Push-Location -LiteralPath (Join-Path $PSScriptRoot 'server')
-        try { & mvn.cmd spring-boot:run } finally { Pop-Location }
+        & mvn.cmd spring-boot:run
     }
     'frontend' {
         Push-Location -LiteralPath (Join-Path $PSScriptRoot 'frontend')
         try { & npm.cmd run dev } finally { Pop-Location }
     }
     'docker' {
-        $configuration = Get-Content -LiteralPath 'server\src\main\resources\application.yaml' -Raw
+        $configuration = Get-Content -LiteralPath 'src\main\resources\application.yaml' -Raw
         $databaseSettings = @{
             MYSQL_USER = '(?m)^ {4}username:\s*(.+)$'
             MYSQL_PASSWORD = '(?m)^ {4}password:\s*(.+)$'
