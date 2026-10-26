@@ -102,6 +102,7 @@ async function load() {
   );
 }
 async function action(fn: () => Promise<void>) {
+  if (busy.value) return;
   busy.value = true;
   error.value = "";
   try {
@@ -182,7 +183,13 @@ void load().catch((e) => (error.value = e.message));
       </p>
     </div>
     <div class="row">
-      <button @click="showInvitation = true">
+      <button
+        :disabled="busy || readingImport"
+        @click="
+          error = '';
+          showInvitation = true;
+        "
+      >
         {{ t("Create student invitation") }}
       </button>
       <label class="button"
@@ -193,13 +200,26 @@ void load().catch((e) => (error.value = e.message));
           hidden
           :disabled="busy"
           @change="readImport" /></label
-      ><button class="primary" @click="showForm = true">
+      ><button
+        class="primary"
+        :disabled="busy || readingImport"
+        @click="
+          error = '';
+          showForm = true;
+        "
+      >
         ＋ {{ t("Add member") }}
       </button>
     </div>
   </header>
   <ProgressStatus v-if="readingImport" :label="t('Reading roster…')" />
-  <p v-if="error" class="error" role="alert">{{ error }}</p>
+  <p
+    v-if="error && !showInvitation && !showForm && !importRows.length"
+    class="error"
+    role="alert"
+  >
+    {{ error }}
+  </p>
   <section
     v-if="invitation?.invitationCode"
     class="panel invitation-result"
@@ -224,7 +244,7 @@ void load().catch((e) => (error.value = e.message));
   <div
     v-if="showInvitation"
     class="modal-backdrop"
-    @click.self="showInvitation = false"
+    @click.self="!busy && (showInvitation = false)"
   >
     <form
       class="modal form-stack"
@@ -234,6 +254,7 @@ void load().catch((e) => (error.value = e.message));
       @submit.prevent="createInvitation"
     >
       <h2>{{ t("Create student invitation") }}</h2>
+      <p v-if="error" class="error" role="alert">{{ error }}</p>
       <label
         >{{ t("Name")
         }}<input v-model="invitationForm.name" required maxlength="100"
@@ -250,7 +271,7 @@ void load().catch((e) => (error.value = e.message));
         }}</small></label
       >
       <div class="row end">
-        <button type="button" @click="showInvitation = false">
+        <button type="button" :disabled="busy" @click="showInvitation = false">
           {{ t("Cancel") }}</button
         ><button class="primary" :disabled="busy">
           {{ t("Create invitation") }}
@@ -308,7 +329,11 @@ void load().catch((e) => (error.value = e.message));
       </tbody>
     </table>
   </section>
-  <div v-if="showForm" class="modal-backdrop" @click.self="showForm = false">
+  <div
+    v-if="showForm"
+    class="modal-backdrop"
+    @click.self="!busy && (showForm = false)"
+  >
     <form
       class="modal form-stack"
       role="dialog"
@@ -317,6 +342,7 @@ void load().catch((e) => (error.value = e.message));
       @submit.prevent="add"
     >
       <h2>{{ t("Add member") }}</h2>
+      <p v-if="error" class="error" role="alert">{{ error }}</p>
       <label
         >{{ t("Name")
         }}<input v-model="form.name" required maxlength="100" /></label
@@ -350,7 +376,7 @@ void load().catch((e) => (error.value = e.message));
         }}
       </p>
       <div class="row end">
-        <button type="button" @click="showForm = false">
+        <button type="button" :disabled="busy" @click="showForm = false">
           {{ t("Cancel") }}</button
         ><button class="primary" :disabled="busy">{{ t("Add") }}</button>
       </div>
@@ -359,7 +385,7 @@ void load().catch((e) => (error.value = e.message));
   <div
     v-if="importRows.length"
     class="modal-backdrop"
-    @click.self="importRows = []"
+    @click.self="!busy && (importRows = [])"
   >
     <form
       class="modal wide form-stack"
@@ -413,7 +439,8 @@ void load().catch((e) => (error.value = e.message));
       <ProgressStatus v-if="readingImport" :label="t('Reading roster…')" />
       <p v-if="error" class="error" role="alert">{{ error }}</p>
       <div class="row end">
-        <button type="button" @click="importRows = []">{{ t("Cancel") }}</button
+        <button type="button" :disabled="busy" @click="importRows = []">
+          {{ t("Cancel") }}</button
         ><button class="primary" :disabled="busy">
           {{ t("Import {0} students", [importRows.length]) }}
         </button>

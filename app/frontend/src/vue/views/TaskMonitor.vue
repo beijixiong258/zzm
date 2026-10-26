@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref } from "vue";
+import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { t } from "../../i18n";
 import {
   call,
@@ -14,6 +14,7 @@ import {
   type Version,
   type Workspace,
 } from "../../classroom-api";
+import { dirty } from "../classroom-state";
 import TaskContent from "../components/TaskContent.vue";
 import RichText from "../components/RichText.vue";
 import RecordHistory from "../components/RecordHistory.vue";
@@ -28,7 +29,8 @@ const error = ref(""),
   loading = ref(true),
   inspecting = ref(false),
   filter = ref(""),
-  note = ref("");
+  note = ref(""),
+  feedbackDrafts = ref<Record<string, string>>({});
 let rosterSequence = 0,
   recordSequence = 0,
   disposed = false;
@@ -44,12 +46,51 @@ const counters = computed(() => ({
   inProgress: students.value.filter((s) => s.status === "inProgress").length,
   completed: students.value.filter((s) => s.status === "completed").length,
 }));
+const edited = computed(() => {
+  const record = selected.value?.record;
+  return (
+    !!record &&
+    (note.value !== (record.teacherNote || "") ||
+      record.messages.some(
+        (message) =>
+          message.pendingReview &&
+          message.requestId &&
+          feedbackDrafts.value[message.requestId] !== undefined &&
+          feedbackDrafts.value[message.requestId] !== message.content,
+      ))
+  );
+});
+watch(edited, (value) => (dirty.value = value), { flush: "sync" });
 function closeRecord() {
-  if (busy.value) return;
+  if (
+    busy.value ||
+    (edited.value && !window.confirm(t("Discard unsaved changes?")))
+  )
+    return false;
   recordSequence++;
   inspecting.value = false;
   selected.value = null;
   note.value = "";
+  feedbackDrafts.value = {};
+  return true;
+}
+function changeVersion(event: Event) {
+  const input = event.target as HTMLSelectElement;
+  const nextVersion = input.value;
+  input.value = versionId.value;
+  if (!closeRecord()) return;
+  versionId.value = nextVersion;
+  void refresh();
+}
+function updateRecord(workspace: Workspace, record: LearningRecord) {
+  const pending = new Set(
+    record.messages
+      .filter((message) => message.pendingReview)
+      .map((message) => message.requestId),
+  );
+  for (const requestId of Object.keys(feedbackDrafts.value))
+    if (!pending.has(requestId)) delete feedbackDrafts.value[requestId];
+  workspace.record = record;
 }
 function isCurrentRecord(
   workspace: Workspace,
@@ -64,10 +105,9 @@ function isCurrentRecord(
   );
 }
 async function refresh() {
-  if (busy.value) return;
+  if (!closeRecord()) return;
   const sequence = ++rosterSequence;
   const requestedVersion = versionId.value;
-  closeRecord();
   students.value = [];
   loading.value = true;
   error.value = "";
@@ -101,7 +141,7 @@ async function load() {
   }
 }
 async function inspect(id: string) {
-  if (busy.value || loading.value) return;
+  if (busy.value || loading.value || !closeRecord()) return;
   const sequence = ++recordSequence;
   selected.value = null;
   note.value = "";
@@ -135,7 +175,7 @@ async function review(status: string) {
       { revision: record.revision, status, teacherNote: note.value },
     );
     if (!isCurrentRecord(workspace, record.id, sequence)) return;
-    workspace.record = saved;
+    updateRecord(workspace, saved);
     const rows = await call<StudentRow[]>(
       `/sessions/${key(props.taskId)}/students${versionParam(requestedVersion)}`,
     );
@@ -162,7 +202,7 @@ async function approve(requestId: string, text: string) {
       { text },
     );
     if (isCurrentRecord(workspace, record.id, sequence))
-      workspace.record = saved;
+      updateRecord(workspace, saved);
   } catch (e) {
     if (isCurrentRecord(workspace, record.id, sequence))
       error.value = (e as Error).message;
@@ -174,6 +214,7 @@ onBeforeUnmount(() => {
   disposed = true;
   rosterSequence++;
   recordSequence++;
+  dirty.value = false;
 });
 void load();
 </script>
@@ -188,9 +229,9 @@ void load();
       <label
         >{{ t("Task version")
         }}<select
-          v-model="versionId"
+          :value="versionId"
           :disabled="busy || loading"
-          @change="refresh"
+          @change="changeVersion"
         >
           <option v-if="!versions.length" value="">
             {{ t("Not published") }}
@@ -340,13 +381,23 @@ void load();
               {{ t("AI feedback is awaiting teacher review.") }}
             </p>
             <textarea
-              v-model="message.content"
+              :value="feedbackDrafts[message.requestId!] ?? message.content"
+              @input="
+                feedbackDrafts[message.requestId!] = (
+                  $event.target as HTMLTextAreaElement
+                ).value
+              "
               :disabled="busy"
               rows="6"
               :aria-label="t('Review AI feedback')"
             /><button
               :disabled="busy"
-              @click="approve(message.requestId!, message.content)"
+              @click="
+                approve(
+                  message.requestId!,
+                  feedbackDrafts[message.requestId!] ?? message.content,
+                )
+              "
             >
               {{ t("Approve and release feedback") }}
             </button></template

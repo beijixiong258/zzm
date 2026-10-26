@@ -42,6 +42,7 @@ watch(
 );
 let active = 0;
 function choose(event: Event) {
+  if (props.disabled) return;
   const input = event.target as HTMLInputElement;
   for (const file of Array.from(input.files || []))
     queue.value.push({
@@ -58,6 +59,7 @@ function choose(event: Event) {
   pump();
 }
 function retry(item: Upload) {
+  if (props.disabled) return;
   item.status = "queued";
   item.error = "";
   item.progress = 0;
@@ -150,6 +152,7 @@ async function send(item: Upload) {
         ><button
           v-if="item.status === 'failed'"
           type="button"
+          :disabled="disabled"
           @click="retry(item)"
         >
           {{ t("Retry") }}

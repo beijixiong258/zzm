@@ -41,6 +41,7 @@ const busy = ref(false),
   error = ref(""),
   success = ref(""),
   loading = ref(true),
+  ready = ref(false),
   job = ref<Job | null>(null),
   selectedMaterial = ref<Material | null>(null);
 const importSources = ref<string[]>([]);
@@ -76,6 +77,8 @@ watch(
   { deep: true, flush: "sync" },
 );
 function accept(value: Task) {
+  if (disposed) return;
+  previewKey.value++;
   draft.value = value;
   baseline.value = JSON.stringify(value);
   dirty.value = false;
@@ -83,9 +86,11 @@ function accept(value: Task) {
 async function loadMaterials() {
   clearTimeout(materialTimer);
   try {
-    materials.value = await call<Material[]>(
+    const loaded = await call<Material[]>(
       `/courses/${key(props.courseId)}/materials`,
     );
+    if (disposed) return;
+    materials.value = loaded;
     if (error.value === materialLoadError) error.value = "";
     materialLoadError = "";
   } catch (e) {
@@ -114,7 +119,11 @@ async function loadMaterials() {
 }
 async function checkContext() {
   const sequence = ++contextSequence;
-  if (!draft.value.title.trim() || disposed) return;
+  if (!draft.value.title.trim() || disposed) {
+    checkingContext.value = false;
+    usage.value = null;
+    return;
+  }
   checkingContext.value = true;
   try {
     const next = await call<ContextUsage>(
@@ -133,6 +142,9 @@ watch(
   draft,
   () => {
     clearTimeout(contextTimer);
+    contextSequence++;
+    checkingContext.value = false;
+    usage.value = null;
     contextTimer = setTimeout(() => void checkContext(), 700);
   },
   { deep: true },
@@ -140,7 +152,7 @@ watch(
 function uploaded(material: Material) {
   materials.value.push(material);
   chooseMaterial(material.id, true);
-  void loadMaterials();
+  void loadMaterials().catch((e) => (error.value = e.message));
 }
 async function retryMaterial() {
   if (!selectedMaterial.value) return;
@@ -152,12 +164,16 @@ async function retryMaterial() {
 async function simulate() {
   await action(async () => {
     await saveDraft();
-    previewKey.value++;
   });
 }
 async function load() {
+  if (disposed) return;
+  loading.value = true;
+  ready.value = false;
+  error.value = "";
   try {
     await loadMaterials();
+    if (disposed) return;
     if (props.taskId) {
       accept(await call<Task>(`/sessions/${key(props.taskId)}`));
       versions.value = await call<Version[]>(
@@ -183,14 +199,15 @@ async function load() {
         );
       accept(task);
     }
+    if (!disposed) ready.value = true;
   } catch (e) {
-    error.value = (e as Error).message;
+    if (!disposed) error.value = (e as Error).message;
   } finally {
-    loading.value = false;
+    if (!disposed) loading.value = false;
   }
 }
 async function action(fn: () => Promise<void>) {
-  if (busy.value) return;
+  if (busy.value || !ready.value || disposed) return;
   busy.value = true;
   error.value = "";
   success.value = "";
@@ -278,7 +295,6 @@ async function poll() {
       }
       accept(await call<Task>(`/generations/${key(next.id)}/apply`, "POST"));
       job.value.status = "applied";
-      previewKey.value++;
       success.value = t(
         "AI content is ready. Review the student preview before publishing.",
       );
@@ -352,7 +368,7 @@ void load();
   </nav>
   <header class="page-heading compact-heading">
     <div>
-      <h1>{{ draft.id ? t("Edit task") : t("Create task") }}</h1>
+      <h1>{{ taskId || draft.id ? t("Edit task") : t("Create task") }}</h1>
       <p class="muted">
         {{
           t(
@@ -368,13 +384,15 @@ void load();
       >
         {{ t("Student progress") }}
       </button>
-      <button :disabled="busy || active || loading" @click="save">
+      <button :disabled="busy || active || loading || !ready" @click="save">
         {{ t("Save draft") }}
       </button>
       <button
         v-if="!workbench"
         class="primary"
-        :disabled="busy || active || loading || !draft.content.handout"
+        :disabled="
+          busy || active || loading || !ready || !draft.content.handout
+        "
         @click="publish"
       >
         {{ t("Publish task") }}
@@ -384,6 +402,9 @@ void load();
   <p v-if="error" role="alert" class="error">{{ systemText(error) }}</p>
   <p v-if="success" role="status" class="success">{{ systemText(success) }}</p>
   <ProgressStatus v-if="loading" :label="t('Loading…')" />
+  <div v-else-if="!ready" class="panel">
+    <button @click="load">{{ t("Retry") }}</button>
+  </div>
   <div v-else class="authoring-layout">
     <div class="authoring-form">
       <fieldset :disabled="busy || !!active" class="panel form-stack">
@@ -450,9 +471,10 @@ void load();
         <FileUploader
           :endpoint="'/courses/' + key(courseId) + '/materials'"
           :visibility="uploadVisibility"
+          :disabled="busy || !!active"
           @pending="pendingUploads = $event"
           @uploaded="uploaded"
-          @settled="loadMaterials"
+          @settled="loadMaterials().catch((e) => (error = e.message))"
         />
         <MaterialTree
           :materials="materials.filter((m) => !m.archived)"

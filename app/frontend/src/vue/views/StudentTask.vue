@@ -32,6 +32,8 @@ const busy = ref(false),
   error = ref(""),
   success = ref(""),
   prompt = ref("");
+const pendingUploads = ref(0),
+  feedbackDrafts = ref<Record<string, string>>({});
 const attachments = ref<Material[]>([]),
   attachmentIds = ref<string[]>([]),
   questionId = ref("");
@@ -52,34 +54,56 @@ const awaiting = computed(() =>
 let timer: ReturnType<typeof setTimeout> | undefined,
   contextTimer: ReturnType<typeof setTimeout> | undefined,
   disposed = false,
-  contextSequence = 0;
+  contextSequence = 0,
+  attachmentSequence = 0,
+  refreshSequence = 0;
 watch(
-  changed,
-  (value) => {
-    if (!props.preview) dirty.value = value;
+  [changed, pendingUploads],
+  ([value, pending]) => {
+    if (!props.preview) dirty.value = value || pending > 0;
   },
   { flush: "sync" },
 );
-function accept(value: LearningRecord) {
-  if (!workspace.value) return;
+function updateRecord(value: LearningRecord) {
+  if (!workspace.value || disposed) return;
+  if (record.value?.id !== value.id) feedbackDrafts.value = {};
+  const pending = new Set(
+    value.messages
+      .filter((message) => message.pendingReview)
+      .map((message) => message.requestId),
+  );
+  for (const requestId of Object.keys(feedbackDrafts.value))
+    if (!pending.has(requestId)) delete feedbackDrafts.value[requestId];
   workspace.value.record = value;
+}
+function accept(value: LearningRecord) {
+  if (!workspace.value || disposed) return;
+  updateRecord(value);
   answers.value = { ...value.answers };
   savedAnswers.value = JSON.stringify(answers.value);
-  if (!props.preview) dirty.value = false;
+  if (!props.preview) dirty.value = changed.value || pendingUploads.value > 0;
 }
 async function loadAttachments() {
   clearTimeout(timer);
   if (!record.value || disposed) return;
+  const recordId = record.value.id;
+  const sequence = ++attachmentSequence;
+  const current = () =>
+    !disposed &&
+    record.value?.id === recordId &&
+    sequence === attachmentSequence;
   try {
-    attachments.value = await call<Material[]>(
-      `/records/${key(record.value.id)}/attachments`,
+    const files = await call<Material[]>(
+      `/records/${key(recordId)}/attachments`,
     );
+    if (!current()) return;
+    attachments.value = files;
     if (awaiting.value) await refreshRecord();
   } catch (e) {
-    if (!disposed) error.value = (e as Error).message;
+    if (current()) error.value = (e as Error).message;
   }
   if (
-    !disposed &&
+    current() &&
     (awaiting.value ||
       attachments.value.some((m) =>
         ["queued", "processing"].includes(m.status),
@@ -89,9 +113,11 @@ async function loadAttachments() {
 }
 async function load() {
   try {
-    workspace.value = await call<Workspace>(
+    const loaded = await call<Workspace>(
       `/sessions/${key(props.taskId)}/${props.preview ? "preview/workspace" : `workspace${versionParam(props.versionId)}`}`,
     );
+    if (disposed) return;
+    workspace.value = loaded;
     if (workspace.value.record) {
       accept(workspace.value.record);
       await loadAttachments();
@@ -102,17 +128,26 @@ async function load() {
   }
 }
 async function refreshRecord() {
-  if (!record.value) return;
+  if (!record.value || disposed || busy.value) return;
+  const recordId = record.value.id;
+  const revision = record.value.revision;
+  const sequence = ++refreshSequence;
+  const current = () =>
+    !disposed &&
+    !busy.value &&
+    sequence === refreshSequence &&
+    record.value?.id === recordId &&
+    record.value.revision === revision;
   if (props.preview) {
     const next = await call<Workspace>(
       `/records/${key(record.value.id)}/observe`,
     );
-    if (next.record && workspace.value) workspace.value.record = next.record;
+    if (next.record && current()) updateRecord(next.record);
   } else {
     const next = await call<Workspace>(
       `/sessions/${key(props.taskId)}/workspace${versionParam(workspace.value?.task.versionId)}`,
     );
-    if (next.record && workspace.value) workspace.value.record = next.record;
+    if (next.record && current()) updateRecord(next.record);
   }
 }
 async function action(fn: () => Promise<void>) {
@@ -129,6 +164,7 @@ async function action(fn: () => Promise<void>) {
   }
 }
 async function start() {
+  if (pendingUploads.value) return;
   await action(async () => {
     accept(
       await call<LearningRecord>(
@@ -165,6 +201,7 @@ async function exportTask() {
   });
 }
 async function resetConversation() {
+  if (pendingUploads.value) return;
   if (
     !window.confirm(
       t(
@@ -194,6 +231,7 @@ async function save() {
   });
 }
 async function submit() {
+  if (pendingUploads.value) return;
   if (!window.confirm(t("Submit your work for teacher review?"))) return;
   await action(async () => {
     await saveAnswers();
@@ -210,11 +248,13 @@ async function submit() {
 async function checkContext() {
   const sequence = ++contextSequence;
   if (
+    disposed ||
     !record.value ||
     !prompt.value.trim() ||
     record.value.conversationLimitReached
   ) {
     usage.value = null;
+    checking.value = false;
     return;
   }
   checking.value = true;
@@ -241,12 +281,15 @@ watch(
   [prompt, attachmentIds, answers],
   () => {
     clearTimeout(contextTimer);
+    contextSequence++;
+    checking.value = false;
+    usage.value = null;
     contextTimer = setTimeout(() => void checkContext(), 500);
   },
   { deep: true },
 );
 async function chat() {
-  if (!prompt.value.trim()) return;
+  if (!prompt.value.trim() || pendingUploads.value) return;
   await action(async () => {
     await saveAnswers();
     if (!record.value) return;
@@ -363,7 +406,11 @@ void load();
         :data-status="record?.status || 'notStarted'"
         >{{ statusText(record?.status || "notStarted") }}</span
       >
-      <button class="primary" :disabled="busy || !workspace" @click="start">
+      <button
+        class="primary"
+        :disabled="busy || pendingUploads > 0 || !workspace"
+        @click="start"
+      >
         {{ t(record ? "Start a new simulation" : "Start simulation") }}
       </button>
     </nav>
@@ -393,7 +440,11 @@ void load();
           ><template v-else-if="!readonly"
             ><button :disabled="busy || !changed" @click="save">
               {{ t("Save answers") }}</button
-            ><button class="primary" :disabled="busy" @click="submit">
+            ><button
+              class="primary"
+              :disabled="busy || pendingUploads > 0"
+              @click="submit"
+            >
               {{ t("Submit for review") }}
             </button></template
           >
@@ -407,6 +458,13 @@ void load();
             }}
           </p>
         </div>
+        <p v-if="pendingUploads" class="notice" role="status">
+          {{
+            t(
+              "Wait for all uploads to finish before submitting or starting a new conversation.",
+            )
+          }}
+        </p>
         <div v-if="record" class="student-attachments form-stack">
           <h3>{{ t("Your documents and images") }}</h3>
           <p class="muted">
@@ -448,6 +506,8 @@ void load();
               :endpoint="`/records/${key(record.id)}/attachments`"
               :extra="{ questionId }"
               :folders="false"
+              :disabled="busy"
+              @pending="pendingUploads = $event"
               @uploaded="uploaded"
               @settled="loadAttachments"
           /></template>
@@ -527,12 +587,25 @@ void load();
                 </p>
                 <template v-if="preview">
                   <textarea
-                    v-model="message.content"
+                    :value="
+                      feedbackDrafts[message.requestId!] ?? message.content
+                    "
+                    :disabled="busy"
+                    @input="
+                      feedbackDrafts[message.requestId!] = (
+                        $event.target as HTMLTextAreaElement
+                      ).value
+                    "
                     rows="6"
                     :aria-label="t('Review AI feedback')"
                   /><button
                     :disabled="busy"
-                    @click="approve(message.requestId!, message.content)"
+                    @click="
+                      approve(
+                        message.requestId!,
+                        feedbackDrafts[message.requestId!] ?? message.content,
+                      )
+                    "
                   >
                     {{ t("Approve and release feedback") }}
                   </button></template
@@ -556,7 +629,7 @@ void load();
           />
           <button
             v-if="!readonly"
-            :disabled="busy || awaiting"
+            :disabled="busy || pendingUploads > 0 || awaiting"
             @click="resetConversation"
           >
             {{ t("Start a new conversation") }}
@@ -588,6 +661,7 @@ void load();
               class="primary"
               :disabled="
                 busy ||
+                pendingUploads > 0 ||
                 awaiting ||
                 record.conversationLimitReached ||
                 !prompt.trim() ||

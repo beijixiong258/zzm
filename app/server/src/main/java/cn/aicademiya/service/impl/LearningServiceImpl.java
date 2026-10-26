@@ -173,7 +173,7 @@ public class LearningServiceImpl extends ServiceImpl<LearningRecordMapper, Learn
         sessions.require(record.getSessionId(), user, true);
         if (!Set.of("submitted", "confirmed", "needsRevision").contains(record.getStatus())) throw error(409, "The student has not submitted this task");
         record.setStatus(input.getStatus()); record.setTeacherNote(input.getTeacherNote()); record.setReviewedAt(LocalDateTime.now(ZoneOffset.UTC));
-        saveRevision(record, input.getRevision()); return view(record);
+        saveRevision(record, input.getRevision()); return recordView(record, true);
     }
     @Override public List<Map<String, Object>> history(AccountUser user) {
         if (Boolean.TRUE.equals(user.getMustChangePassword())) throw error(403, "Password change required");
