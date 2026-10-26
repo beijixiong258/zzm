@@ -656,35 +656,83 @@ void load();
           </div>
         </template>
         <template #results>
-          <details v-if="draft.title" class="conversation-result">
+          <details class="conversation-result" open>
             <summary>{{ t("Current task configuration") }}</summary>
-            <dl class="configuration-summary">
-              <dt>{{ t("Task name") }}</dt>
-              <dd>{{ draft.title }}</dd>
-              <dt>{{ t("Task type") }}</dt>
-              <dd>
-                {{
-                  t(
-                    draft.sessionType === "assignment"
-                      ? "Assignment"
-                      : "AI tutor",
-                  )
-                }}
-              </dd>
-              <dt>{{ t("Teaching language") }}</dt>
-              <dd>
-                {{ draft.teachingLanguage === "zh-CN" ? "中文" : "English" }}
-              </dd>
-              <dt>{{ t("Learning goals") }}</dt>
-              <dd>{{ draft.learningGoals || "—" }}</dd>
-              <dt>{{ t("Additional instructions for AI") }}</dt>
-              <dd>{{ draft.additionalInstructions || "—" }}</dd>
-            </dl>
+            <p class="muted">
+              {{
+                t(
+                  "Edit these fields directly, or describe changes in the conversation.",
+                )
+              }}
+            </p>
+            <form @submit.prevent="save">
+              <fieldset :disabled="busy || chatBusy || !!active">
+                <dl class="configuration-summary">
+                  <dt>
+                    <label for="task-title">{{ t("Task name") }}</label>
+                  </dt>
+                  <dd>
+                    <input
+                      id="task-title"
+                      v-model.trim="draft.title"
+                      maxlength="300"
+                      required
+                    />
+                  </dd>
+                  <dt>
+                    <label for="task-type">{{ t("Task type") }}</label>
+                  </dt>
+                  <dd>
+                    <select id="task-type" v-model="draft.sessionType">
+                      <option value="tutor">{{ t("AI tutor") }}</option>
+                      <option value="assignment">{{ t("Assignment") }}</option>
+                    </select>
+                  </dd>
+                  <dt>
+                    <label for="task-language">{{
+                      t("Teaching language")
+                    }}</label>
+                  </dt>
+                  <dd>
+                    <select id="task-language" v-model="draft.teachingLanguage">
+                      <option value="zh-CN">中文</option>
+                      <option value="en">English</option>
+                    </select>
+                  </dd>
+                  <dt>
+                    <label for="task-learning-goals">{{
+                      t("Learning goals")
+                    }}</label>
+                  </dt>
+                  <dd>
+                    <textarea
+                      id="task-learning-goals"
+                      v-model="draft.learningGoals"
+                      rows="3"
+                      maxlength="20000"
+                    />
+                  </dd>
+                  <dt>
+                    <label for="task-instructions">{{
+                      t("Additional instructions for AI")
+                    }}</label>
+                  </dt>
+                  <dd>
+                    <textarea
+                      id="task-instructions"
+                      v-model="draft.additionalInstructions"
+                      rows="3"
+                      maxlength="20000"
+                    />
+                  </dd>
+                </dl>
+                <button class="primary" type="submit">
+                  {{ t("Save draft") }}
+                </button>
+              </fieldset>
+            </form>
           </details>
           <div class="conversation-actions row wrap">
-            <button :disabled="busy || chatBusy || !!active" @click="save">
-              {{ t("Save draft") }}
-            </button>
             <button
               :disabled="
                 busy ||
