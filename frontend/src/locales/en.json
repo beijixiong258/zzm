@@ -1374,5 +1374,7 @@
   "The provider rejected this request.": "The provider rejected this request.",
   "Course instructions": "Course instructions",
   "No questions were extracted from the selected source materials.": "No questions were extracted from the selected source materials.",
-  "Imported questions must reference only the selected question source materials. Review the model response and retry.": "Imported questions must reference only the selected question source materials. Review the model response and retry."
+  "Imported questions must reference only the selected question source materials. Review the model response and retry.": "Imported questions must reference only the selected question source materials. Review the model response and retry.",
+  "Edit these fields directly, or describe changes in the conversation.": "Edit these fields directly, or describe changes in the conversation.",
+  "Save course configuration": "Save course configuration"
 }

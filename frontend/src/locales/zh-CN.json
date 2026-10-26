@@ -1374,5 +1374,7 @@
   "The provider rejected this request.": "上游服务商拒绝了本次请求。",
   "Course instructions": "课程通用指令",
   "No questions were extracted from the selected source materials.": "未能从指定来源材料中提取到题目。",
-  "Imported questions must reference only the selected question source materials. Review the model response and retry.": "导入题目必须仅引用指定的原题来源材料。请查看模型返回后重试。"
+  "Imported questions must reference only the selected question source materials. Review the model response and retry.": "导入题目必须仅引用指定的原题来源材料。请查看模型返回后重试。",
+  "Edit these fields directly, or describe changes in the conversation.": "可直接编辑以下字段，也可以在对话中提出修改要求。",
+  "Save course configuration": "保存课程配置"
 }

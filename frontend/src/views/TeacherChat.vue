@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, onBeforeUnmount, ref, watch } from "vue";
 import {
   call,
   key,
@@ -7,9 +7,10 @@ import {
   type Member,
   type TeacherReply,
 } from "../classroom-api";
-import { t } from "../i18n";
+import { systemText, t } from "../i18n";
 import {
   courses,
+  dirty,
   navigate,
   refreshCourses,
   retainCourseAddress,
@@ -24,18 +25,59 @@ const form = ref({
   title: existing?.title || "",
   code: existing?.code || "",
   description: existing?.description || "",
-  courseInformation: existing?.courseInformation || "",
+  courseInformation: existing?.courseInformation || existing?.description || "",
   studentProfile: existing?.studentProfile || "",
   systemInstructions: existing?.systemInstructions || "",
 });
 const members = ref<Member[] | null>(null),
-  chatting = ref(false);
+  chatting = ref(false),
+  saving = ref(false),
+  saved = ref(false),
+  error = ref("");
+let savedConfiguration = JSON.stringify(form.value);
+watch(
+  form,
+  () => {
+    dirty.value = JSON.stringify(form.value) !== savedConfiguration;
+    saved.value = false;
+    error.value = "";
+  },
+  { deep: true, flush: "sync" },
+);
+onBeforeUnmount(() => {
+  dirty.value = false;
+});
 const conversationKey = computed(
   () => `${user.value?.id}:course:${currentId.value || "new"}`,
 );
 const courseTasks = computed(() =>
   (tasks.value[currentId.value] || []).filter((task) => !task.archived),
 );
+async function saveCourse() {
+  const course = await call<Course>(
+    currentId.value ? "/courses/" + key(currentId.value) : "/courses",
+    currentId.value ? "PUT" : "POST",
+    form.value,
+  );
+  currentId.value = course.id;
+  savedConfiguration = JSON.stringify(form.value);
+  dirty.value = false;
+  retainCourseAddress(course.id);
+  await refreshCourses();
+}
+async function save() {
+  saving.value = true;
+  saved.value = false;
+  error.value = "";
+  try {
+    await saveCourse();
+    saved.value = true;
+  } catch (e) {
+    error.value = systemText((e as Error).message);
+  } finally {
+    saving.value = false;
+  }
+}
 async function configure(reply: TeacherReply) {
   const courseFields = Object.keys(form.value) as (keyof typeof form.value)[];
   const changed = courseFields.filter((name) =>
@@ -49,14 +91,7 @@ async function configure(reply: TeacherReply) {
         "The course draft is retained here. Provide a course name and code to save it.",
       );
     } else {
-      const course = await call<Course>(
-        currentId.value ? `/courses/${key(currentId.value)}` : "/courses",
-        currentId.value ? "PUT" : "POST",
-        form.value,
-      );
-      currentId.value = course.id;
-      retainCourseAddress(course.id);
-      await refreshCourses();
+      await saveCourse();
       outcome = t("Course configuration saved.");
     }
   }
@@ -129,7 +164,7 @@ async function configure(reply: TeacherReply) {
       </div>
       <button
         v-if="currentId"
-        :disabled="chatting"
+        :disabled="chatting || saving"
         @click="navigate({ page: 'materials', courseId: currentId })"
       >
         {{ t("File management") }}
@@ -143,6 +178,7 @@ async function configure(reply: TeacherReply) {
         courseDraft: form,
       }"
       :apply-reply="configure"
+      :disabled="saving"
       @pending="chatting = $event"
       :welcome="
         t(
@@ -151,30 +187,99 @@ async function configure(reply: TeacherReply) {
       "
     >
       <template #results>
-        <section v-if="form.title || currentId" class="conversation-result">
+        <section class="conversation-result">
           <strong>{{ t("Current course configuration") }}</strong>
-          <dl class="configuration-summary">
-            <dt>{{ t("Course name") }}</dt>
-            <dd>{{ form.title || "—" }}</dd>
-            <dt>{{ t("Course code") }}</dt>
-            <dd>{{ form.code || "—" }}</dd>
-            <dt>{{ t("Course information") }}</dt>
-            <dd>{{ form.courseInformation || form.description || "—" }}</dd>
-            <dt>{{ t("Student profile") }}</dt>
-            <dd>{{ form.studentProfile || "—" }}</dd>
-            <dt>{{ t("Course instructions") }}</dt>
-            <dd>{{ form.systemInstructions || "—" }}</dd>
-          </dl>
+          <p class="muted">
+            {{
+              t(
+                "Edit these fields directly, or describe changes in the conversation.",
+              )
+            }}
+          </p>
+          <form @submit.prevent="save">
+            <fieldset :disabled="chatting || saving">
+              <dl class="configuration-summary">
+                <dt>
+                  <label for="course-title">{{ t("Course name") }}</label>
+                </dt>
+                <dd>
+                  <input
+                    id="course-title"
+                    v-model.trim="form.title"
+                    maxlength="300"
+                    required
+                  />
+                </dd>
+                <dt>
+                  <label for="course-code">{{ t("Course code") }}</label>
+                </dt>
+                <dd>
+                  <input
+                    id="course-code"
+                    v-model.trim="form.code"
+                    maxlength="100"
+                    required
+                  />
+                </dd>
+                <dt>
+                  <label for="course-information">{{
+                    t("Course information")
+                  }}</label>
+                </dt>
+                <dd>
+                  <textarea
+                    id="course-information"
+                    v-model="form.courseInformation"
+                    rows="3"
+                    maxlength="20000"
+                  />
+                </dd>
+                <dt>
+                  <label for="course-student-profile">{{
+                    t("Student profile")
+                  }}</label>
+                </dt>
+                <dd>
+                  <textarea
+                    id="course-student-profile"
+                    v-model="form.studentProfile"
+                    rows="3"
+                    maxlength="20000"
+                  />
+                </dd>
+                <dt>
+                  <label for="course-instructions">{{
+                    t("Course instructions")
+                  }}</label>
+                </dt>
+                <dd>
+                  <textarea
+                    id="course-instructions"
+                    v-model="form.systemInstructions"
+                    rows="3"
+                    maxlength="20000"
+                  />
+                </dd>
+              </dl>
+              <button class="primary" type="submit">
+                {{ t(saving ? "Saving…" : "Save course configuration") }}
+              </button>
+            </fieldset>
+            <p v-if="saved" class="success" role="status">
+              {{ t("Course configuration saved.") }}
+            </p>
+            <p v-if="error" class="error" role="alert">{{ error }}</p>
+          </form>
           <div v-if="currentId" class="row wrap">
             <button
               class="primary"
-              :disabled="chatting"
+              :disabled="chatting || saving"
               @click="navigate({ page: 'task', courseId: currentId })"
             >
               ＋ {{ t("New task conversation") }}
             </button>
             <button
-              :disabled="chatting"
+              :disabled="chatting || saving"
               @click="navigate({ page: 'materials', courseId: currentId })"
             >
               {{ t("File management") }}
@@ -184,7 +289,7 @@ async function configure(reply: TeacherReply) {
             <button
               v-for="task in courseTasks"
               :key="task.id"
-              :disabled="chatting"
+              :disabled="chatting || saving"
               @click="
                 navigate({ page: 'task', courseId: currentId, taskId: task.id })
               "
