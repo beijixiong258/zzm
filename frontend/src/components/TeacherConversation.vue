@@ -7,7 +7,7 @@ import ContextMeter from "./ContextMeter.vue";
 const props = defineProps<{
   conversationKey: string;
   context: Record<string, unknown>;
-  applyReply: (reply: TeacherReply) => Promise<string | void>;
+  applyReply: (reply: TeacherReply, message: string) => Promise<string | void>;
   disabled?: boolean;
   welcome: string;
 }>();
@@ -83,7 +83,7 @@ async function send() {
       history: messages.value,
       locale: locale.value,
     });
-    const outcome = await props.applyReply(response);
+    const outcome = await props.applyReply(response, message);
     messages.value.push(
       { role: "user", content: message },
       {

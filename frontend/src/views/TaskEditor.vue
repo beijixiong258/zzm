@@ -247,7 +247,10 @@ async function save() {
     success.value = t("Draft saved.");
   });
 }
-async function generate(kind = "generate") {
+async function generate(
+  kind = "generate",
+  instruction = draft.value.additionalInstructions,
+) {
   if (pendingUploads.value) return false;
   importSources.value = importSources.value.filter((id) =>
     draft.value.materialIds.includes(id),
@@ -272,7 +275,7 @@ async function generate(kind = "generate") {
         revision: draft.value.revision,
         kind,
         sourceMaterialIds: importSources.value,
-        instruction: draft.value.additionalInstructions,
+        instruction,
       },
     );
     accept(await call<Task>(`/sessions/${key(draft.value.id)}`));
@@ -451,7 +454,7 @@ async function approveObserved(message: ChatMessage) {
     if (observed.value === workspace) workspace.record = saved;
   });
 }
-async function configure(reply: TeacherReply) {
+async function configure(reply: TeacherReply, message: string) {
   const fields = [
     "title",
     "description",
@@ -501,7 +504,7 @@ async function configure(reply: TeacherReply) {
         "\n" +
         t("Wait for the current uploads to finish before generating.")
       );
-    const started = await generate(reply.action);
+    const started = await generate(reply.action, message);
     if (error.value) throw Error(error.value);
     if (started)
       outcome += "\n" + t("Generation started. Progress is shown below.");

@@ -257,6 +257,9 @@ public class AiService {
             Never modify question content, answers, source references, materials, permissions or IDs through fields.
             action is exactly one of none, newTask, selectFiles, generate, import, revise, preview, publish,
             members, progress, inviteStudent, files. Choose an action ONLY when the latest teacher message requests it.
+            Updating basic course or task fields uses action none, including requests to change or save those fields.
+            generate, import and revise refer to lesson or question content, not basic fields. If the teacher defers
+            content work, use none. Use revise only for an explicit request to revise existing lesson or question content.
             For inviteStudent only, use fields studentName and studentUsername; never invent credentials.
             Selection and publish actions open explicit controls; the model cannot publish on its own.
             Questions without source reference answers remain blank. Give qualitative feedback, never scores or grades.
