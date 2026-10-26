@@ -16,6 +16,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import java.io.IOException;
 import java.nio.file.*;
@@ -36,7 +37,7 @@ public class MaterialServiceImpl extends ServiceImpl<CourseMaterialMapper, Cours
     private final LearningRecordMapper records;
     @Override public List<Map<String, Object>> library(String courseId, AccountUser user) {
         courses.requireAccess(courseId, user, true);
-        return lambdaQuery().eq(CourseMaterial::getCourseId, courseId).isNull(CourseMaterial::getOwnerId).orderByAsc(CourseMaterial::getRelativePath).list().stream().map(this::view).toList();
+        return lambdaQuery().eq(CourseMaterial::getCourseId, courseId).isNull(CourseMaterial::getOwnerId).isNull(CourseMaterial::getFileRemovedAt).orderByAsc(CourseMaterial::getRelativePath).list().stream().map(this::view).toList();
     }
     @Override public CourseMaterial upload(String courseId, MultipartFile file, String relativePath, String visibility, AccountUser user) {
         courses.requireAccess(courseId, user, true);
@@ -95,6 +96,7 @@ public class MaterialServiceImpl extends ServiceImpl<CourseMaterialMapper, Cours
         CourseMaterial material = getById(id);
         if (material == null) throw error(404, "Material not found");
         courses.requireAccess(material.getCourseId(), user, !"student".equals(user.getRole()));
+        if (material.getFileRemovedAt() != null) throw error(410, "This material has been removed.");
         if (material.getOwnerId() != null) {
             if (!material.getOwnerId().equals(user.getId()) && "student".equals(user.getRole())) throw error(403, "Attachment access denied");
             if (Boolean.TRUE.equals(material.getArchived())) throw error(410, "This attachment has been removed.");
@@ -121,6 +123,26 @@ public class MaterialServiceImpl extends ServiceImpl<CourseMaterialMapper, Cours
     @Override public void archive(String id, boolean archived, AccountUser user) {
         CourseMaterial material = requireFile(id, null, user); courses.requireAccess(material.getCourseId(), user, true);
         lambdaUpdate().eq(CourseMaterial::getId, id).set(CourseMaterial::getArchived, archived).update();
+    }
+    @Override @Transactional public void removeMaterial(String id, AccountUser user) {
+        CourseMaterial material = lambdaQuery().eq(CourseMaterial::getId, id).last("FOR UPDATE").one();
+        if (material == null) throw error(404, "Material not found");
+        courses.requireAccess(material.getCourseId(), user, true);
+        if (material.getOwnerId() != null) throw error(422, "Student attachments must be removed from their learning record.");
+        if (material.getFileRemovedAt() != null) return;
+        List<TeachingSession> drafts = sessions.selectList(Wrappers.<TeachingSession>lambdaQuery()
+            .eq(TeachingSession::getCourseId, material.getCourseId()));
+        List<String> references = drafts.stream().filter(task -> JSONUtil.toList(task.getMaterialIdsJson(), String.class).contains(id))
+            .map(TeachingSession::getTitle).toList();
+        if (!references.isEmpty()) throw error(409, "Material is used by tasks. Remove its references or archive it: " + String.join(", ", references));
+        boolean published = versions.selectList(Wrappers.<SessionVersion>lambdaQuery().eq(SessionVersion::getCourseId, material.getCourseId())).stream()
+            .anyMatch(version -> {
+                JSONArray source = JSONUtil.parseObj(version.getContentJson()).getJSONArray("materialIds");
+                return source != null && source.contains(id);
+            });
+        if (published) throw error(409, "Material is retained by a published version. Archive it to preserve existing learning records.");
+        lambdaUpdate().eq(CourseMaterial::getId, id).set(CourseMaterial::getArchived, true)
+            .set(CourseMaterial::getFileRemovedAt, LocalDateTime.now(ZoneOffset.UTC)).set(CourseMaterial::getRemovedBy, user.getId()).update();
     }
     @Override public void retry(String id, AccountUser user) {
         CourseMaterial material = requireFile(id, null, user);
@@ -191,19 +213,18 @@ public class MaterialServiceImpl extends ServiceImpl<CourseMaterialMapper, Cours
         catch (IOException exception) { log.warn("Uncommitted upload could not be moved to the recycle directory: {}", source.getFileName()); }
     }
     @Override public synchronized void recycleRemovedAttachments() {
-        List<CourseMaterial> removed = lambdaQuery().eq(CourseMaterial::getArchived, true).isNotNull(CourseMaterial::getOwnerId)
+        List<CourseMaterial> removed = lambdaQuery().eq(CourseMaterial::getArchived, true)
             .isNotNull(CourseMaterial::getFileRemovedAt).isNull(CourseMaterial::getTrashPath).ne(CourseMaterial::getStatus, "processing")
             .orderByAsc(CourseMaterial::getFileRemovedAt).page(new Page<CourseMaterial>(1, 50, false)).getRecords();
         for (CourseMaterial attachment : removed) {
-            // Even archived references count: copied course materials may share physical storage.
-            if (lambdaQuery().eq(CourseMaterial::getStoragePath, attachment.getStoragePath()).ne(CourseMaterial::getId, attachment.getId()).exists()) {
-                log.warn("Attachment {} has shared storage; recycling skipped", attachment.getId()); continue;
-            }
+            List<CourseMaterial> shared = lambdaQuery().eq(CourseMaterial::getStoragePath, attachment.getStoragePath()).list();
+            if (shared.stream().anyMatch(file -> file.getFileRemovedAt() == null || "processing".equals(file.getStatus()))) continue;
+            if (shared.stream().allMatch(file -> file.getTrashPath() != null)) continue;
             try {
-                Path destination = moveToRecycle(Path.of(attachment.getStoragePath()), "removed-attachments");
+                Path destination = moveToRecycle(Path.of(attachment.getStoragePath()), "removed-materials");
                 if (attachment.getFileSize() != null && Files.size(destination) != attachment.getFileSize())
                     throw new IOException("Recycled file size differs from metadata");
-                lambdaUpdate().eq(CourseMaterial::getId, attachment.getId()).eq(CourseMaterial::getArchived, true)
+                lambdaUpdate().in(CourseMaterial::getId, shared.stream().map(CourseMaterial::getId).toList()).isNotNull(CourseMaterial::getFileRemovedAt)
                     .isNull(CourseMaterial::getTrashPath).set(CourseMaterial::getTrashPath, destination.toString()).update();
             } catch (IOException | RuntimeException exception) {
                 log.warn("Attachment {} could not be recycled ({}); the background job will retry", attachment.getId(), exception.getClass().getSimpleName());
@@ -249,7 +270,9 @@ public class MaterialServiceImpl extends ServiceImpl<CourseMaterialMapper, Cours
     }
     @Override public List<CourseMaterial> selected(String courseId, List<String> ids) {
         if (ids == null || ids.isEmpty()) return List.of();
-        List<CourseMaterial> result = lambdaQuery().eq(CourseMaterial::getCourseId, courseId).isNull(CourseMaterial::getOwnerId).in(CourseMaterial::getId, ids).eq(CourseMaterial::getArchived, false).list();
+        var query = lambdaQuery().eq(CourseMaterial::getCourseId, courseId).isNull(CourseMaterial::getOwnerId).in(CourseMaterial::getId, ids).eq(CourseMaterial::getArchived, false).isNull(CourseMaterial::getFileRemovedAt);
+        if (TransactionSynchronizationManager.isActualTransactionActive()) query.last("FOR UPDATE");
+        List<CourseMaterial> result = query.list();
         if (result.size() != new HashSet<>(ids).size()) throw error(422, "Selected materials must belong to this course and be active");
         return result;
     }

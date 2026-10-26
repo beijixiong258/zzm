@@ -161,7 +161,7 @@ public class PdfInputReader {
             result.setStatus(complete(report) ? "ready" : "incomplete");
             if (!complete(report)) result.setWarning("PDF preparation is incomplete. Reprocess the file before using it.");
             else if (report.getImageInputTokensEstimated() > ContextBudget.INPUT_LIMIT)
-                result.setWarning("The PDF images alone exceed the 40,000-token input limit. Split the PDF before using it with AI.");
+                result.setWarning("Local token estimate is high. This is advisory only; the provider determines capacity and actual usage.");
         } catch (IOException | RuntimeException exception) {
             log.warn("PDF preparation failed ({})", exception.getClass().getSimpleName());
             report.getFailedUnits().add("Document");

@@ -50,7 +50,7 @@ public class QwenClient {
         return complete(messages, output, json, images, ContextBudget.SAFETY, progress);
     }
     private Completion complete(List<Message> messages, int output, boolean json, int images, int safetyReserve, java.util.function.IntConsumer progress) {
-        Map<String, Object> measurement = budget.require(messages, output, images, safetyReserve);
+        Map<String, Object> measurement = budget.describe(messages, output, images, safetyReserve);
         boolean acquired = false;
         try {
             acquired = slots.tryAcquire(10, TimeUnit.SECONDS);
@@ -91,7 +91,7 @@ public class QwenClient {
                 finish = response.getResult().getMetadata().getFinishReason();
             }
             if (response == null) throw error(502, "AI returned an empty response");
-            if ("length".equalsIgnoreCase(finish)) throw error(502, "AI response was truncated. Reduce the material size and retry.");
+            if ("length".equalsIgnoreCase(finish)) throw error(502, "Upstream AI response was truncated (finish_reason=length). Check the model output token setting and retry.");
             if ("content_filter".equalsIgnoreCase(finish)) throw error(502, "AI could not process this content. Check the selected material.");
             if (text == null || text.isBlank()) throw error(502, "AI returned an empty response");
             if (response.getMetadata() != null && response.getMetadata().getUsage() != null) {
@@ -105,24 +105,44 @@ public class QwenClient {
         } catch (InterruptedException exception) {
             Thread.currentThread().interrupt(); throw error(503, "AI request was interrupted. Try again when ready.");
         } catch (ResponseStatusException exception) { throw exception;
-        } catch (NonTransientAiException exception) { throw error(502, exception.getMessage());
+        } catch (NonTransientAiException | TransientAiException exception) { throw error(502, exception.getMessage());
         } catch (org.springframework.web.reactive.function.client.WebClientResponseException exception) {
             int status = exception.getStatusCode().value();
-            String detail = switch (status) {
-                case 401, 403 -> "AI authentication failed. Check the API key and model permissions.";
-                case 404 -> "AI model or API endpoint was not found. Check the configuration.";
-                case 413 -> "AI request is too large. Reduce the material or image size.";
-                case 429 -> "All AI request slots are busy. Your work is saved; try again shortly.";
-                default -> status >= 500 ? "AI service is temporarily unavailable. Your work is saved; try again shortly."
-                    : "AI rejected the request (HTTP " + status + "). Check the model input format and context limit.";
-            };
             log.warn("AI streaming request failed (HTTP {})", status);
-            throw error(502, detail);
+            throw error(502, providerError(status, exception.getResponseBodyAsString()));
         } catch (RuntimeException exception) {
+            for (Throwable cause = exception; cause != null; cause = cause.getCause()) {
+                if (cause instanceof org.springframework.web.reactive.function.client.WebClientResponseException response)
+                    throw error(502, providerError(response.getStatusCode().value(), response.getResponseBodyAsString()));
+                if (cause instanceof NonTransientAiException || cause instanceof TransientAiException)
+                    throw error(502, cause.getMessage());
+                if (cause instanceof java.util.concurrent.TimeoutException || cause instanceof java.net.SocketTimeoutException)
+                    throw error(504, "Upstream AI request timed out after limited retries. No incomplete result was applied.");
+            }
             log.warn("AI request failed: {} (cause: {})", exception.getClass().getSimpleName(),
                 exception.getCause() == null ? "none" : exception.getCause().getClass().getSimpleName());
-            throw error(502, "AI connection timed out or the service is unavailable after limited retries. Check the connection and try again.");
+            throw error(502, "AI connection or response processing failed (" + exception.getClass().getSimpleName() + "). No incomplete result was applied.");
         } finally { if (acquired) slots.release(); }
+    }
+    private String providerError(int status, String body) {
+        String reason = Objects.toString(body, "").strip();
+        try {
+            JSONObject response = JSONUtil.parseObj(reason);
+            Object detail = response.get("error");
+            reason = detail instanceof JSONObject problem ? problem.getStr("message", problem.toString())
+                : response.getStr("message", Objects.toString(detail, reason));
+        } catch (RuntimeException ignored) { /* Preserve non-JSON provider diagnostics. */ }
+        String key = environment("AICADEMIYA_AI_API_KEY", configuration().getStr("api_key", ""));
+        if (!key.isBlank()) reason = reason.replace(key, "[redacted]");
+        if (reason.length() > 2000) reason = reason.substring(0, 2000) + "…";
+        if (reason.isBlank()) reason = status == 429 ? "Provider rate limit or quota exceeded." : "The provider rejected this request.";
+        return "Upstream AI request failed (HTTP " + status + "): " + reason;
+    }
+    public int outputTokens(String operation, int fallback) {
+        JSONObject ai = configuration();
+        int output = ai.getInt(operation + "_max_tokens", ai.getInt("max_tokens", fallback));
+        if (output < 1) throw error(422, "The configured AI output token limit must be positive.");
+        return output;
     }
     public JSONObject configuration() {
         try {
@@ -135,7 +155,8 @@ public class QwenClient {
         JSONObject ai = configuration();
         return Map.of("model", environment("AICADEMIYA_AI_MODEL", ai.getStr("model", "Qwen/Qwen3.8-27B")),
             "configured", !environment("AICADEMIYA_AI_API_KEY", ai.getStr("api_key", "")).isBlank(),
-            "contextWindow", ContextBudget.WINDOW, "inputLimit", ContextBudget.INPUT_LIMIT, "safetyReserve", ContextBudget.SAFETY);
+            "contextWindow", ContextBudget.WINDOW, "inputLimit", ContextBudget.INPUT_LIMIT, "safetyReserve", ContextBudget.SAFETY,
+            "tokenEstimateOnly", true);
     }
     private ChatClient client(int output, boolean json) {
         JSONObject ai = configuration();
@@ -162,13 +183,8 @@ public class QwenClient {
                 @Override public boolean hasError(ClientHttpResponse response) throws IOException { return response.getStatusCode().isError(); }
                 @Override public void handleError(URI url, HttpMethod method, ClientHttpResponse response) throws IOException {
                     int status = response.getStatusCode().value();
-                    if (status == 429 || status >= 500) throw new TransientAiException("AI service is busy (HTTP " + status + ")");
-                    String detail = switch (status) {
-                        case 401, 403 -> "AI authentication failed. Check the API key and model permissions.";
-                        case 404 -> "AI model or API endpoint was not found. Check the configuration.";
-                        case 413 -> "AI request is too large. Reduce the material or image size.";
-                        default -> "AI rejected the request (HTTP " + status + "). Check the model input format and context limit.";
-                    };
+                    String detail = providerError(status, new String(response.getBody().readNBytes(8192), StandardCharsets.UTF_8));
+                    if (status == 429 || status >= 500) throw new TransientAiException(detail);
                     throw new NonTransientAiException(detail);
                 }
             }).build();

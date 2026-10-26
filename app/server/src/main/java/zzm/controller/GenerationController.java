@@ -20,7 +20,7 @@ public class GenerationController {
         return generations.listJobs(id, accounts.current(request));
     }
     @PostMapping("/generations/{id}/apply") public Object apply(@PathVariable String id, HttpServletRequest request) { return sessions.view(generations.apply(id, accounts.current(request)), true); }
-    @PostMapping("/teacher/assistant") public Object assistant(@Valid @RequestBody Requests.Chat input, HttpServletRequest request) {
+    @PostMapping("/teacher/assistant") public Object assistant(@Valid @RequestBody Requests.TeacherChat input, HttpServletRequest request) {
         return generations.assistTeacher(input, accounts.current(request));
     }
 }

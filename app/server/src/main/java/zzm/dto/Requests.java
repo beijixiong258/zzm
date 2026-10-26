@@ -9,6 +9,21 @@ import java.util.Map;
 
 public final class Requests {
     private Requests() {}
+    @Data public static class TeacherChat {
+        @NotBlank @Size(max = 10000) private String message;
+        @Pattern(regexp = "course|task") private String scope = "course";
+        @Pattern(regexp = "zh-CN|en") private String locale = "zh-CN";
+        @Size(max = 64) private String courseId;
+        @Size(max = 64) private String taskId;
+        private CourseInput courseDraft;
+        private SessionInput taskDraft;
+        @NotNull @Size(max = 1000) private List<@NotNull @Valid ChatMessage> history = new ArrayList<>();
+    }
+    @Data public static class TeacherReply {
+        private String message;
+        private Map<String, String> fields = new java.util.LinkedHashMap<>();
+        private String action = "none";
+    }
     @Data public static class StudentLogin {
         @NotBlank @Size(max = 64) private String username;
         @NotBlank @Size(max = 128) private String invitationCode;

@@ -71,6 +71,28 @@ export function t(key: string, values: readonly unknown[] = []): string {
 
 /** Translate known server messages without hiding unfamiliar diagnostics. */
 export function systemText(value: string): string {
+  const question = value.match(/^Question (\d+): ([\s\S]*)$/);
+  if (question)
+    return t("Question {0}", [question[1]]) + ": " + systemText(question[2]);
+  const upstream = value.match(
+    /^Upstream AI request failed \(HTTP (\d+)\): ([\s\S]*)$/,
+  );
+  if (upstream)
+    return (
+      t("Upstream AI request failed (HTTP {0})", [upstream[1]]) +
+      ": " +
+      systemText(upstream[2])
+    );
+  for (const prefix of [
+    "Material preparation failed",
+    "Model output parsing failed",
+    "Question validation failed",
+    "AI request failed",
+    "Material is used by tasks. Remove its references or archive it",
+  ]) {
+    if (value.startsWith(prefix + ": "))
+      return t(prefix) + ": " + systemText(value.slice(prefix.length + 2));
+  }
   const translate = (part: string): string => {
     if (Object.hasOwn(en, part)) return t(part);
     const english = englishByChinese.get(part);

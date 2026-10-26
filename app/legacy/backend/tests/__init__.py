@@ -1,1 +1,0 @@
-"""Isolated synthetic backend tests."""

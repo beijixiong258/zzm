@@ -40,14 +40,12 @@ public class AiController {
         }
         result.put("pendingMaterials", selected.stream().filter(m -> Set.of("queued", "processing").contains(m.getStatus())).map(m -> m.getId()).toList());
         result.put("incompleteMaterials", selected.stream().filter(m -> !Set.of("queued", "processing").contains(m.getStatus())
-            && (Set.of("incomplete", "failed").contains(m.getStatus()) || ai.needsPdfReprocessing(m))).map(m -> m.getId()).toList());
+            && !materialComplete(m)).map(m -> m.getId()).toList());
         boolean complete = ((List<?>) result.get("pendingMaterials")).isEmpty() && ((List<?>) result.get("incompleteMaterials")).isEmpty();
-        if (!complete) {
-            result.put("allowed", false);
-            if (result.get("revisionBudget") instanceof Map<?, ?> revision) {
-                @SuppressWarnings("unchecked") Map<String, Object> revisionBudget = (Map<String, Object>) revision;
-                revisionBudget.put("allowed", false);
-            }
+        result.put("materialsReady", complete);
+        if (result.get("revisionBudget") instanceof Map<?, ?> revision) {
+            @SuppressWarnings("unchecked") Map<String, Object> revisionBudget = (Map<String, Object>) revision;
+            revisionBudget.put("materialsReady", complete);
         }
         result.put("materials", selected.stream().map(m -> {
             String text = Objects.toString(ai.materialInputs(List.of(m)).get(0).get("text"), "");
@@ -55,5 +53,9 @@ public class AiController {
                 "textUpperBound", budget.upperBound(text), "imageEstimate", ai.imageTokens(List.of(m)));
         }).toList());
         return result;
+    }
+    private boolean materialComplete(zzm.entity.CourseMaterial material) {
+        try { materials.requireProcessed(List.of(material)); return true; }
+        catch (org.springframework.web.server.ResponseStatusException exception) { return false; }
     }
 }

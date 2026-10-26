@@ -4,9 +4,9 @@ services:
     restart: unless-stopped
     environment:
       MYSQL_DATABASE: aicademiya
-      MYSQL_USER: aicademiya
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?Set MYSQL_PASSWORD in .env}
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Set MYSQL_ROOT_PASSWORD in .env}
+      MYSQL_USER: ${MYSQL_USER:?Use start.ps1 -Component docker to read application.yaml}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?Use start.ps1 -Component docker to read application.yaml}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Use start.ps1 -Component docker to read application.yaml}
     ports:
       - "127.0.0.1:3306:3306"
     volumes:
@@ -27,8 +27,6 @@ services:
       - "127.0.0.1:8001:8001"
     environment:
       MYSQL_URL: jdbc:mysql://mysql:3306/aicademiya?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC
-      MYSQL_USER: aicademiya
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
       AICADEMIYA_CONFIG: /config/config.json
       AICADEMIYA_UPLOAD_DIR: /data/uploads
       AICADEMIYA_TRASH_DIR: /data/recycle
@@ -43,7 +41,7 @@ services:
       AICADEMIYA_AI_API_KEY: ${AICADEMIYA_AI_API_KEY:-}
     volumes:
       - uploads:/data/uploads
-      - recycle:/data/recycle
+      - "${AICADEMIYA_TRASH_HOST_DIR:-C:/Users/user/Desktop/智能体回收站/垃圾桶/AIcademiya}:/data/recycle"
       - ./config.json:/config/config.json:ro
   frontend:
     build: ./frontend

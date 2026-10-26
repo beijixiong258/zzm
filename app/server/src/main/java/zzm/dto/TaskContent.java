@@ -46,6 +46,9 @@ public class TaskContent {
         private String type;
         private String prompt;
         private List<String> options = new ArrayList<>();
+        public void setOptions(List<String> options) {
+            this.options = options == null ? new ArrayList<>() : options;
+        }
         private Integer answerSlots = 1;
         private String referenceAnswer;
         private String explanation;

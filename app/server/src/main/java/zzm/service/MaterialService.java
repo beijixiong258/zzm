@@ -13,6 +13,7 @@ public interface MaterialService extends IService<CourseMaterial> {
     CourseMaterial requireFile(String id, String versionId, AccountUser user);
     void edit(String id, Requests.MaterialInput input, AccountUser user);
     void archive(String id, boolean archived, AccountUser user);
+    void removeMaterial(String id, AccountUser user);
     void retry(String id, AccountUser user);
     void recoverProcessing();
     void processNext();

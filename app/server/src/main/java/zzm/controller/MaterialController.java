@@ -38,5 +38,6 @@ public class MaterialController {
     }
     @PutMapping("/materials/{id}") public void edit(@PathVariable String id, @Valid @RequestBody Requests.MaterialInput input, HttpServletRequest request) { materials.edit(id, input, accounts.current(request)); }
     @PostMapping("/materials/{id}/archive") public void archive(@PathVariable String id, @RequestParam boolean archived, HttpServletRequest request) { materials.archive(id, archived, accounts.current(request)); }
+    @DeleteMapping("/materials/{id}") public void remove(@PathVariable String id, HttpServletRequest request) { materials.removeMaterial(id, accounts.current(request)); }
     @PostMapping("/materials/{id}/retry") public void retry(@PathVariable String id, HttpServletRequest request) { materials.retry(id, accounts.current(request)); }
 }

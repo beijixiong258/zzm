@@ -176,13 +176,16 @@ public class SessionServiceImpl extends ServiceImpl<TeachingSessionMapper, Teach
             .forEach(m -> publicImages.add(m.getId()));
         if (content.getIllustrationMaterialIds() == null) content.setIllustrationMaterialIds(new ArrayList<>());
         if (!publicImages.containsAll(content.getIllustrationMaterialIds())) throw error(422, "Lesson illustrations must be selected images visible to students");
+        int questionNumber = 0;
         for (TaskContent.Question question : content.getQuestions()) {
+            questionNumber++;
             if (question == null) throw error(422, "Question data is incomplete");
             if (question.getId() == null || question.getId().isBlank()) question.setId(IdUtil.fastSimpleUUID());
             if (question.getId().length() > 100 || !seen.add(question.getId())) throw error(422, "Question identifiers must be unique");
             if (!Set.of("openResponse", "readingResponse", "fillInBlank", "singleChoice", "multipleChoice", "trueFalse", "imageMatching").contains(Objects.toString(question.getType(), ""))) throw error(422, "Unsupported question type");
             if (question.getPrompt() == null || question.getPrompt().length() > 20000 || publishing && question.getPrompt().isBlank()) throw error(422, "Question text is required");
-            if (question.getOptions() == null || question.getOptions().size() > 20 || question.getOptions().stream().anyMatch(option -> option == null || option.length() > 10000)) throw error(422, "Invalid answer options");
+            if ("openResponse".equals(question.getType()) && question.getOptions() == null) question.setOptions(List.of());
+            if (question.getOptions() == null || question.getOptions().size() > 20 || question.getOptions().stream().anyMatch(option -> option == null || option.length() > 10000)) throw error(422, "Question " + questionNumber + ": Invalid answer options");
             if (question.getSourceMaterialIds() == null) question.setSourceMaterialIds(new ArrayList<>());
             if (question.getImageMaterialIds() == null) question.setImageMaterialIds(new ArrayList<>());
             if (!materialIds.containsAll(question.getSourceMaterialIds()) || !materialIds.containsAll(question.getImageMaterialIds())) throw error(422, "Question references must use selected materials");
@@ -192,7 +195,7 @@ public class SessionServiceImpl extends ServiceImpl<TeachingSessionMapper, Teach
                 if (Set.of("singleChoice", "multipleChoice", "trueFalse").contains(question.getType())) {
                     if (question.getOptions().size() < 2 || question.getOptions().stream().anyMatch(String::isBlank) || new HashSet<>(question.getOptions()).size() != question.getOptions().size()) throw error(422, "Choice questions need distinct non-empty options");
                     String reference = Objects.toString(question.getReferenceAnswer(), ""); List<String> answers = reference.isBlank() ? List.of() : "multipleChoice".equals(question.getType()) ? reference.lines().toList() : List.of(reference);
-                    if (!question.getOptions().containsAll(answers)) throw error(422, "The correct answer must match an option");
+                    if (!question.getOptions().containsAll(answers)) throw error(422, "Question " + questionNumber + ": The correct answer must match an option");
                 }
                 if ("fillInBlank".equals(question.getType()) && (question.getAnswerSlots() == null || question.getAnswerSlots() < 1 || question.getAnswerSlots() > 20)) throw error(422, "Invalid number of blanks");
                 if ("imageMatching".equals(question.getType()) && question.getImageMaterialIds().isEmpty()) throw error(422, "Image matching questions need illustrations");

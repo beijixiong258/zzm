@@ -99,7 +99,9 @@ export type ContextUsage = {
   outputReserve: number;
   safetyReserve: number;
   remaining: number;
-  allowed: boolean;
+  tokenEstimateOnly?: boolean;
+  estimatedOverReference?: boolean;
+  materialsReady?: boolean;
   revisionBudget?: ContextUsage;
   incompleteMaterials?: string[];
   pendingMaterials?: string[];
@@ -156,7 +158,14 @@ export type Job = {
   stage: string;
   progressCharacters?: number;
   errorMessage: string;
+  diagnosticResponse?: string | null;
   result: TaskContent | null;
+  usage?: ContextUsage;
+};
+export type TeacherReply = {
+  message: string;
+  fields: Record<string, string>;
+  action: string;
   usage?: ContextUsage;
 };
 export type ChatMessage = {

@@ -13,7 +13,6 @@ config.json
 data-local/
 .env.*
 local-settings*.json
-!.env.example
 # Course seed contains original materials/excerpts: private upload, not Git.
 sample_data/
 data/
