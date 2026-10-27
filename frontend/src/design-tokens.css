@@ -1,9 +1,14 @@
 /* One shared vocabulary for controls, content and semantic states. */
 :root {
-  --font-ui: "Segoe UI", "PingFang SC", "Microsoft YaHei", Arial, sans-serif;
-  --font-display:
-    Georgia, "Noto Serif SC", "Source Han Serif SC", "Songti SC", "SimSun",
-    serif;
+  --font-ui: var(--td-font-family);
+  --font-display: var(--font-ui);
+  --td-brand-color: #1f5d50;
+  --td-brand-color-hover: #327568;
+  --td-brand-color-focus: #e3eee9;
+  --td-brand-color-active: #16483e;
+  --td-brand-color-disabled: #a2c5b9;
+  --td-brand-color-light: #edf3ee;
+  --td-brand-color-light-hover: #dce9e0;
   --ink: #23352e;
   --muted: #52645b;
   --teal: #1f5d50;
@@ -35,5 +40,5 @@
   --focus: #5f9685;
   --shadow-panel: 0 2px 5px #23352e03, 0 12px 30px #23352e04;
   --shadow-raised: 0 6px 22px #23352e0d;
-  --radius: 12px;
+  --radius: var(--td-radius-large);
 }

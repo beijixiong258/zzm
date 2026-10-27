@@ -8,6 +8,7 @@ import {
   type User,
 } from "./classroom-api";
 import { savedLocale, setLocale, t } from "./i18n";
+import { confirmAction } from "./confirmAction";
 
 export const user = ref<User | null>(null);
 export const courses = ref<Course[]>([]);
@@ -34,8 +35,11 @@ function readRoute(): Route {
 }
 export const route = ref<Route>(readRoute());
 export const routeKey = ref(0);
-export function navigate(next: Partial<Route>) {
-  if (dirty.value && !window.confirm(t("Leave without saving your changes?")))
+export async function navigate(next: Partial<Route>) {
+  if (
+    dirty.value &&
+    !(await confirmAction(t("Leave without saving your changes?")))
+  )
     return false;
   dirty.value = false;
   const value: Route = { page: "home", courseId: "", taskId: "", ...next };
@@ -64,13 +68,24 @@ export function retainCourseAddress(courseId: string) {
   query.set("courseId", courseId);
   history.replaceState(null, "", `#${query}`);
 }
-window.addEventListener("popstate", () => {
-  if (dirty.value && !window.confirm(t("Leave without saving your changes?"))) {
+window.addEventListener("popstate", async () => {
+  const next = readRoute();
+  // Cancelling browser Back restores the current address and raises popstate again.
+  if (
+    Object.entries(next).every(
+      ([key, value]) => route.value[key as keyof Route] === value,
+    )
+  )
+    return;
+  if (
+    dirty.value &&
+    !(await confirmAction(t("Leave without saving your changes?")))
+  ) {
     history.go(1);
     return;
   }
   dirty.value = false;
-  route.value = readRoute();
+  route.value = next;
   routeKey.value++;
 });
 window.addEventListener("beforeunload", (event) => {

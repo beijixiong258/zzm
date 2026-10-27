@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Button as TButton } from "tdesign-vue-next";
 import { ref } from "vue";
 import { t, systemText } from "../i18n";
 import { call } from "../classroom-api";
@@ -28,15 +29,27 @@ async function check(vision: boolean) {
 <template>
   <div class="ai-connection">
     <div class="row wrap">
-      <button type="button" :disabled="!!busy" @click="check(false)">
+      <TButton
+        theme="default"
+        variant="outline"
+        type="button"
+        :disabled="!!busy"
+        @click="check(false)"
+      >
         {{
           t(busy === "text" ? "Checking connection…" : "Test AI connection")
-        }}</button
-      ><button type="button" :disabled="!!busy" @click="check(true)">
+        }}</TButton
+      ><TButton
+        theme="default"
+        variant="outline"
+        type="button"
+        :disabled="!!busy"
+        @click="check(true)"
+      >
         {{
           t(busy === "vision" ? "Checking vision…" : "Test image understanding")
         }}
-      </button>
+      </TButton>
     </div>
     <p
       v-if="result"

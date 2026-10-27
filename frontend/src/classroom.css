@@ -15,133 +15,21 @@ body {
   background: #dce9e0;
   color: var(--teal-dark);
 }
-button,
-input,
-textarea,
-select {
-  font: inherit;
-}
-button,
-.button {
-  border: 1px solid var(--line);
-  background: var(--paper);
-  color: var(--ink);
-  border-radius: 8px;
-  padding: 9px 15px;
-  cursor: pointer;
-  text-decoration: none;
-  line-height: 1.4;
-  min-height: 38px;
-  font-weight: 500;
-  transition:
-    background-color 160ms ease,
-    border-color 160ms ease,
-    box-shadow 160ms ease;
-}
-button:enabled:hover,
-.button:hover {
-  background: var(--soft);
-  border-color: var(--control);
-}
-button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-button.primary,
-.button.primary {
-  background: var(--teal);
-  color: white;
-  border-color: var(--teal);
-}
-button.primary:enabled:hover,
-.button.primary:hover {
-  background: var(--teal-dark);
-  border-color: var(--teal-dark);
-  box-shadow: 0 3px 10px #1f5d501a;
-}
-.danger {
-  color: var(--danger);
-}
-button.danger,
-.button.danger {
-  background: var(--danger-soft);
-  border-color: var(--danger-line);
-  color: var(--danger);
-}
-button.danger:enabled:hover,
-.button.danger:hover {
-  background: var(--danger-hover);
-  border-color: var(--danger);
-}
-button.warning-action {
-  color: var(--warning);
-  background: var(--warning-soft);
-  border-color: var(--warning-line);
-}
-button.warning-action:enabled:hover {
-  background: #f8ebc9;
-  border-color: var(--warning);
-}
-input:not([type="checkbox"]):not([type="radio"]),
-textarea,
-select {
-  width: 100%;
-  border: 1px solid #ccd7d0;
-  border-radius: 7px;
-  padding: 10px 12px;
-  background: var(--paper);
-  color: var(--ink);
-  min-width: 0;
-  transition:
-    border-color 160ms ease,
-    box-shadow 160ms ease;
-}
-input::placeholder,
-textarea::placeholder {
-  color: #6c7971;
-  font-weight: 400;
-}
-textarea {
-  resize: vertical;
-  line-height: 1.6;
-}
-textarea:disabled,
-input:disabled,
-select:disabled {
-  background: var(--soft);
-  color: var(--muted);
-}
-input[type="checkbox"],
-input[type="radio"] {
-  accent-color: var(--teal);
-  flex: 0 0 auto;
-}
-select[multiple] {
-  min-height: 85px;
-}
-button:focus-visible,
-input:focus-visible,
-textarea:focus-visible,
-select:focus-visible,
-summary:focus-visible,
-a:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
-}
-input:focus-visible,
-textarea:focus-visible,
-select:focus-visible {
-  border-color: var(--teal);
-}
-label {
+label:not(.t-checkbox):not(.t-radio) {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  font-weight: 550;
+  font-weight: 500;
 }
 label small {
   color: var(--muted);
   font-weight: 400;
+}
+button:focus-visible,
+summary:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
 }
 fieldset {
   min-width: 0;
@@ -466,7 +354,7 @@ small {
   background: #fbfcfa;
   font-size: 12px;
 }
-.topbar select {
+.topbar .t-select__wrap {
   width: 125px;
   padding: 7px 10px;
   background: transparent;
@@ -685,7 +573,8 @@ footer {
   flex-direction: column;
   gap: 8px;
 }
-.answer-options label {
+.answer-options .t-checkbox,
+.answer-options .t-radio {
   flex-direction: row;
   align-items: baseline;
   border: 1px solid var(--line);
@@ -693,7 +582,8 @@ footer {
   border-radius: 7px;
   font-weight: 400;
 }
-.answer-options label:has(input:checked) {
+.answer-options .t-checkbox:has(input:checked),
+.answer-options .t-radio:has(input:checked) {
   background: var(--soft);
   border-color: var(--teal);
 }
@@ -853,29 +743,12 @@ td button {
 .panel > .row > input {
   max-width: 260px;
 }
-.modal-backdrop {
-  position: fixed;
-  inset: 0;
-  background: #182f2566;
-  z-index: 100;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
+.app-dialog .t-dialog__body {
+  max-height: calc(90vh - 100px);
+  overflow: auto;
 }
-.modal {
-  position: relative;
-  background: var(--paper);
-  padding: 30px;
-  width: min(100%, 580px);
-  max-height: 90vh;
-  overflow-y: auto;
-  border-radius: 14px;
-  box-shadow: 0 15px 60px #15251d33;
-}
-.modal.wide {
-  width: min(100%, 1100px);
-  padding-top: 48px;
+.app-dialog-content {
+  outline: 0;
 }
 /* Login uses its own responsive layout without changing the workspace shell. */
 .login-page {
@@ -893,7 +766,7 @@ td button {
   justify-content: flex-end;
   width: min(100%, 1480px);
 }
-.login-toolbar select {
+.login-toolbar .t-select__wrap {
   width: 112px;
   min-height: 38px;
   padding: 6px 10px;
@@ -1099,36 +972,14 @@ td button {
   line-height: 1.4;
   letter-spacing: -0.025em;
 }
-.login-card .sign-in-tabs {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 4px;
-  padding: 4px;
-  margin-bottom: 22px;
-  border: 1px solid #e2e8e3;
-  border-radius: 9px;
-  background: #f3f6f3;
+.login-role-tabs {
+  display: flex;
+  width: 100%;
+  margin-bottom: 24px;
 }
-.login-card .sign-in-tabs button {
-  min-width: 0;
-  min-height: 40px;
-  padding: 8px;
-  border: 1px solid transparent;
-  border-radius: 6px;
-  background: transparent;
-  color: #5e7065;
-  font-size: 13px;
-  line-height: 1.4;
-}
-.login-card .sign-in-tabs button.primary {
-  border-color: #dce6de;
-  background: #fff;
-  color: #2c5543;
-  box-shadow: 0 2px 5px #253b2e08;
-}
-.login-card .sign-in-tabs button:hover {
-  background: #e8efe9;
-  box-shadow: none;
+.login-role-tabs .t-radio-button {
+  flex: 1;
+  text-align: center;
 }
 .login-method {
   display: block;
@@ -1174,14 +1025,7 @@ td button {
   font-size: 13px;
   font-weight: 500;
 }
-.login-card input {
-  min-height: 48px;
-  padding: 10px 13px;
-  border-color: #bdccc2;
-  border-radius: 6px;
-  font-size: 16px;
-  line-height: 1.5;
-}
+
 .login-card .login-submit {
   display: inline-flex;
   align-items: center;
@@ -1241,9 +1085,7 @@ td button {
   .login-demo-panel {
     padding: 8px;
   }
-  .login-card input {
-    min-height: 46px;
-  }
+
   .login-card .login-submit {
     min-height: 44px;
   }
@@ -1537,6 +1379,14 @@ td button {
   font-family: Georgia, "Times New Roman", serif;
   font-size: 20px;
   font-weight: 700;
+  white-space: nowrap;
+}
+.classroom-sidebar .brand.t-button {
+  padding: 0;
+}
+.classroom-sidebar .brand-lockup {
+  font-size: 18px;
+  gap: 10px;
 }
 .brand-mark {
   display: inline-flex;
@@ -1741,7 +1591,7 @@ td button {
 .library-upload .form-stack {
   gap: 12px;
 }
-.library-upload select {
+.library-upload .t-select__wrap {
   max-width: 380px;
 }
 .progress-status {
@@ -1956,28 +1806,20 @@ td button {
   white-space: nowrap;
 }
 .conversation-composer {
-  position: sticky;
-  bottom: 14px;
   background: #fff;
   padding: 16px 18px;
   border: 1px solid #cbdccc;
   border-radius: 22px;
   box-shadow: 0 6px 24px #153b2010;
   margin-top: 24px;
-  z-index: 4;
 }
-.conversation-composer form textarea {
+.conversation-composer .t-textarea__inner {
   border: 0;
   box-shadow: none;
-  background: transparent;
-  resize: vertical;
   min-height: 84px;
-  max-height: 280px;
   padding: 10px 2px;
 }
-.conversation-composer form textarea:focus {
-  outline: 0;
-}
+
 .task-attachment-tools .file-uploader > .muted {
   font-size: 11px;
   margin: 8px 0;
@@ -2002,7 +1844,7 @@ td button {
   margin-bottom: 10px;
   color: var(--muted);
 }
-.upload-visibility select {
+.upload-visibility .t-select__wrap {
   max-width: 220px;
   margin: 10px 0;
 }
@@ -2036,12 +1878,23 @@ td button {
   font-size: 12px;
   text-align: left;
 }
-.conversation-actions {
-  gap: 8px;
-  margin: 20px 0;
+.task-heading {
+  align-items: flex-start;
+  flex-wrap: wrap;
 }
-.conversation-actions button {
+.task-heading-title {
+  flex: 1 1 180px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.task-heading-actions {
+  justify-content: flex-end;
+  gap: 8px;
+  max-width: 100%;
+}
+.task-heading-actions .t-button {
   font-size: 13px;
+  white-space: nowrap;
 }
 .conversation-footnote {
   display: block;
@@ -2116,7 +1969,6 @@ td button {
     flex-wrap: wrap;
   }
   .conversation-composer {
-    bottom: 8px;
     padding: 12px;
   }
   .conversation-result {
@@ -2134,4 +1986,55 @@ td button {
     flex-direction: column;
     align-items: stretch;
   }
+}
+
+/* TDesign controls share the existing business layouts and brand theme. */
+.t-button__text {
+  min-width: 0;
+}
+.classroom-sidebar .t-button,
+.conversation-task-links .t-button {
+  justify-content: flex-start;
+}
+.classroom-sidebar .t-button,
+.conversation-task-links .t-button,
+.selected-materials .t-button,
+.tree-file .t-button,
+.progress-row.t-button {
+  height: auto;
+  min-height: var(--td-comp-size-m);
+  white-space: normal;
+}
+.classroom-sidebar .t-button__text,
+.conversation-task-links .t-button__text,
+.selected-materials .t-button__text,
+.tree-file .t-button__text {
+  display: block;
+  overflow-wrap: anywhere;
+}
+.progress-row .t-button__text {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  gap: 16px;
+}
+.form-stack .t-input,
+.form-stack .t-select,
+.configuration-summary .t-input,
+.configuration-summary .t-select {
+  min-height: 36px;
+}
+.import-sources,
+.student-attachment-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.t-checkbox__label,
+.t-radio__label {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.progress-status .t-loading {
+  margin-right: 8px;
 }

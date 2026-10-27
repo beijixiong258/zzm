@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Input as TInput, Button as TButton } from "tdesign-vue-next";
 import { computed, ref } from "vue";
 import { t } from "../i18n";
 import { call, key } from "../classroom-api";
@@ -65,9 +66,12 @@ async function join() {
   </div>
   <form v-if="!course" class="panel row" @submit.prevent="join">
     <label class="grow"
-      >{{ t("Course invitation code") }}<input v-model="joinCode" required
+      >{{ t("Course invitation code")
+      }}<TInput v-control-attrs="{ required: true }" v-model="joinCode"
     /></label>
-    <button :disabled="busy">{{ t("Join course") }}</button>
+    <TButton theme="default" variant="outline" type="submit" :disabled="busy">{{
+      t("Join course")
+    }}</TButton>
   </form>
   <h2>{{ t(course ? "Learning tasks" : "My courses") }}</h2>
   <div v-if="!course" class="course-grid">
@@ -79,9 +83,14 @@ async function join() {
       <span class="course-code">{{ item.code }}</span>
       <h3>{{ item.title }}</h3>
       <p class="muted">{{ item.description }}</p>
-      <button @click="navigate({ page: 'course', courseId: item.id })">
+      <TButton
+        theme="default"
+        variant="outline"
+        type="button"
+        @click="navigate({ page: 'course', courseId: item.id })"
+      >
         {{ t("Open course") }} →
-      </button>
+      </TButton>
     </article>
   </div>
   <div v-else class="task-list">
@@ -104,13 +113,16 @@ async function join() {
           t(task.sessionType === "tutor" ? "AI tutor" : "Assignment")
         }}</small>
       </div>
-      <button
+      <TButton
+        theme="default"
+        variant="outline"
+        type="button"
         @click="
           navigate({ page: 'learn', courseId: course.id, taskId: task.id })
         "
       >
         {{ t("Open task") }}
-      </button>
+      </TButton>
     </article>
     <p v-if="!courseTasks.length" class="panel empty">
       {{ t("Your teacher has not published a task yet.") }}

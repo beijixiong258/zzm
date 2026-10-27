@@ -1,4 +1,12 @@
 <script setup lang="ts">
+import { confirmAction } from "../confirmAction";
+import {
+  Checkbox as TCheckbox,
+  Button as TButton,
+  Select as TSelect,
+  Option as TOption,
+  Input as TInput,
+} from "tdesign-vue-next";
 import { computed, ref } from "vue";
 import { t } from "../i18n";
 import { call, key, type Material } from "../classroom-api";
@@ -51,11 +59,11 @@ async function save() {
 async function archive() {
   if (
     !selected.value ||
-    !window.confirm(
+    !(await confirmAction(
       t(
         "Change the archive state of this material? Published versions keep their original references.",
       ),
-    )
+    ))
   )
     return;
   await action(async () => {
@@ -73,12 +81,12 @@ async function retry() {
 async function removeMaterial(material: Material) {
   if (
     busy.value ||
-    !window.confirm(
+    !(await confirmAction(
       t(
         "Delete {0}? Unused uploaded files will be moved to the recycle folder.",
         [material.title],
       ),
-    )
+    ))
   )
     return;
   await action(async () => {
@@ -90,9 +98,14 @@ void load();
 </script>
 <template>
   <nav class="page-return-bar" :aria-label="t('Back')">
-    <button @click="navigate({ page: 'course', courseId })">
+    <TButton
+      theme="default"
+      variant="outline"
+      type="button"
+      @click="navigate({ page: 'course', courseId })"
+    >
       ← {{ t("Back to course") }}
-    </button>
+    </TButton>
     <span class="muted">{{ t("Course materials") }}</span>
   </nav>
   <header class="page-heading compact-heading">
@@ -110,11 +123,13 @@ void load();
     <div class="form-stack">
       <label
         >{{ t("Visibility for new uploads")
-        }}<select v-model="uploadVisibility">
-          <option value="student">{{ t("Students and teachers") }}</option>
-          <option value="teacher">{{ t("Teachers and AI only") }}</option>
-        </select></label
-      >
+        }}<TSelect v-model="uploadVisibility">
+          <TOption value="student" :label="t('Students and teachers')" />
+          <TOption
+            value="teacher"
+            :label="t('Teachers and AI only')"
+          /> </TSelect
+      ></label>
       <FileUploader
         :endpoint="`/courses/${key(courseId)}/materials`"
         :visibility="uploadVisibility"
@@ -135,10 +150,9 @@ void load();
   </p>
   <div class="library-layout">
     <aside class="panel">
-      <label class="check-label"
-        ><input v-model="showArchived" type="checkbox" />{{
-          t("Show archived items")
-        }}</label
+      <TCheckbox v-model="showArchived">{{
+        t("Show archived items")
+      }}</TCheckbox
       ><MaterialTree
         :materials="materials.filter((m) => showArchived || !m.archived)"
         :selected="selectedId"
@@ -155,22 +169,36 @@ void load();
       <template v-if="selected"
         ><form class="row wrap material-edit" @submit.prevent="save">
           <label class="grow"
-            >{{ t("Material title") }}<input v-model="title" required /></label
+            >{{ t("Material title")
+            }}<TInput
+              v-control-attrs="{ required: true }"
+              v-model="title" /></label
           ><label
             >{{ t("Visibility")
-            }}<select v-model="visibility">
-              <option value="student">{{ t("Students and teachers") }}</option>
-              <option value="teacher">{{ t("Teachers and AI only") }}</option>
-            </select></label
-          ><button :disabled="busy">{{ t("Save") }}</button
-          ><button
+            }}<TSelect v-model="visibility">
+              <TOption value="student" :label="t('Students and teachers')" />
+              <TOption
+                value="teacher"
+                :label="t('Teachers and AI only')"
+              /> </TSelect></label
+          ><TButton
+            theme="default"
+            variant="outline"
+            type="submit"
+            :disabled="busy"
+            >{{ t("Save") }}</TButton
+          ><TButton
+            theme="default"
+            variant="outline"
             type="button"
             :class="{ 'warning-action': !selected.archived }"
             :disabled="busy"
             @click="archive"
           >
-            {{ t(selected.archived ? "Restore" : "Archive") }}</button
-          ><button
+            {{ t(selected.archived ? "Restore" : "Archive") }}</TButton
+          ><TButton
+            theme="default"
+            variant="outline"
             v-if="
               !['queued', 'processing'].includes(selected.status) &&
               !selected.archived
@@ -180,7 +208,7 @@ void load();
             @click="retry"
           >
             {{ t("Reprocess material") }}
-          </button>
+          </TButton>
         </form>
         <p class="muted">
           {{

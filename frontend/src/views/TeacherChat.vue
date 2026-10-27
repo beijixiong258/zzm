@@ -1,4 +1,9 @@
 <script setup lang="ts">
+import {
+  Button as TButton,
+  Input as TInput,
+  Textarea as TTextarea,
+} from "tdesign-vue-next";
 import { computed, onBeforeUnmount, ref, watch } from "vue";
 import {
   call,
@@ -167,7 +172,10 @@ async function configure(reply: TeacherReply) {
         <strong>{{ form.title || t("New course conversation") }}</strong>
       </div>
       <div v-if="currentId" class="row wrap">
-        <button
+        <TButton
+          theme="primary"
+          variant="base"
+          type="button"
           class="primary"
           :disabled="chatting || saving || dirty"
           :title="
@@ -180,13 +188,16 @@ async function configure(reply: TeacherReply) {
           @click="navigate({ page: 'task', courseId: currentId })"
         >
           ＋ {{ t("New task conversation") }}
-        </button>
-        <button
+        </TButton>
+        <TButton
+          theme="default"
+          variant="outline"
+          type="button"
           :disabled="chatting || saving"
           @click="navigate({ page: 'materials', courseId: currentId })"
         >
           {{ t("File management") }}
-        </button>
+        </TButton>
       </div>
     </header>
     <TeacherConversation
@@ -222,22 +233,24 @@ async function configure(reply: TeacherReply) {
                   <label for="course-title">{{ t("Course name") }}</label>
                 </dt>
                 <dd>
-                  <input
-                    id="course-title"
-                    v-model.trim="form.title"
+                  <TInput
+                    :disabled="chatting || saving"
+                    v-control-attrs="{ id: 'course-title', required: true }"
+                    v-model="form.title"
+                    @blur="form.title = form.title.trim()"
                     maxlength="300"
-                    required
                   />
                 </dd>
                 <dt>
                   <label for="course-code">{{ t("Course code") }}</label>
                 </dt>
                 <dd>
-                  <input
-                    id="course-code"
-                    v-model.trim="form.code"
+                  <TInput
+                    :disabled="chatting || saving"
+                    v-control-attrs="{ id: 'course-code', required: true }"
+                    v-model="form.code"
+                    @blur="form.code = form.code.trim()"
                     maxlength="100"
-                    required
                   />
                 </dd>
                 <dt>
@@ -246,10 +259,11 @@ async function configure(reply: TeacherReply) {
                   }}</label>
                 </dt>
                 <dd>
-                  <textarea
-                    id="course-information"
+                  <TTextarea
+                    :disabled="chatting || saving"
+                    v-control-attrs="{ id: 'course-information', rows: '3' }"
+                    :autosize="{ minRows: 3, maxRows: 10 }"
                     v-model="form.courseInformation"
-                    rows="3"
                     maxlength="20000"
                   />
                 </dd>
@@ -259,10 +273,14 @@ async function configure(reply: TeacherReply) {
                   }}</label>
                 </dt>
                 <dd>
-                  <textarea
-                    id="course-student-profile"
+                  <TTextarea
+                    :disabled="chatting || saving"
+                    v-control-attrs="{
+                      id: 'course-student-profile',
+                      rows: '3',
+                    }"
+                    :autosize="{ minRows: 3, maxRows: 10 }"
                     v-model="form.studentProfile"
-                    rows="3"
                     maxlength="20000"
                   />
                 </dd>
@@ -272,10 +290,11 @@ async function configure(reply: TeacherReply) {
                   }}</label>
                 </dt>
                 <dd>
-                  <textarea
-                    id="course-instructions"
+                  <TTextarea
+                    :disabled="chatting || saving"
+                    v-control-attrs="{ id: 'course-instructions', rows: '3' }"
+                    :autosize="{ minRows: 3, maxRows: 10 }"
                     v-model="form.systemInstructions"
-                    rows="3"
                     maxlength="20000"
                   />
                 </dd>
@@ -288,9 +307,15 @@ async function configure(reply: TeacherReply) {
                     )
                   }}
                 </small>
-                <button class="primary" type="submit">
+                <TButton
+                  :disabled="chatting || saving"
+                  theme="primary"
+                  variant="base"
+                  class="primary"
+                  type="submit"
+                >
                   {{ t(saving ? "Saving…" : "Save course configuration") }}
-                </button>
+                </TButton>
               </div>
             </fieldset>
             <p v-if="saved" class="success" role="status">
@@ -299,7 +324,10 @@ async function configure(reply: TeacherReply) {
             <p v-if="error" class="error" role="alert">{{ error }}</p>
           </form>
           <div v-if="courseTasks.length" class="conversation-task-links">
-            <button
+            <TButton
+              theme="default"
+              variant="outline"
+              type="button"
               v-for="task in courseTasks"
               :key="task.id"
               :disabled="chatting || saving"
@@ -308,7 +336,7 @@ async function configure(reply: TeacherReply) {
               "
             >
               {{ task.title }} →
-            </button>
+            </TButton>
           </div>
         </section>
         <section v-if="members" class="conversation-result">

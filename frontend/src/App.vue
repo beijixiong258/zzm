@@ -1,5 +1,17 @@
 <script setup lang="ts">
+import {
+  Select as TSelect,
+  Option as TOption,
+  Button as TButton,
+  Input as TInput,
+  ConfigProvider as TConfigProvider,
+  RadioGroup as TRadioGroup,
+  Table as TTable,
+  type GlobalConfigProvider,
+} from "tdesign-vue-next";
 import { computed, defineAsyncComponent, ref, watch } from "vue";
+import zhCN from "tdesign-vue-next/es/locale/zh_CN";
+import enUS from "tdesign-vue-next/es/locale/en_US";
 import { ArrowRight, Compass, MessageSquare } from "lucide-vue-next";
 import { locale, setLocale, t } from "./i18n";
 import {
@@ -77,6 +89,10 @@ const course = computed(() =>
   courses.value.find((c) => c.id === route.value.courseId),
 );
 const pageKey = routeKey;
+const componentLocale = computed(
+  () =>
+    (locale.value === "en" ? enUS : zhCN) as unknown as GlobalConfigProvider,
+);
 async function action(fn: () => Promise<void>) {
   busy.value = true;
   error.value = "";
@@ -136,7 +152,7 @@ async function demo(id: string) {
   });
 }
 async function signOut() {
-  if (!navigate({ page: "home" })) return;
+  if (!(await navigate({ page: "home" }))) return;
   await action(async () => {
     await call("/auth/logout", "POST");
     user.value = null;
@@ -145,7 +161,7 @@ async function signOut() {
   });
 }
 async function open(page: string) {
-  if (!navigate({ page })) return;
+  if (!(await navigate({ page }))) return;
   menuOpen.value = false;
 }
 watch(
@@ -187,510 +203,612 @@ function taskTitle(id: string) {
 void boot();
 </script>
 <template>
-  <div v-if="!ready" class="startup">
-    <BrandLogo :wordmark="false" />
-    <p>{{ t("Opening your workspace…") }}</p>
-  </div>
-  <main v-else-if="!user" class="login-page" :lang="locale">
-    <div class="login-toolbar">
-      <select
-        :value="locale"
-        :aria-label="t('Interface language')"
-        @change="setLocale(($event.target as HTMLSelectElement).value)"
-      >
-        <option value="zh-CN">中文</option>
-        <option value="en">English</option>
-      </select>
+  <TConfigProvider :global-config="componentLocale">
+    <div v-if="!ready" class="startup">
+      <BrandLogo :wordmark="false" />
+      <p>{{ t("Opening your workspace…") }}</p>
     </div>
-    <div class="login-layout">
-      <section class="login-story" aria-labelledby="login-story-title">
-        <p class="login-eyebrow">{{ t("A space for deeper learning") }}</p>
-        <h1 id="login-story-title">
-          {{ t("A little curiosity.\nA deeper understanding.") }}
-        </h1>
-        <p class="login-introduction">
-          {{
-            t(
-              "A focused space for questions, reflection and thoughtful feedback.",
-            )
-          }}
-        </p>
-        <div class="login-illustration" aria-hidden="true">
-          <div class="login-orbit"></div>
-          <div class="login-note login-note-explore">
-            <Compass :size="25" :stroke-width="1.4" />
-            <span>{{ t("Explore the idea.") }}</span>
-            <i></i><i></i>
-          </div>
-          <div class="login-note login-note-discuss">
-            <MessageSquare :size="25" :stroke-width="1.4" />
-            <span>{{ t("Find your voice.") }}</span>
-            <i></i><i></i>
-          </div>
-        </div>
-        <ol class="login-principles">
-          <li><span>01</span> / {{ t("Think") }}</li>
-          <li><span>02</span> / {{ t("Discuss") }}</li>
-          <li><span>03</span> / {{ t("Reflect") }}</li>
-        </ol>
-      </section>
-      <section class="login-card" aria-labelledby="login-form-title">
-        <div class="login-brand">
-          <span class="login-brand-mark" aria-hidden="true"></span>
-          <div class="login-brand-copy">
-            <span class="login-wordmark">AIcademiya</span>
-            <span class="login-tagline">{{ t("Learn with intention") }}</span>
-          </div>
-        </div>
-        <h2 id="login-form-title">
-          {{
-            t(
-              creatingAdmin
-                ? "Create the first administrator account"
-                : "Your learning starts here.",
-            )
-          }}
-        </h2>
-        <p v-if="error" class="error" role="alert">{{ error }}</p>
-        <div
-          class="sign-in-tabs login-role-tabs"
-          role="group"
-          :aria-label="t('Sign in as')"
-        >
-          <button
-            v-for="role in loginRoles"
-            :key="role.value"
-            type="button"
-            :class="{ primary: loginRole === role.value }"
-            :aria-pressed="loginRole === role.value"
-            :disabled="busy"
-            @click="loginRole = role.value"
-          >
-            {{ t(role.label) }}
-          </button>
-        </div>
-        <button
-          v-if="loginRole === 'student'"
-          type="button"
-          class="login-method"
-          :disabled="busy"
-          @click="
-            studentEmail = !studentEmail;
-            error = '';
-          "
-        >
-          {{
-            t(
-              studentEmail
-                ? "Use a personal invitation code"
-                : "Use email and password",
-            )
-          }}
-        </button>
-        <form class="form-stack" @submit.prevent="signIn">
-          <label v-if="creatingAdmin">
-            {{ t("Name") }}
-            <input v-model="loginForm.name" required autocomplete="name" />
-          </label>
-          <template v-if="studentSignIn">
-            <label>
-              {{ t("Username") }}
-              <input
-                v-model="studentCredentials.username"
-                required
-                autocomplete="username"
-                autocapitalize="none"
-                :spellcheck="false"
-                maxlength="64"
-              />
-            </label>
-            <label>
-              {{ t("Invitation code") }}
-              <input
-                v-model="studentCredentials.invitationCode"
-                type="password"
-                required
-                autocomplete="current-password"
-                maxlength="128"
-              />
-            </label>
-          </template>
-          <template v-else>
-            <label>
-              {{ t("Email address") }}
-              <input
-                v-model="loginForm.email"
-                type="email"
-                required
-                autocomplete="username"
-                autocapitalize="none"
-                :spellcheck="false"
-                placeholder="you@example.edu"
-              />
-            </label>
-            <label>
-              {{ t("Password") }}
-              <input
-                v-model="loginForm.password"
-                type="password"
-                required
-                :minlength="creatingAdmin ? 8 : 1"
-                :autocomplete="
-                  creatingAdmin ? 'new-password' : 'current-password'
-                "
-              />
-            </label>
-          </template>
-          <div
-            v-if="
-              bootstrap?.demoEnabled && demoAccounts.length && !creatingAdmin
-            "
-            class="login-demo-panel"
-          >
-            <small>{{ t("Try a demo — no password needed") }}</small>
-            <div class="login-demo-options">
-              <button
-                v-for="account in demoAccounts"
-                :key="account.id"
-                type="button"
-                :disabled="busy"
-                @click="demo(account.id)"
-              >
-                {{
-                  t(
-                    account.role === "teacher"
-                      ? "Demo teacher sign-in"
-                      : "Demo student sign-in",
-                  )
-                }}
-              </button>
-            </div>
-          </div>
-          <small v-if="studentSignIn" class="login-help">
-            {{
-              t(
-                "Use the personal invitation code your teacher gave you. A course join code cannot be used to sign in.",
-              )
-            }}
-          </small>
-          <button class="primary login-submit" :disabled="busy || !bootstrap">
-            <ArrowRight :size="18" aria-hidden="true" />
-            {{ t(creatingAdmin ? "Create account and sign in" : "Sign in") }}
-          </button>
-        </form>
-        <p v-if="creatingAdmin" class="login-help login-access-note">
-          {{
-            t(
-              "Create your administrator account to start a fresh teaching workspace.",
-            )
-          }}
-        </p>
-        <button v-if="!bootstrap" :disabled="busy" @click="boot">
-          {{ t("Retry connection") }}
-        </button>
-      </section>
-    </div>
-  </main>
-  <div v-else :class="['classroom-shell', { 'teacher-shell': staff }]">
-    <button
-      class="mobile-menu"
-      :aria-label="t('Toggle navigation')"
-      @click="menuOpen = !menuOpen"
-    >
-      ☰
-    </button>
-    <aside :class="['classroom-sidebar', { open: menuOpen }]">
-      <button class="brand" @click="open('home')">
-        <BrandLogo /></button
-      ><button
-        class="nav-home"
-        :class="{ active: route.page === 'home' }"
-        @click="open('home')"
-      >
-        {{ staff ? "＋" : "⌂" }}
-        {{ t(staff ? "New course conversation" : "Home") }}
-      </button>
-      <p class="nav-caption">{{ t("MY COURSES") }}</p>
-      <div class="course-navigation">
-        <details
-          v-for="item in courses.filter((c) => !c.archived)"
-          :key="item.id"
-          :open="item.id === route.courseId"
-        >
-          <summary>{{ item.title }}</summary>
-          <button
-            @click="
-              navigate({ page: 'course', courseId: item.id });
-              menuOpen = false;
-            "
-          >
-            {{ t(staff ? "Course conversation" : "Course overview") }}</button
-          ><template v-if="staff"
-            ><button
-              :disabled="
-                route.page === 'course' && route.courseId === item.id && dirty
-              "
-              @click="
-                navigate({ page: 'task', courseId: item.id });
-                menuOpen = false;
-              "
-            >
-              ＋ {{ t("Create task") }}</button
-            ><button
-              @click="
-                navigate({ page: 'materials', courseId: item.id });
-                menuOpen = false;
-              "
-            >
-              {{ t("Materials") }}
-            </button></template
-          ><button
-            v-for="task in (tasks[item.id] || []).filter((s) => !s.archived)"
-            :key="task.id"
-            :class="{ active: route.taskId === task.id }"
-            @click="
-              navigate({
-                page: staff ? 'task' : 'learn',
-                courseId: item.id,
-                taskId: task.id,
-              });
-              menuOpen = false;
-            "
-          >
-            <span>{{ task.sessionType === "tutor" ? "✦" : "▤" }}</span
-            >{{ task.title }}
-          </button>
-        </details>
-        <p v-if="!courses.length" class="muted small">
-          {{ t("Your courses will appear here.") }}
-        </p>
-      </div>
-      <nav class="secondary-nav">
-        <button v-if="!staff" @click="open('history')">
-          {{ t("Learning history") }}</button
-        ><button v-if="user.role === 'admin'" @click="open('accounts')">
-          {{ t("Account management") }}</button
-        ><button @click="open('settings')">{{ t("Account settings") }}</button>
-      </nav>
-      <div class="sidebar-user">
-        <strong>{{ user.name }}</strong
-        ><small>{{
-          t(
-            user.role === "student"
-              ? "Student"
-              : user.role === "admin"
-                ? "Administrator"
-                : "Teacher",
-          )
-        }}</small
-        ><button @click="signOut">{{ t("Sign out") }}</button>
-      </div>
-    </aside>
-    <div v-if="menuOpen" class="sidebar-shade" @click="menuOpen = false" />
-    <div class="classroom-main">
-      <header class="topbar">
-        <div>
-          <span>{{
-            t(staff ? "Teaching workspace" : "Learning workspace")
-          }}</span
-          ><span v-if="course" class="muted"> / {{ course.code }}</span>
-        </div>
-        <select
+    <main v-else-if="!user" class="login-page" :lang="locale">
+      <div class="login-toolbar">
+        <TSelect
+          v-control-attrs="{ 'aria-label': t('Interface language') }"
           :value="locale"
-          :aria-label="t('Interface language')"
-          @change="setLocale(($event.target as HTMLSelectElement).value)"
+          @change="setLocale(String($event))"
         >
-          <option value="zh-CN">中文</option>
-          <option value="en">English</option>
-        </select>
-      </header>
-      <main class="page-body">
-        <p v-if="error" class="error" role="alert">{{ error }}</p>
-        <template v-if="user.mustChangePassword || route.page === 'settings'"
-          ><header class="page-heading">
-            <div>
-              <h1>{{ t("Account settings") }}</h1>
-              <p v-if="user.mustChangePassword" class="notice">
-                {{ t("Change your temporary password before continuing.") }}
-              </p>
+          <TOption value="zh-CN" label="中文" />
+          <TOption value="en" label="English" />
+        </TSelect>
+      </div>
+      <div class="login-layout">
+        <section class="login-story" aria-labelledby="login-story-title">
+          <p class="login-eyebrow">{{ t("A space for deeper learning") }}</p>
+          <h1 id="login-story-title">
+            {{ t("A little curiosity.\nA deeper understanding.") }}
+          </h1>
+          <p class="login-introduction">
+            {{
+              t(
+                "A focused space for questions, reflection and thoughtful feedback.",
+              )
+            }}
+          </p>
+          <div class="login-illustration" aria-hidden="true">
+            <div class="login-orbit"></div>
+            <div class="login-note login-note-explore">
+              <Compass :size="25" :stroke-width="1.4" />
+              <span>{{ t("Explore the idea.") }}</span>
+              <i></i><i></i>
             </div>
-          </header>
-          <p v-if="user.demo" class="panel">
+            <div class="login-note login-note-discuss">
+              <MessageSquare :size="25" :stroke-width="1.4" />
+              <span>{{ t("Find your voice.") }}</span>
+              <i></i><i></i>
+            </div>
+          </div>
+          <ol class="login-principles">
+            <li><span>01</span> / {{ t("Think") }}</li>
+            <li><span>02</span> / {{ t("Discuss") }}</li>
+            <li><span>03</span> / {{ t("Reflect") }}</li>
+          </ol>
+        </section>
+        <section class="login-card" aria-labelledby="login-form-title">
+          <div class="login-brand">
+            <span class="login-brand-mark" aria-hidden="true"></span>
+            <div class="login-brand-copy">
+              <span class="login-wordmark">AIcademiya</span>
+              <span class="login-tagline">{{ t("Learn with intention") }}</span>
+            </div>
+          </div>
+          <h2 id="login-form-title">
             {{
               t(
-                "This is a demo account. Use the demo sign-in buttons; no password is required.",
+                creatingAdmin
+                  ? "Create the first administrator account"
+                  : "Your learning starts here.",
               )
             }}
-          </p>
-          <p v-else-if="user.username && !user.email" class="panel">
+          </h2>
+          <p v-if="error" class="error" role="alert">{{ error }}</p>
+          <TRadioGroup
+            v-model="loginRole"
+            class="login-role-tabs"
+            theme="button"
+            variant="primary-filled"
+            :disabled="busy"
+            :options="
+              loginRoles.map((role) => ({
+                value: role.value,
+                label: t(role.label),
+              }))
+            "
+            :aria-label="t('Sign in as')"
+          />
+          <TButton
+            theme="default"
+            variant="outline"
+            v-if="loginRole === 'student'"
+            type="button"
+            class="login-method"
+            :disabled="busy"
+            @click="
+              studentEmail = !studentEmail;
+              error = '';
+            "
+          >
             {{
               t(
-                "Your account uses a personal invitation code. Ask your teacher to reset it when needed.",
+                studentEmail
+                  ? "Use a personal invitation code"
+                  : "Use email and password",
               )
             }}
-          </p>
-          <form
-            v-else
-            class="panel form-stack settings-form"
-            @submit.prevent="changePassword"
-          >
-            <h2>{{ t("Change password") }}</h2>
-            <label
-              >{{ t("Current password")
-              }}<input
-                v-model="passwordForm.currentPassword"
-                type="password"
-                required
-                autocomplete="current-password" /></label
-            ><label
-              >{{ t("New password")
-              }}<input
-                v-model="passwordForm.newPassword"
-                type="password"
-                minlength="8"
-                required
-                autocomplete="new-password" /></label
-            ><button class="primary" :disabled="busy">
-              {{ t("Save password") }}
-            </button>
-          </form></template
-        >
-        <TeacherChat
-          v-else-if="staff && ['home', 'course'].includes(route.page)"
-          :key="pageKey"
-          :course-id="route.courseId"
-        />
-        <ClassroomHome
-          v-else-if="!staff && ['home', 'course'].includes(route.page)"
-          :key="pageKey"
-          :course-id="route.courseId"
-        />
-        <TaskEditor
-          v-else-if="staff && route.page === 'task'"
-          :key="pageKey"
-          :course-id="route.courseId"
-          :task-id="route.taskId"
-        />
-        <CourseLibrary
-          v-else-if="staff && route.page === 'materials'"
-          :key="pageKey"
-          :course-id="route.courseId"
-        />
-        <StudentTask
-          v-else-if="!staff && route.page === 'learn'"
-          :key="pageKey"
-          :task-id="route.taskId"
-          :version-id="route.versionId"
-        />
-        <section v-else-if="route.page === 'history'">
-          <h1>{{ t("Learning history") }}</h1>
-          <article
-            v-for="record in historyRows"
-            :key="record.id"
-            class="panel task-card"
-          >
-            <div class="grow">
-              <h3>{{ taskTitle(record.sessionId) }}</h3>
-              <p>{{ dateText(record.updatedAt) }}</p>
-              <small>{{ t("Version") }}: {{ record.versionId }}</small>
-              <div>
-                <span class="badge status-label" :data-status="record.status">{{
-                  statusText(record.status)
-                }}</span>
+          </TButton>
+          <form class="form-stack" @submit.prevent="signIn">
+            <label v-if="creatingAdmin">
+              {{ t("Name") }}
+              <TInput
+                v-control-attrs="{ required: true }"
+                v-model="loginForm.name"
+                autocomplete="name"
+              />
+            </label>
+            <template v-if="studentSignIn">
+              <label>
+                {{ t("Username") }}
+                <TInput
+                  v-control-attrs="{ required: true, autocapitalize: 'none' }"
+                  v-model="studentCredentials.username"
+                  autocomplete="username"
+                  :spell-check="false"
+                  maxlength="64"
+                />
+              </label>
+              <label>
+                {{ t("Invitation code") }}
+                <TInput
+                  v-control-attrs="{ required: true }"
+                  v-model="studentCredentials.invitationCode"
+                  type="password"
+                  autocomplete="current-password"
+                  maxlength="128"
+                />
+              </label>
+            </template>
+            <template v-else>
+              <label>
+                {{ t("Email address") }}
+                <TInput
+                  v-control-attrs="{
+                    type: 'email',
+                    required: true,
+                    autocapitalize: 'none',
+                  }"
+                  v-model="loginForm.email"
+                  autocomplete="username"
+                  :spell-check="false"
+                  placeholder="you@example.edu"
+                />
+              </label>
+              <label>
+                {{ t("Password") }}
+                <TInput
+                  v-control-attrs="{
+                    required: true,
+                    minlength: creatingAdmin ? 8 : 1,
+                  }"
+                  v-model="loginForm.password"
+                  type="password"
+                  :autocomplete="
+                    creatingAdmin ? 'new-password' : 'current-password'
+                  "
+                />
+              </label>
+            </template>
+            <div
+              v-if="
+                bootstrap?.demoEnabled && demoAccounts.length && !creatingAdmin
+              "
+              class="login-demo-panel"
+            >
+              <small>{{ t("Try a demo — no password needed") }}</small>
+              <div class="login-demo-options">
+                <TButton
+                  theme="default"
+                  variant="outline"
+                  v-for="account in demoAccounts"
+                  :key="account.id"
+                  type="button"
+                  :disabled="busy"
+                  @click="demo(account.id)"
+                >
+                  {{
+                    t(
+                      account.role === "teacher"
+                        ? "Demo teacher sign-in"
+                        : "Demo student sign-in",
+                    )
+                  }}
+                </TButton>
               </div>
             </div>
-            <button
+            <small v-if="studentSignIn" class="login-help">
+              {{
+                t(
+                  "Use the personal invitation code your teacher gave you. A course join code cannot be used to sign in.",
+                )
+              }}
+            </small>
+            <TButton
+              theme="primary"
+              variant="base"
+              type="submit"
+              class="primary login-submit"
+              :disabled="busy || !bootstrap"
+            >
+              <ArrowRight :size="18" aria-hidden="true" />
+              {{ t(creatingAdmin ? "Create account and sign in" : "Sign in") }}
+            </TButton>
+          </form>
+          <p v-if="creatingAdmin" class="login-help login-access-note">
+            {{
+              t(
+                "Create your administrator account to start a fresh teaching workspace.",
+              )
+            }}
+          </p>
+          <TButton
+            theme="default"
+            variant="outline"
+            type="button"
+            v-if="!bootstrap"
+            :disabled="busy"
+            @click="boot"
+          >
+            {{ t("Retry connection") }}
+          </TButton>
+        </section>
+      </div>
+    </main>
+    <div v-else :class="['classroom-shell', { 'teacher-shell': staff }]">
+      <TButton
+        theme="default"
+        variant="outline"
+        type="button"
+        class="mobile-menu"
+        :aria-label="t('Toggle navigation')"
+        @click="menuOpen = !menuOpen"
+      >
+        ☰
+      </TButton>
+      <aside :class="['classroom-sidebar', { open: menuOpen }]">
+        <TButton
+          theme="default"
+          variant="outline"
+          type="button"
+          class="brand"
+          @click="open('home')"
+        >
+          <BrandLogo /></TButton
+        ><TButton
+          theme="default"
+          variant="outline"
+          type="button"
+          class="nav-home"
+          :class="{ active: route.page === 'home' }"
+          @click="open('home')"
+        >
+          {{ staff ? "＋" : "⌂" }}
+          {{ t(staff ? "New course conversation" : "Home") }}
+        </TButton>
+        <p class="nav-caption">{{ t("MY COURSES") }}</p>
+        <div class="course-navigation">
+          <details
+            v-for="item in courses.filter((c) => !c.archived)"
+            :key="item.id"
+            :open="item.id === route.courseId"
+          >
+            <summary>{{ item.title }}</summary>
+            <TButton
+              theme="default"
+              variant="outline"
+              type="button"
               @click="
-                navigate({
-                  page: 'learn',
-                  taskId: record.sessionId,
-                  versionId: record.versionId,
-                })
+                navigate({ page: 'course', courseId: item.id });
+                menuOpen = false;
               "
             >
-              {{ t("View learning record") }}
-            </button>
-          </article>
-          <p v-if="!historyRows.length" class="empty">
-            {{ t("Your learning history will appear here.") }}
+              {{
+                t(staff ? "Course conversation" : "Course overview")
+              }}</TButton
+            ><template v-if="staff"
+              ><TButton
+                theme="default"
+                variant="outline"
+                type="button"
+                :disabled="
+                  route.page === 'course' && route.courseId === item.id && dirty
+                "
+                @click="
+                  navigate({ page: 'task', courseId: item.id });
+                  menuOpen = false;
+                "
+              >
+                ＋ {{ t("Create task") }}</TButton
+              ><TButton
+                theme="default"
+                variant="outline"
+                type="button"
+                @click="
+                  navigate({ page: 'materials', courseId: item.id });
+                  menuOpen = false;
+                "
+              >
+                {{ t("Materials") }}
+              </TButton></template
+            ><TButton
+              theme="default"
+              variant="outline"
+              type="button"
+              v-for="task in (tasks[item.id] || []).filter((s) => !s.archived)"
+              :key="task.id"
+              :class="{ active: route.taskId === task.id }"
+              @click="
+                navigate({
+                  page: staff ? 'task' : 'learn',
+                  courseId: item.id,
+                  taskId: task.id,
+                });
+                menuOpen = false;
+              "
+            >
+              <span>{{ task.sessionType === "tutor" ? "✦" : "▤" }}</span
+              >{{ task.title }}
+            </TButton>
+          </details>
+          <p v-if="!courses.length" class="muted small">
+            {{ t("Your courses will appear here.") }}
           </p>
-        </section>
-        <section v-else-if="user.role === 'admin' && route.page === 'accounts'">
-          <div class="page-heading">
-            <h1>{{ t("Account management") }}</h1>
-            <button class="primary" @click="showAccount = true">
-              ＋ {{ t("Create account") }}
-            </button>
-          </div>
-          <div class="panel table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>{{ t("Name") }}</th>
-                  <th>{{ t("Email") }}</th>
-                  <th>{{ t("Role") }}</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="account in accountRows" :key="account.id">
-                  <td>{{ account.name }}</td>
-                  <td>{{ account.email }}</td>
-                  <td>
-                    {{
-                      t(
-                        account.role === "admin"
-                          ? "Administrator"
-                          : account.role === "teacher"
-                            ? "Teacher"
-                            : "Student",
-                      )
-                    }}
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </section>
-        <p v-else class="empty">
-          {{ t("This page is not available to your role.") }}
-        </p>
-      </main>
-      <footer>AIcademiya · {{ t("A considered space for learning.") }}</footer>
-    </div>
-    <AppDialog
-      v-if="showAccount"
-      :title="t('Create account')"
-      @close="showAccount = false"
-    >
-      <form class="form-stack" @submit.prevent="createAccount">
-        <label
-          >{{ t("Name") }}<input v-model="accountForm.name" required /></label
-        ><label
-          >{{ t("Email")
-          }}<input v-model="accountForm.email" type="email" required /></label
-        ><label
-          >{{ t("Password")
-          }}<input
-            v-model="accountForm.password"
-            type="password"
-            minlength="8"
-            required /></label
-        ><label
-          >{{ t("Role")
-          }}<select v-model="accountForm.role">
-            <option value="student">{{ t("Student") }}</option>
-            <option value="teacher">{{ t("Teacher") }}</option>
-            <option value="admin">{{ t("Administrator") }}</option>
-          </select></label
-        >
-        <div class="row end">
-          <button type="button" @click="showAccount = false">
-            {{ t("Cancel") }}</button
-          ><button class="primary" :disabled="busy">
-            {{ t("Create account") }}
-          </button>
         </div>
-      </form>
-    </AppDialog>
-  </div>
+        <nav class="secondary-nav">
+          <TButton
+            theme="default"
+            variant="outline"
+            type="button"
+            v-if="!staff"
+            @click="open('history')"
+          >
+            {{ t("Learning history") }}</TButton
+          ><TButton
+            theme="default"
+            variant="outline"
+            type="button"
+            v-if="user.role === 'admin'"
+            @click="open('accounts')"
+          >
+            {{ t("Account management") }}</TButton
+          ><TButton
+            theme="default"
+            variant="outline"
+            type="button"
+            @click="open('settings')"
+            >{{ t("Account settings") }}</TButton
+          >
+        </nav>
+        <div class="sidebar-user">
+          <strong>{{ user.name }}</strong
+          ><small>{{
+            t(
+              user.role === "student"
+                ? "Student"
+                : user.role === "admin"
+                  ? "Administrator"
+                  : "Teacher",
+            )
+          }}</small
+          ><TButton
+            theme="default"
+            variant="outline"
+            type="button"
+            @click="signOut"
+            >{{ t("Sign out") }}</TButton
+          >
+        </div>
+      </aside>
+      <div v-if="menuOpen" class="sidebar-shade" @click="menuOpen = false" />
+      <div class="classroom-main">
+        <header class="topbar">
+          <div>
+            <span>{{
+              t(staff ? "Teaching workspace" : "Learning workspace")
+            }}</span
+            ><span v-if="course" class="muted"> / {{ course.code }}</span>
+          </div>
+          <TSelect
+            v-control-attrs="{ 'aria-label': t('Interface language') }"
+            :value="locale"
+            @change="setLocale(String($event))"
+          >
+            <TOption value="zh-CN" label="中文" />
+            <TOption value="en" label="English" />
+          </TSelect>
+        </header>
+        <main class="page-body">
+          <p v-if="error" class="error" role="alert">{{ error }}</p>
+          <template v-if="user.mustChangePassword || route.page === 'settings'"
+            ><header class="page-heading">
+              <div>
+                <h1>{{ t("Account settings") }}</h1>
+                <p v-if="user.mustChangePassword" class="notice">
+                  {{ t("Change your temporary password before continuing.") }}
+                </p>
+              </div>
+            </header>
+            <p v-if="user.demo" class="panel">
+              {{
+                t(
+                  "This is a demo account. Use the demo sign-in buttons; no password is required.",
+                )
+              }}
+            </p>
+            <p v-else-if="user.username && !user.email" class="panel">
+              {{
+                t(
+                  "Your account uses a personal invitation code. Ask your teacher to reset it when needed.",
+                )
+              }}
+            </p>
+            <form
+              v-else
+              class="panel form-stack settings-form"
+              @submit.prevent="changePassword"
+            >
+              <h2>{{ t("Change password") }}</h2>
+              <label
+                >{{ t("Current password")
+                }}<TInput
+                  v-control-attrs="{ required: true }"
+                  v-model="passwordForm.currentPassword"
+                  type="password"
+                  autocomplete="current-password" /></label
+              ><label
+                >{{ t("New password")
+                }}<TInput
+                  v-control-attrs="{ minlength: '8', required: true }"
+                  v-model="passwordForm.newPassword"
+                  type="password"
+                  autocomplete="new-password" /></label
+              ><TButton
+                theme="primary"
+                variant="base"
+                type="submit"
+                class="primary"
+                :disabled="busy"
+              >
+                {{ t("Save password") }}
+              </TButton>
+            </form></template
+          >
+          <TeacherChat
+            v-else-if="staff && ['home', 'course'].includes(route.page)"
+            :key="pageKey"
+            :course-id="route.courseId"
+          />
+          <ClassroomHome
+            v-else-if="!staff && ['home', 'course'].includes(route.page)"
+            :key="pageKey"
+            :course-id="route.courseId"
+          />
+          <TaskEditor
+            v-else-if="staff && route.page === 'task'"
+            :key="pageKey"
+            :course-id="route.courseId"
+            :task-id="route.taskId"
+          />
+          <CourseLibrary
+            v-else-if="staff && route.page === 'materials'"
+            :key="pageKey"
+            :course-id="route.courseId"
+          />
+          <StudentTask
+            v-else-if="!staff && route.page === 'learn'"
+            :key="pageKey"
+            :task-id="route.taskId"
+            :version-id="route.versionId"
+          />
+          <section v-else-if="route.page === 'history'">
+            <h1>{{ t("Learning history") }}</h1>
+            <article
+              v-for="record in historyRows"
+              :key="record.id"
+              class="panel task-card"
+            >
+              <div class="grow">
+                <h3>{{ taskTitle(record.sessionId) }}</h3>
+                <p>{{ dateText(record.updatedAt) }}</p>
+                <small>{{ t("Version") }}: {{ record.versionId }}</small>
+                <div>
+                  <span
+                    class="badge status-label"
+                    :data-status="record.status"
+                    >{{ statusText(record.status) }}</span
+                  >
+                </div>
+              </div>
+              <TButton
+                theme="default"
+                variant="outline"
+                type="button"
+                @click="
+                  navigate({
+                    page: 'learn',
+                    taskId: record.sessionId,
+                    versionId: record.versionId,
+                  })
+                "
+              >
+                {{ t("View learning record") }}
+              </TButton>
+            </article>
+            <p v-if="!historyRows.length" class="empty">
+              {{ t("Your learning history will appear here.") }}
+            </p>
+          </section>
+          <section
+            v-else-if="user.role === 'admin' && route.page === 'accounts'"
+          >
+            <div class="page-heading">
+              <h1>{{ t("Account management") }}</h1>
+              <TButton
+                theme="primary"
+                variant="base"
+                type="button"
+                class="primary"
+                @click="showAccount = true"
+              >
+                ＋ {{ t("Create account") }}
+              </TButton>
+            </div>
+            <div class="panel table-wrap">
+              <TTable
+                row-key="id"
+                :data="accountRows"
+                :columns="[
+                  { colKey: 'name', title: t('Name') },
+                  { colKey: 'email', title: t('Email') },
+                  { colKey: 'role', title: t('Role') },
+                ]"
+              >
+                <template #role="{ row }">
+                  {{
+                    t(
+                      row.role === "admin"
+                        ? "Administrator"
+                        : row.role === "teacher"
+                          ? "Teacher"
+                          : "Student",
+                    )
+                  }}
+                </template>
+              </TTable>
+            </div>
+          </section>
+          <p v-else class="empty">
+            {{ t("This page is not available to your role.") }}
+          </p>
+        </main>
+        <footer>
+          AIcademiya · {{ t("A considered space for learning.") }}
+        </footer>
+      </div>
+      <AppDialog
+        v-if="showAccount"
+        :title="t('Create account')"
+        @close="showAccount = false"
+      >
+        <form class="form-stack" @submit.prevent="createAccount">
+          <label
+            >{{ t("Name")
+            }}<TInput
+              v-control-attrs="{ required: true }"
+              v-model="accountForm.name" /></label
+          ><label
+            >{{ t("Email")
+            }}<TInput
+              v-control-attrs="{ type: 'email', required: true }"
+              v-model="accountForm.email" /></label
+          ><label
+            >{{ t("Password")
+            }}<TInput
+              v-control-attrs="{ minlength: '8', required: true }"
+              v-model="accountForm.password"
+              type="password" /></label
+          ><label
+            >{{ t("Role")
+            }}<TSelect v-model="accountForm.role">
+              <TOption value="student" :label="t('Student')" />
+              <TOption value="teacher" :label="t('Teacher')" />
+              <TOption value="admin" :label="t('Administrator')" /> </TSelect
+          ></label>
+          <div class="row end">
+            <TButton
+              theme="default"
+              variant="outline"
+              type="button"
+              @click="showAccount = false"
+            >
+              {{ t("Cancel") }}</TButton
+            ><TButton
+              theme="primary"
+              variant="base"
+              type="submit"
+              class="primary"
+              :disabled="busy"
+            >
+              {{ t("Create account") }}
+            </TButton>
+          </div>
+        </form>
+      </AppDialog>
+    </div>
+  </TConfigProvider>
 </template>

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Button as TButton } from "tdesign-vue-next";
 import { ref, watch } from "vue";
 import { t } from "../i18n";
 import { upload, type Material } from "../classroom-api";
@@ -29,6 +30,8 @@ type Upload = {
   progress: number;
 };
 const queue = ref<Upload[]>([]);
+const fileInput = ref<HTMLInputElement | null>(null);
+const folderInput = ref<HTMLInputElement | null>(null);
 watch(
   queue,
   () =>
@@ -102,26 +105,42 @@ async function send(item: Upload) {
 <template>
   <div class="file-uploader">
     <div class="row wrap">
-      <label class="button"
-        >＋ {{ t("Upload files")
-        }}<input
-          type="file"
-          multiple
-          hidden
-          :disabled="disabled"
-          accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.md,.png,.jpg,.jpeg,.webp,.epub"
-          @change="choose"
-      /></label>
-      <label v-if="folders" class="button"
-        >＋ {{ t("Upload folder")
-        }}<input
-          type="file"
-          multiple
-          webkitdirectory
-          hidden
-          :disabled="disabled"
-          @change="choose"
-      /></label>
+      <TButton
+        theme="default"
+        variant="outline"
+        :disabled="disabled"
+        @click="fileInput?.click()"
+      >
+        ＋ {{ t("Upload files") }}
+      </TButton>
+      <input
+        ref="fileInput"
+        type="file"
+        multiple
+        hidden
+        :disabled="disabled"
+        accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.md,.png,.jpg,.jpeg,.webp,.epub"
+        @change="choose"
+      />
+      <TButton
+        v-if="folders"
+        theme="default"
+        variant="outline"
+        :disabled="disabled"
+        @click="folderInput?.click()"
+      >
+        ＋ {{ t("Upload folder") }}
+      </TButton>
+      <input
+        v-if="folders"
+        ref="folderInput"
+        type="file"
+        multiple
+        webkitdirectory
+        hidden
+        :disabled="disabled"
+        @change="choose"
+      />
       <slot name="actions" />
     </div>
     <p class="muted">
@@ -150,14 +169,16 @@ async function send(item: Upload) {
           :value="item.progress >= 100 ? null : item.progress"
         />
         <span v-if="item.error" class="error">{{ item.error }}</span
-        ><button
+        ><TButton
+          theme="default"
+          variant="outline"
           v-if="item.status === 'failed'"
           type="button"
           :disabled="disabled"
           @click="retry(item)"
         >
           {{ t("Retry") }}
-        </button>
+        </TButton>
       </li>
     </ul>
   </div>

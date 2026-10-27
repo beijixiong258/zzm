@@ -1,4 +1,14 @@
 <script setup lang="ts">
+import { confirmAction } from "../confirmAction";
+import {
+  Checkbox as TCheckbox,
+  CheckboxGroup as TCheckboxGroup,
+  RadioGroup as TRadioGroup,
+  Button as TButton,
+  Select as TSelect,
+  Option as TOption,
+  Textarea as TTextarea,
+} from "tdesign-vue-next";
 import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { t } from "../i18n";
 import {
@@ -203,11 +213,11 @@ async function exportTask() {
 async function resetConversation() {
   if (pendingUploads.value) return;
   if (
-    !window.confirm(
+    !(await confirmAction(
       t(
         "Start a new conversation? Your previous conversation will remain in the history.",
       ),
-    )
+    ))
   )
     return;
   await action(async () => {
@@ -232,7 +242,7 @@ async function save() {
 }
 async function submit() {
   if (pendingUploads.value) return;
-  if (!window.confirm(t("Submit your work for teacher review?"))) return;
+  if (!(await confirmAction(t("Submit your work for teacher review?")))) return;
   await action(async () => {
     await saveAnswers();
     if (record.value)
@@ -324,11 +334,11 @@ async function retryAttachment(id: string) {
 }
 async function removeAttachment(file: Material) {
   if (
-    !window.confirm(
+    !(await confirmAction(
       t(
         "Remove this attachment? It will no longer be sent to the AI tutor. Previous messages will keep a removal notice.",
       ),
-    )
+    ))
   )
     return;
   await action(async () => {
@@ -389,39 +399,45 @@ void load();
       class="preview-navigation"
       :aria-label="t('Student preview')"
     >
-      <button
-        :aria-pressed="previewPane === 'lesson'"
-        @click="previewPane = 'lesson'"
-      >
-        {{ t("Lesson and practice") }}
-      </button>
-      <button
-        :aria-pressed="previewPane === 'chat'"
-        @click="previewPane = 'chat'"
-      >
-        {{ t("AI conversation") }}
-      </button>
+      <TRadioGroup
+        v-model="previewPane"
+        theme="button"
+        variant="primary-filled"
+        :options="[
+          { value: 'lesson', label: t('Lesson and practice') },
+          { value: 'chat', label: t('AI conversation') },
+        ]"
+      />
       <span
         class="badge status-label"
         :data-status="record?.status || 'notStarted'"
         >{{ statusText(record?.status || "notStarted") }}</span
       >
-      <button
+      <TButton
+        theme="primary"
+        variant="base"
+        type="button"
         class="primary"
         :disabled="busy || pendingUploads > 0 || !workspace"
         @click="start"
       >
         {{ t(record ? "Start a new simulation" : "Start simulation") }}
-      </button>
+      </TButton>
     </nav>
     <p v-if="error" class="error" role="alert">{{ error }}</p>
     <p v-if="success" class="success" role="status">{{ success }}</p>
     <div v-if="workspace" class="learning-layout">
       <section v-show="!preview || previewPane === 'lesson'" class="panel">
         <div v-if="!preview" class="row end">
-          <button :disabled="busy || !record" @click="exportTask">
+          <TButton
+            theme="default"
+            variant="outline"
+            type="button"
+            :disabled="busy || !record"
+            @click="exportTask"
+          >
             {{ t("Export my learning result (Markdown)") }}
-          </button>
+          </TButton>
         </div>
         <TaskContent
           :task="workspace.task"
@@ -430,23 +446,35 @@ void load();
           @answer="(id, value) => (answers[id] = value)"
         />
         <div v-if="record || !preview" class="row wrap task-actions">
-          <button
+          <TButton
+            theme="primary"
+            variant="base"
+            type="button"
             v-if="!record"
             class="primary"
             :disabled="busy"
             @click="start"
           >
-            {{ t("Start learning") }}</button
+            {{ t("Start learning") }}</TButton
           ><template v-else-if="!readonly"
-            ><button :disabled="busy || !changed" @click="save">
-              {{ t("Save answers") }}</button
-            ><button
+            ><TButton
+              theme="default"
+              variant="outline"
+              type="button"
+              :disabled="busy || !changed"
+              @click="save"
+            >
+              {{ t("Save answers") }}</TButton
+            ><TButton
+              theme="primary"
+              variant="base"
+              type="button"
               class="primary"
               :disabled="busy || pendingUploads > 0"
               @click="submit"
             >
               {{ t("Submit for review") }}
-            </button></template
+            </TButton></template
           >
           <p v-else class="muted">
             {{
@@ -491,16 +519,14 @@ void load();
           <template v-if="!readonly"
             ><label
               >{{ t("Attach to")
-              }}<select v-model="questionId">
-                <option value="">{{ t("Conversation") }}</option>
-                <option
+              }}<TSelect v-model="questionId">
+                <TOption value="" :label="t('Conversation')" />
+                <TOption
                   v-for="(q, index) in workspace.task.content.questions"
                   :key="q.id"
                   :value="q.id"
-                >
-                  {{ t("Question {0}", [index + 1]) }}
-                </option>
-              </select></label
+                  :label="t('Question {0}', [index + 1])"
+                /> </TSelect></label
             ><FileUploader
               :key="record.id"
               :endpoint="`/records/${key(record.id)}/attachments`"
@@ -511,42 +537,54 @@ void load();
               @uploaded="uploaded"
               @settled="loadAttachments"
           /></template>
-          <label v-for="file in attachments" :key="file.id" class="check-label"
-            ><input
-              v-if="!readonly"
-              v-model="attachmentIds"
-              type="checkbox"
-              :value="file.id"
-              :disabled="
-                busy ||
-                (!attachmentIds.includes(file.id) &&
-                  !['ready', 'needsReview'].includes(file.status))
-              "
-            /><a :href="fileUrl(file.id)" target="_blank" rel="noopener">{{
-              file.title
-            }}</a
-            ><span class="status-label" :data-status="file.status">{{
-              statusText(file.status)
-            }}</span
-            ><MaterialProgress :material="file" /><small
-              v-if="file.questionId"
-              >{{ t("Question attachment") }}</small
-            ><button
-              v-if="!readonly && ['incomplete', 'failed'].includes(file.status)"
-              type="button"
-              :disabled="busy"
-              @click.prevent="retryAttachment(file.id)"
-            >
-              {{ t("Reprocess material") }}</button
-            ><button
-              v-if="!readonly"
-              type="button"
-              :disabled="busy"
-              @click.prevent="removeAttachment(file)"
-            >
-              {{ t("Remove attachment") }}
-            </button></label
+          <TCheckboxGroup
+            v-model="attachmentIds"
+            class="student-attachment-list"
           >
+            <div v-for="file in attachments" :key="file.id" class="check-label">
+              <TCheckbox
+                v-if="!readonly"
+                :value="file.id"
+                v-control-attrs="{
+                  'aria-label': t('Select {0}', [file.title]),
+                }"
+                :disabled="
+                  busy ||
+                  (!attachmentIds.includes(file.id) &&
+                    !['ready', 'needsReview'].includes(file.status))
+                "
+              /><a :href="fileUrl(file.id)" target="_blank" rel="noopener">{{
+                file.title
+              }}</a
+              ><span class="status-label" :data-status="file.status">{{
+                statusText(file.status)
+              }}</span
+              ><MaterialProgress :material="file" /><small
+                v-if="file.questionId"
+                >{{ t("Question attachment") }}</small
+              ><TButton
+                theme="default"
+                variant="outline"
+                v-if="
+                  !readonly && ['incomplete', 'failed'].includes(file.status)
+                "
+                type="button"
+                :disabled="busy"
+                @click.prevent="retryAttachment(file.id)"
+              >
+                {{ t("Reprocess material") }}</TButton
+              ><TButton
+                theme="default"
+                variant="outline"
+                v-if="!readonly"
+                type="button"
+                :disabled="busy"
+                @click.prevent="removeAttachment(file)"
+              >
+                {{ t("Remove attachment") }}
+              </TButton>
+            </div>
+          </TCheckboxGroup>
         </div>
         <RecordHistory
           v-if="record"
@@ -586,19 +624,23 @@ void load();
                   {{ t("AI feedback is awaiting teacher review.") }}
                 </p>
                 <template v-if="preview">
-                  <textarea
+                  <TTextarea
+                    v-control-attrs="{
+                      rows: '6',
+                      'aria-label': t('Review AI feedback'),
+                    }"
+                    :autosize="{ minRows: 6, maxRows: 10 }"
                     :value="
                       feedbackDrafts[message.requestId!] ?? message.content
                     "
                     :disabled="busy"
-                    @input="
-                      feedbackDrafts[message.requestId!] = (
-                        $event.target as HTMLTextAreaElement
-                      ).value
+                    @change="
+                      feedbackDrafts[message.requestId!] = String($event)
                     "
-                    rows="6"
-                    :aria-label="t('Review AI feedback')"
-                  /><button
+                  /><TButton
+                    theme="default"
+                    variant="outline"
+                    type="button"
                     :disabled="busy"
                     @click="
                       approve(
@@ -608,7 +650,7 @@ void load();
                     "
                   >
                     {{ t("Approve and release feedback") }}
-                  </button></template
+                  </TButton></template
                 ></template
               ><RichText v-else :text="message.content" />
               <div v-for="id in message.attachmentIds || []" :key="id">
@@ -627,13 +669,16 @@ void load();
             :questions="workspace.task.content.questions"
             kind="conversation"
           />
-          <button
+          <TButton
+            theme="default"
+            variant="outline"
+            type="button"
             v-if="!readonly"
             :disabled="busy || pendingUploads > 0 || awaiting"
             @click="resetConversation"
           >
             {{ t("Start a new conversation") }}
-          </button>
+          </TButton>
           <RecordHistory
             v-if="record.messagesTruncated"
             :record="record"
@@ -648,16 +693,22 @@ void load();
             }}
           </p>
           <form v-if="!readonly" class="form-stack" @submit.prevent="chat">
-            <textarea
+            <TTextarea
+              v-control-attrs="{
+                rows: '3',
+                'aria-label': t('Message to the AI tutor'),
+              }"
+              :autosize="{ minRows: 3, maxRows: 10 }"
               v-model="prompt"
-              rows="3"
               maxlength="10000"
               :disabled="busy || awaiting || record.conversationLimitReached"
-              :aria-label="t('Message to the AI tutor')"
               :placeholder="
                 t('Ask about this task or describe where you are stuck.')
               "
-            /><ContextMeter :usage="usage" :loading="checking" /><button
+            /><ContextMeter :usage="usage" :loading="checking" /><TButton
+              theme="primary"
+              variant="base"
+              type="submit"
               class="primary"
               :disabled="
                 busy ||
@@ -677,7 +728,7 @@ void load();
               "
             >
               {{ t(busy ? "Thinking…" : "Send") }}
-            </button>
+            </TButton>
           </form>
         </template>
       </aside>

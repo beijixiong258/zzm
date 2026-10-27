@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Button as TButton } from "tdesign-vue-next";
 import { computed, ref, watch } from "vue";
 import { t } from "../i18n";
 import {
@@ -150,7 +151,9 @@ function toggle(event: Event) {
             <RichText :text="answer" />
           </div>
         </template>
-        <button
+        <TButton
+          theme="default"
+          variant="outline"
           v-else-if="kind === 'conversation'"
           type="button"
           :disabled="loading"
@@ -159,7 +162,7 @@ function toggle(event: Event) {
         >
           {{ dateText(entry.archivedAt) }} ·
           {{ t("{0} messages", [entry.messageCount || 0]) }}
-        </button>
+        </TButton>
         <template v-else>
           <strong>{{ entry.title }}</strong>
           <p class="muted">
@@ -176,26 +179,30 @@ function toggle(event: Event) {
         </template>
       </section>
       <div v-if="entries.total > entries.size" class="history-pagination">
-        <button
+        <TButton
+          theme="default"
+          variant="outline"
           type="button"
           :disabled="loading || entries.page <= 1"
           @click="load(entries.page - 1)"
         >
           {{ t("Previous page") }}
-        </button>
+        </TButton>
         <small>{{
           t("Page {0} of {1}", [
             entries.page,
             Math.ceil(entries.total / entries.size),
           ])
         }}</small>
-        <button
+        <TButton
+          theme="default"
+          variant="outline"
           type="button"
           :disabled="loading || !entries.hasMore"
           @click="load(entries.page + 1)"
         >
           {{ t("Next page") }}
-        </button>
+        </TButton>
       </div>
     </template>
     <section v-if="messages" class="history-conversation">
@@ -226,26 +233,30 @@ function toggle(event: Event) {
         {{ t("No conversation yet.") }}
       </p>
       <div v-if="messages.total > messages.size" class="history-pagination">
-        <button
+        <TButton
+          theme="default"
+          variant="outline"
           type="button"
           :disabled="loading || messages.page <= 1"
           @click="loadMessages(selected, messages.page - 1)"
         >
           {{ t("Previous page") }}
-        </button>
+        </TButton>
         <small>{{
           t("Page {0} of {1}", [
             messages.page,
             Math.ceil(messages.total / messages.size),
           ])
         }}</small>
-        <button
+        <TButton
+          theme="default"
+          variant="outline"
           type="button"
           :disabled="loading || !messages.hasMore"
           @click="loadMessages(selected, messages.page + 1)"
         >
           {{ t("Next page") }}
-        </button>
+        </TButton>
       </div>
     </section>
   </details>

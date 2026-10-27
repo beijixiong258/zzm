@@ -1,4 +1,9 @@
 <script setup lang="ts">
+import {
+  Textarea as TTextarea,
+  Checkbox as TCheckbox,
+  Radio as TRadio,
+} from "tdesign-vue-next";
 import { t } from "../i18n";
 import { fileUrl, questionTypes, type Task } from "../classroom-api";
 import RichText from "./RichText.vue";
@@ -113,32 +118,31 @@ function multiple(id: string, option: string, checked: boolean, answer = "") {
         "
         class="answer-options"
       >
-        <label
+        <div
           v-for="(option, optionIndex) in question.options"
           :key="optionIndex"
         >
-          <input
-            :type="question.type === 'multipleChoice' ? 'checkbox' : 'radio'"
+          <TCheckbox
+            v-if="question.type === 'multipleChoice'"
+            :checked="
+              (answers?.[question.id] || '').split('\n').includes(option)
+            "
+            :disabled="readonly || preview"
+            @change="
+              multiple(question.id, option, $event, answers?.[question.id])
+            "
+            >{{ option }}</TCheckbox
+          >
+          <TRadio
+            v-else
             :name="`answer-${question.id}-${preview ? 'preview' : 'student'}`"
             :value="option"
             :disabled="readonly || preview"
-            :checked="
-              question.type === 'multipleChoice'
-                ? (answers?.[question.id] || '').split('\n').includes(option)
-                : answers?.[question.id] === option
-            "
-            @change="
-              question.type === 'multipleChoice'
-                ? multiple(
-                    question.id,
-                    option,
-                    ($event.target as HTMLInputElement).checked,
-                    answers?.[question.id],
-                  )
-                : emit('answer', question.id, option)
-            "
-          />{{ option }}
-        </label>
+            :checked="answers?.[question.id] === option"
+            @change="emit('answer', question.id, option)"
+            >{{ option }}</TRadio
+          >
+        </div>
       </div>
       <template v-else>
         <ol
@@ -152,19 +156,16 @@ function multiple(id: string, option: string, checked: boolean, answer = "") {
             {{ option }}
           </li>
         </ol>
-        <textarea
-          :aria-label="t('Answer to question {0}', [index + 1])"
+        <TTextarea
+          v-control-attrs="{
+            'aria-label': t('Answer to question {0}', [index + 1]),
+            rows: '3',
+          }"
+          :autosize="{ minRows: 3, maxRows: 10 }"
           :value="answers?.[question.id] || ''"
           :disabled="readonly || preview"
           :placeholder="t('Write your answer here')"
-          rows="3"
-          @input="
-            emit(
-              'answer',
-              question.id,
-              ($event.target as HTMLTextAreaElement).value,
-            )
-          "
+          @change="emit('answer', question.id, String($event))"
         />
       </template>
       <details v-if="question.hint">

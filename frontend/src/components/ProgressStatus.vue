@@ -1,22 +1,18 @@
 <script setup lang="ts">
+import { Loading as TLoading, Progress as TProgress } from "tdesign-vue-next";
 defineProps<{ label: string; detail?: string; value?: number | null }>();
 </script>
 <template>
   <div class="progress-status" role="status">
     <div class="row spread">
-      <span
-        ><span
-          v-if="value == null"
-          class="activity-spinner"
-          aria-hidden="true"
-        />{{ label }}</span
-      >
+      <span><TLoading v-if="value == null" size="small" />{{ label }}</span>
       <small v-if="value != null">{{ Math.round(value) }}%</small>
     </div>
-    <progress
+    <TProgress
+      v-if="value != null"
       :aria-label="label"
-      max="100"
-      :value="value == null ? undefined : value"
+      :percentage="value"
+      :label="false"
     />
     <small v-if="detail" class="muted">{{ detail }}</small>
   </div>

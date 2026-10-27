@@ -1,4 +1,16 @@
 <script setup lang="ts">
+import { confirmAction } from "../confirmAction";
+import {
+  Button as TButton,
+  Select as TSelect,
+  Option as TOption,
+  Input as TInput,
+  Textarea as TTextarea,
+  Dropdown as TDropdown,
+  Checkbox as TCheckbox,
+  CheckboxGroup as TCheckboxGroup,
+  type DropdownOption,
+} from "tdesign-vue-next";
 import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
 import { t, systemText } from "../i18n";
 import {
@@ -61,6 +73,7 @@ const busy = ref(false),
   selectedMaterial = ref<Material | null>(null);
 const importSources = ref<string[]>([]);
 const pendingUploads = ref(0);
+const taskActionsVisible = ref(false);
 const chatBusy = ref(false),
   choosingFiles = ref(false),
   showImportSources = ref(false),
@@ -78,6 +91,7 @@ const activeMaterials = computed(() =>
 );
 const students = ref<StudentRow[] | null>(null),
   observed = ref<Workspace | null>(null);
+const studentProgressPanel = ref<HTMLElement | null>(null);
 const conversationKey = computed(
   () =>
     `${user.value?.id}:task:${draft.value.id || props.taskId || props.courseId + ":new"}`,
@@ -99,6 +113,59 @@ const selected = computed(() =>
     (m) => !m.archived && draft.value.materialIds.includes(m.id),
   ),
 );
+const taskActions = computed<DropdownOption[]>(() => [
+  ...(draft.value.content.handout
+    ? [
+        {
+          content: t("Revise with these instructions"),
+          value: "revise",
+          disabled:
+            busy.value ||
+            chatBusy.value ||
+            !!active.value ||
+            pendingUploads.value > 0 ||
+            !draft.value.additionalInstructions?.trim() ||
+            usage.value?.materialsReady === false,
+          onClick: () => {
+            void generate("revise");
+          },
+        },
+      ]
+    : []),
+  ...(draft.value.id
+    ? [
+        {
+          content: t("Student progress"),
+          value: "progress",
+          disabled: busy.value || chatBusy.value,
+          onClick: () => {
+            void action(async () => {
+              await viewProgress();
+              await nextTick();
+              studentProgressPanel.value?.scrollIntoView({
+                block: "start",
+                behavior: "smooth",
+              });
+            });
+          },
+        },
+      ]
+    : []),
+  {
+    content: t("File management"),
+    value: "files",
+    disabled: busy.value || chatBusy.value || !!active.value,
+    onClick: () => {
+      void openFileSelection();
+    },
+  },
+  {
+    content: t("Course conversation"),
+    value: "course",
+    disabled: busy.value || chatBusy.value || !!active.value,
+    onClick: () => navigate({ page: "course", courseId: props.courseId }),
+  },
+]);
 const preview = computed(() =>
   studentTask({ ...draft.value, materials: selected.value }),
 );
@@ -250,11 +317,11 @@ async function generate(
   if (
     kind === "generate" &&
     draft.value.content.questions.length &&
-    !window.confirm(
+    !(await confirmAction(
       t(
         "Generate a new lesson from these materials? The published version will remain available.",
       ),
-    )
+    ))
   )
     return false;
   let started = false;
@@ -317,7 +384,7 @@ async function poll() {
 async function publish() {
   await action(async () => {
     if (dirty.value || !draft.value.id) await saveDraft();
-    if (!window.confirm(t("Publish this task to students?"))) return;
+    if (!(await confirmAction(t("Publish this task to students?")))) return;
     await call(`/sessions/${key(draft.value.id)}/publish`, "POST", {
       revision: draft.value.revision,
     });
@@ -331,9 +398,9 @@ async function publish() {
 }
 async function restore(versionId: string) {
   if (
-    !window.confirm(
+    !(await confirmAction(
       t("Restore this version into the draft? Unsaved edits will be replaced."),
-    )
+    ))
   )
     return;
   await action(async () => {
@@ -498,7 +565,7 @@ async function configure(reply: TeacherReply, message: string) {
     outcome +=
       "\n" +
       t(
-        "Review the preview, then use Publish task below to confirm publication.",
+        "Review the preview, then use Publish task beside the task title to confirm publication.",
       );
   else if (reply.action === "progress") await viewProgress();
   else if (["members", "inviteStudent", "newTask"].includes(reply.action))
@@ -522,28 +589,83 @@ void load();
   <ProgressStatus v-if="loading" :label="t('Loading…')" />
   <div v-else-if="!ready" class="panel">
     <p class="error">{{ systemText(error || materialError) }}</p>
-    <button @click="load">{{ t("Retry") }}</button>
+    <TButton theme="default" variant="outline" type="button" @click="load">{{
+      t("Retry")
+    }}</TButton>
   </div>
   <template v-else>
     <div v-show="!choosingFiles" class="teacher-chat-page task-chat">
-      <header class="conversation-heading">
-        <div>
+      <header class="conversation-heading task-heading">
+        <div class="task-heading-title">
           <p class="eyebrow">{{ t("Task conversation") }}</p>
           <strong>{{ draft.title || t("New task conversation") }}</strong>
         </div>
-        <div class="row wrap">
-          <button
-            :disabled="busy || chatBusy || !!active"
-            @click="navigate({ page: 'course', courseId })"
+        <div class="row wrap task-heading-actions">
+          <TButton
+            :variant="draft.content.handout ? 'outline' : 'base'"
+            type="button"
+            :theme="!draft.content.handout ? 'primary' : 'default'"
+            :disabled="
+              busy ||
+              chatBusy ||
+              !!active ||
+              pendingUploads > 0 ||
+              usage?.materialsReady === false
+            "
+            @click="generate('generate')"
           >
-            {{ t("Course conversation") }}
-          </button>
-          <button
-            :disabled="busy || chatBusy || !!active"
-            @click="openFileSelection"
+            {{
+              t(draft.content.handout ? "Regenerate lesson" : "Generate lesson")
+            }}
+          </TButton>
+          <TButton
+            theme="default"
+            variant="outline"
+            type="button"
+            :disabled="busy || chatBusy || !!active || !selected.length"
+            @click="showImportSources = true"
           >
-            {{ t("File management") }}
-          </button>
+            {{ t("Import existing worksheet") }}
+          </TButton>
+          <TButton
+            theme="default"
+            variant="outline"
+            v-if="draft.content.handout"
+            type="button"
+            :disabled="busy || chatBusy || !!active"
+            @click="showPreview = true"
+          >
+            {{ t("Student preview") }}
+          </TButton>
+          <TDropdown
+            :options="taskActions"
+            trigger="click"
+            placement="bottom-right"
+            :popup-props="{
+              visible: taskActionsVisible,
+              onVisibleChange: (visible) => (taskActionsVisible = visible),
+            }"
+          >
+            <TButton
+              theme="default"
+              variant="outline"
+              :aria-expanded="taskActionsVisible"
+              @keydown.esc.stop="taskActionsVisible = false"
+            >
+              {{ t("More actions") }} <span aria-hidden="true">⌄</span>
+            </TButton>
+          </TDropdown>
+          <TButton
+            theme="primary"
+            variant="base"
+            v-if="draft.content.handout"
+            type="button"
+            class="primary"
+            :disabled="busy || chatBusy || !!active"
+            @click="publish"
+          >
+            {{ t("Publish task") }}
+          </TButton>
         </div>
       </header>
       <p v-if="error || materialError" role="alert" class="error">
@@ -594,18 +716,19 @@ void load();
                 </summary>
                 <label
                   >{{ t("Visibility")
-                  }}<select
+                  }}<TSelect
                     v-model="uploadVisibility"
                     :disabled="busy || chatBusy || !!active"
                   >
-                    <option value="student">
-                      {{ t("Students and teachers") }}
-                    </option>
-                    <option value="teacher">
-                      {{ t("Teachers and AI only") }}
-                    </option>
-                  </select></label
-                >
+                    <TOption
+                      value="student"
+                      :label="t('Students and teachers')"
+                    />
+                    <TOption
+                      value="teacher"
+                      :label="t('Teachers and AI only')"
+                    /> </TSelect
+                ></label>
               </details>
               <FileUploader
                 :endpoint="'/courses/' + key(courseId) + '/materials'"
@@ -616,20 +739,24 @@ void load();
                 @settled="loadMaterials"
               >
                 <template #actions
-                  ><button
+                  ><TButton
+                    theme="default"
+                    variant="outline"
                     type="button"
                     :disabled="busy || chatBusy || !!active"
                     @click="openFileSelection"
                   >
                     {{ t("File management") }}
-                  </button></template
+                  </TButton></template
                 >
               </FileUploader>
               <div v-if="selected.length" class="selected-materials">
                 <small>{{
                   t("Selected materials: {0}", [selected.length])
                 }}</small>
-                <button
+                <TButton
+                  theme="default"
+                  variant="outline"
                   v-for="material in selected"
                   :key="material.id"
                   type="button"
@@ -637,7 +764,7 @@ void load();
                 >
                   {{ material.title }}
                   <small>{{ statusText(material.status) }}</small>
-                </button>
+                </TButton>
               </div>
               <p v-else class="empty selected-empty">
                 {{
@@ -661,21 +788,26 @@ void load();
                     <label for="task-title">{{ t("Task name") }}</label>
                   </dt>
                   <dd>
-                    <input
-                      id="task-title"
-                      v-model.trim="draft.title"
+                    <TInput
+                      :disabled="busy || chatBusy || !!active"
+                      v-control-attrs="{ id: 'task-title', required: true }"
+                      v-model="draft.title"
+                      @blur="draft.title = draft.title.trim()"
                       maxlength="300"
-                      required
                     />
                   </dd>
                   <dt>
                     <label for="task-type">{{ t("Task type") }}</label>
                   </dt>
                   <dd>
-                    <select id="task-type" v-model="draft.sessionType">
-                      <option value="tutor">{{ t("AI tutor") }}</option>
-                      <option value="assignment">{{ t("Assignment") }}</option>
-                    </select>
+                    <TSelect
+                      :disabled="busy || chatBusy || !!active"
+                      v-control-attrs="{ id: 'task-type' }"
+                      v-model="draft.sessionType"
+                    >
+                      <TOption value="tutor" :label="t('AI tutor')" />
+                      <TOption value="assignment" :label="t('Assignment')" />
+                    </TSelect>
                   </dd>
                   <dt>
                     <label for="task-language">{{
@@ -683,10 +815,14 @@ void load();
                     }}</label>
                   </dt>
                   <dd>
-                    <select id="task-language" v-model="draft.teachingLanguage">
-                      <option value="zh-CN">中文</option>
-                      <option value="en">English</option>
-                    </select>
+                    <TSelect
+                      :disabled="busy || chatBusy || !!active"
+                      v-control-attrs="{ id: 'task-language' }"
+                      v-model="draft.teachingLanguage"
+                    >
+                      <TOption value="zh-CN" label="中文" />
+                      <TOption value="en" label="English" />
+                    </TSelect>
                   </dd>
                   <dt>
                     <label for="task-learning-goals">{{
@@ -694,10 +830,11 @@ void load();
                     }}</label>
                   </dt>
                   <dd>
-                    <textarea
-                      id="task-learning-goals"
+                    <TTextarea
+                      :disabled="busy || chatBusy || !!active"
+                      v-control-attrs="{ id: 'task-learning-goals', rows: '3' }"
+                      :autosize="{ minRows: 3, maxRows: 10 }"
                       v-model="draft.learningGoals"
-                      rows="3"
                       maxlength="20000"
                     />
                   </dd>
@@ -707,82 +844,29 @@ void load();
                     }}</label>
                   </dt>
                   <dd>
-                    <textarea
-                      id="task-instructions"
+                    <TTextarea
+                      :disabled="busy || chatBusy || !!active"
+                      v-control-attrs="{ id: 'task-instructions', rows: '3' }"
+                      :autosize="{ minRows: 3, maxRows: 10 }"
                       v-model="draft.additionalInstructions"
-                      rows="3"
                       maxlength="20000"
                     />
                   </dd>
                 </dl>
-                <button class="primary" type="submit">
-                  {{ t("Save draft") }}
-                </button>
+                <div class="row wrap end configuration-actions">
+                  <TButton
+                    :disabled="busy || chatBusy || !!active"
+                    theme="primary"
+                    variant="base"
+                    class="primary"
+                    type="submit"
+                  >
+                    {{ t("Save draft") }}
+                  </TButton>
+                </div>
               </fieldset>
             </form>
           </details>
-          <div class="conversation-actions row wrap">
-            <button
-              :disabled="
-                busy ||
-                chatBusy ||
-                !!active ||
-                pendingUploads > 0 ||
-                usage?.materialsReady === false
-              "
-              @click="generate('generate')"
-            >
-              {{
-                t(
-                  draft.content.handout
-                    ? "Regenerate lesson"
-                    : "Generate lesson",
-                )
-              }}
-            </button>
-            <button
-              :disabled="busy || chatBusy || !!active || !selected.length"
-              @click="showImportSources = true"
-            >
-              {{ t("Import existing worksheet") }}
-            </button>
-            <button
-              v-if="draft.content.handout"
-              :disabled="
-                busy ||
-                chatBusy ||
-                !!active ||
-                pendingUploads > 0 ||
-                !draft.additionalInstructions?.trim() ||
-                usage?.materialsReady === false
-              "
-              @click="generate('revise')"
-            >
-              {{ t("Revise with these instructions") }}
-            </button>
-            <button
-              v-if="draft.content.handout"
-              :disabled="busy || chatBusy || !!active"
-              @click="showPreview = true"
-            >
-              {{ t("Student preview") }}
-            </button>
-            <button
-              v-if="draft.content.handout"
-              class="primary"
-              :disabled="busy || chatBusy || !!active"
-              @click="publish"
-            >
-              {{ t("Publish task") }}
-            </button>
-            <button
-              v-if="draft.id"
-              :disabled="busy || chatBusy"
-              @click="action(viewProgress)"
-            >
-              {{ t("Student progress") }}
-            </button>
-          </div>
           <details class="conversation-result">
             <summary>{{ t("Local token estimate") }}</summary>
             <ContextMeter
@@ -819,13 +903,16 @@ void load();
               <summary>{{ t("Provider usage") }}</summary>
               <ContextMeter :usage="job.usage" />
             </details>
-            <button
+            <TButton
+              theme="default"
+              variant="outline"
+              type="button"
               v-if="['queued', 'running', 'succeeded'].includes(job.status)"
               :disabled="busy"
               @click="poll"
             >
               {{ t("Refresh generation status") }}
-            </button>
+            </TButton>
           </section>
           <section
             v-if="draft.content.handout"
@@ -875,9 +962,16 @@ void load();
               </article>
             </details>
           </section>
-          <section v-if="students" class="conversation-result">
+          <section
+            v-if="students"
+            ref="studentProgressPanel"
+            class="conversation-result"
+          >
             <strong>{{ t("Student progress") }}</strong>
-            <button
+            <TButton
+              theme="default"
+              variant="outline"
+              type="button"
               v-for="student in students"
               :key="student.userId"
               class="progress-row"
@@ -890,7 +984,7 @@ void load();
                   student.total
                 }}</span
               >
-            </button>
+            </TButton>
             <p v-if="!students.length" class="muted">
               {{ t("No students have joined this course yet.") }}
             </p>
@@ -903,12 +997,15 @@ void load();
               class="row spread"
             >
               <span>{{ version.label }}</span
-              ><button
+              ><TButton
+                theme="default"
+                variant="outline"
+                type="button"
                 :disabled="busy || chatBusy || !!active"
                 @click="restore(version.id)"
               >
                 {{ t("Restore to draft") }}
-              </button>
+              </TButton>
             </div>
           </details>
         </template>
@@ -922,13 +1019,30 @@ void load();
       @keydown.esc.prevent="cancelSelection"
     >
       <header class="conversation-heading">
-        <button @click="cancelSelection">← {{ t("Back to task") }}</button>
+        <TButton
+          theme="default"
+          variant="outline"
+          type="button"
+          @click="cancelSelection"
+          >← {{ t("Back to task") }}</TButton
+        >
         <h1>{{ t("File management") }}</h1>
         <div class="row">
-          <button @click="cancelSelection">{{ t("Cancel") }}</button
-          ><button class="primary" @click="saveSelection">
+          <TButton
+            theme="default"
+            variant="outline"
+            type="button"
+            @click="cancelSelection"
+            >{{ t("Cancel") }}</TButton
+          ><TButton
+            theme="primary"
+            variant="base"
+            type="button"
+            class="primary"
+            @click="saveSelection"
+          >
             {{ t("Save") }}
-          </button>
+          </TButton>
         </div>
       </header>
       <p class="muted">
@@ -970,13 +1084,16 @@ void load();
         <section class="panel">
           <template v-if="selectionPreview"
             ><CourseMaterialPreview :material="selectionPreview" />
-            <button
+            <TButton
+              theme="default"
+              variant="outline"
+              type="button"
               v-if="!['queued', 'processing'].includes(selectionPreview.status)"
               :disabled="busy"
               @click="retryMaterial(selectionPreview)"
             >
               {{ t("Reprocess material") }}
-            </button>
+            </TButton>
           </template>
           <p v-else class="empty">
             {{ t("Select a material from the folder tree to preview it.") }}
@@ -998,14 +1115,15 @@ void load();
           )
         }}
       </p>
-      <label v-for="material in selected" :key="material.id" class="check-label"
-        ><input
-          v-model="importSources"
-          type="checkbox"
+      <TCheckboxGroup v-model="importSources" class="import-sources">
+        <TCheckbox
+          v-for="material in selected"
+          :key="material.id"
           :value="material.id"
           :disabled="!['ready', 'needsReview'].includes(material.status)"
-        />{{ material.title }}</label
-      >
+          >{{ material.title }}</TCheckbox
+        >
+      </TCheckboxGroup>
       <p v-if="!selected.length" class="empty">
         {{
           t(
@@ -1014,8 +1132,16 @@ void load();
         }}
       </p>
       <div class="row end">
-        <button @click="showImportSources = false">{{ t("Cancel") }}</button
-        ><button
+        <TButton
+          theme="default"
+          variant="outline"
+          type="button"
+          @click="showImportSources = false"
+          >{{ t("Cancel") }}</TButton
+        ><TButton
+          theme="primary"
+          variant="base"
+          type="button"
           class="primary"
           :disabled="
             busy ||
@@ -1030,7 +1156,7 @@ void load();
           "
         >
           {{ t("Extract worksheet questions") }}
-        </button>
+        </TButton>
       </div>
     </div>
   </AppDialog>
@@ -1041,13 +1167,16 @@ void load();
     @close="selectedMaterial = null"
   >
     <CourseMaterialPreview :material="selectedMaterial" />
-    <button
+    <TButton
+      theme="default"
+      variant="outline"
+      type="button"
       v-if="!['queued', 'processing'].includes(selectedMaterial.status)"
       :disabled="busy"
       @click="retryMaterial(selectedMaterial)"
     >
       {{ t("Reprocess material") }}
-    </button>
+    </TButton>
   </AppDialog>
   <AppDialog
     v-if="showPreview"
@@ -1055,9 +1184,16 @@ void load();
     wide
     @close="showPreview = false"
   >
-    <button v-if="dirty" :disabled="busy" @click="simulate">
+    <TButton
+      theme="default"
+      variant="outline"
+      type="button"
+      v-if="dirty"
+      :disabled="busy"
+      @click="simulate"
+    >
       {{ t("Save and refresh preview") }}
-    </button>
+    </TButton>
     <StudentTask
       v-if="draft.id && draft.content.handout && !dirty"
       :key="draft.id + '-' + previewKey"
@@ -1088,13 +1224,16 @@ void load();
         t(message.role === "user" ? "Student" : "AI assistant")
       }}</small
       ><RichText :text="message.content" />
-      <button
+      <TButton
+        theme="default"
+        variant="outline"
+        type="button"
         v-if="message.pendingReview && message.requestId"
         :disabled="busy"
         @click="approveObserved(message)"
       >
         {{ t("Approve and release feedback") }}
-      </button>
+      </TButton>
     </article>
     <template v-if="observed.record">
       <RecordHistory
@@ -1120,7 +1259,10 @@ void load();
         {{ t("Teacher feedback:") }} {{ observed.record.teacherNote }}
       </p>
       <div class="row wrap">
-        <button
+        <TButton
+          theme="default"
+          variant="outline"
+          type="button"
           :disabled="
             busy ||
             !['submitted', 'confirmed', 'needsRevision'].includes(
@@ -1130,8 +1272,11 @@ void load();
           @click="reviewObserved('needsRevision')"
         >
           {{ t("Request revision") }}
-        </button>
-        <button
+        </TButton>
+        <TButton
+          theme="default"
+          variant="outline"
+          type="button"
           :disabled="
             busy ||
             !['submitted', 'confirmed', 'needsRevision'].includes(
@@ -1141,7 +1286,7 @@ void load();
           @click="reviewObserved('confirmed')"
         >
           {{ t("Confirm completion") }}
-        </button>
+        </TButton>
       </div>
     </template>
   </AppDialog>

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Textarea as TTextarea, Button as TButton } from "tdesign-vue-next";
 import { nextTick, onBeforeUnmount, ref, watch } from "vue";
 import { call, type ChatMessage, type TeacherReply } from "../classroom-api";
 import { locale, systemText, t } from "../i18n";
@@ -140,27 +141,33 @@ function enter(event: KeyboardEvent) {
     <p v-if="error" class="error" role="alert">{{ error }}</p>
     <div class="conversation-composer">
       <form @submit.prevent="send">
-        <textarea
+        <TTextarea
+          v-control-attrs="{
+            rows: '3',
+            'aria-label': t('Message to the teaching assistant'),
+          }"
+          :autosize="{ minRows: 3, maxRows: 10 }"
           v-model="prompt"
-          rows="3"
           maxlength="10000"
           :disabled="busy || disabled"
-          :aria-label="t('Message to the teaching assistant')"
           :placeholder="
             t('Describe what to create or change. AI will help configure it.')
           "
-          @keydown.enter="enter"
+          @keydown="(_, { e }) => e.key === 'Enter' && enter(e)"
         />
         <div class="row spread">
           <small class="muted">{{
             t("Enter to send · Shift+Enter for a new line")
           }}</small>
-          <button
+          <TButton
+            theme="primary"
+            variant="base"
+            type="submit"
             class="primary"
             :disabled="busy || disabled || !prompt.trim()"
           >
             {{ t("Send") }} ↑
-          </button>
+          </TButton>
         </div>
       </form>
     </div>

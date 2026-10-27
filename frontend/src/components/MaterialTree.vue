@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Button as TButton, Checkbox as TCheckbox } from "tdesign-vue-next";
 import { computed } from "vue";
 import MaterialProgress from "./MaterialProgress.vue";
 import { t } from "../i18n";
@@ -105,21 +106,19 @@ const files = computed(() =>
       class="tree-file"
       :class="{ selected: selected === material.id }"
     >
-      <input
+      <TCheckbox
         v-if="selectable"
-        type="checkbox"
         :checked="checked?.includes(material.id)"
         :disabled="disabled"
-        :aria-label="t('Select {0}', [material.title])"
-        @change="
-          emit(
-            'check',
-            material.id,
-            ($event.target as HTMLInputElement).checked,
-          )
-        "
+        v-control-attrs="{ 'aria-label': t('Select {0}', [material.title]) }"
+        @change="emit('check', material.id, $event)"
       />
-      <button type="button" @click="emit('select', material)">
+      <TButton
+        theme="default"
+        variant="outline"
+        type="button"
+        @click="emit('select', material)"
+      >
         <span>{{ material.title }}</span>
         <span class="material-status-row">
           <small class="status-label" :data-status="material.status">{{
@@ -145,8 +144,10 @@ const files = computed(() =>
           }}</small>
         </span>
         <MaterialProgress :material="material" />
-      </button>
-      <button
+      </TButton>
+      <TButton
+        theme="danger"
+        variant="outline"
         v-if="deletable"
         type="button"
         class="danger material-delete"
@@ -155,7 +156,7 @@ const files = computed(() =>
         @click.stop="emit('remove', material)"
       >
         {{ t("Delete") }}
-      </button>
+      </TButton>
     </li>
   </ul>
 </template>
