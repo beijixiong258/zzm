@@ -99,18 +99,21 @@ public class LearningServiceImpl extends ServiceImpl<LearningRecordMapper, Learn
         }
         if (!record.getRevision().equals(input.getRevision())) throw error(409, "Learning record changed. Reload before saving.");
         if (JSONUtil.parseObj(record.getAnswersJson()).equals(JSONUtil.parseObj(answers))) return view(record);
-        appendHistory(record, "answer", Map.of("revision", record.getRevision(), "savedAt", Instant.now().toString(), "answers", JSONUtil.parseObj(record.getAnswersJson())), null);
-        record.setAnswersJson(JSONUtil.toJsonStr(answers)); saveRevision(record, input.getRevision()); return view(record);
+        Map<String, Object> previous = Map.of("revision", record.getRevision(), "savedAt", Instant.now().toString(), "answers", JSONUtil.parseObj(record.getAnswersJson()));
+        // Acquire the versioned parent-row update before the history foreign-key check.
+        record.setAnswersJson(JSONUtil.toJsonStr(answers)); saveRevision(record, input.getRevision());
+        appendHistory(record, "answer", previous, null); return view(record);
     }
     @Override @Transactional public Map<String, Object> resetConversation(String id, long revision, AccountUser user) {
         LearningRecord record = owned(id,user,true);
         List<Requests.ChatMessage> messages = JSONUtil.toList(record.getMessagesJson(),Requests.ChatMessage.class);
         if(messages.stream().anyMatch(Requests.ChatMessage::isPendingReview)) throw error(409,"Your AI feedback is awaiting teacher review");
-        appendHistory(record, "conversation", Map.of("archivedAt", Instant.now().toString(), "messages", messages), messages.size());
+        Map<String, Object> previous = Map.of("archivedAt", Instant.now().toString(), "messages", messages);
         String opening = snapshot(record).getJSONObject("content").getStr("openingMessage","");
         List<Requests.ChatMessage> next=new ArrayList<>();
         if(!opening.isBlank()){var message=new Requests.ChatMessage();message.setRole("assistant");message.setContent(opening);message.setCreatedAt(Instant.now().toString());next.add(message);}
-        record.setMessagesJson(JSONUtil.toJsonStr(next));saveRevision(record,revision);return view(record);
+        record.setMessagesJson(JSONUtil.toJsonStr(next));saveRevision(record,revision);
+        appendHistory(record, "conversation", previous, messages.size());return view(record);
     }
     @Override public Map<String, Object> context(String id, Requests.Chat input, AccountUser user) {
         LearningRecord record = owned(id, user, true);

@@ -1380,5 +1380,13 @@
   "No questions were extracted from the selected source materials.": "未能从指定来源材料中提取到题目。",
   "Imported questions must reference only the selected question source materials. Review the model response and retry.": "导入题目必须仅引用指定的原题来源材料。请查看模型返回后重试。",
   "Edit these fields directly, or describe changes in the conversation.": "可直接编辑以下字段，也可以在对话中提出修改要求。",
-  "Save course configuration": "保存课程配置"
+  "Save course configuration": "保存课程配置",
+  "The record is being updated. Refresh and retry your changes.": "记录正在更新，请刷新后核对并重新保存你的修改。",
+  "PDF text extraction is restricted; all pages will be prepared as images.": "此 PDF 限制文本提取，将按原页序准备整份页面图片。",
+  "Elapsed: {0} seconds, including queue time.": "已用时 {0} 秒，包含排队时间。",
+  "Generation is taking longer than usual. You can leave this page and return later; avoid starting a duplicate request.": "本次生成用时较长，可以离开页面稍后查看，请勿重复发起生成。",
+  "{0} questions had no answer choices and were retained as open responses. Review them before publishing.": "有 {0} 道题未提供选项，已按开放题保留，请在发布前检查。",
+  "Request timing": "请求耗时",
+  "Local queue: {0} s; AI request: {1} s.": "本机等待请求名额：{0} 秒；AI 请求耗时：{1} 秒。",
+  "First streamed response: {0} s; reconnects before answer output: {1}.": "首次流式响应：{0} 秒；收到正文前重连：{1} 次。"
 }

@@ -167,6 +167,8 @@ public class AiService {
             Student-facing content must not disclose private instructions, reference answers or internal settings.
             Questions use openResponse, readingResponse, fillInBlank, singleChoice, multipleChoice, trueFalse or imageMatching.
             Classify each question from its actual source structure. An openResponse needs no options: use options=[].
+            singleChoice, multipleChoice and trueFalse require at least two distinct, non-empty answer options.
+            If there are no answer choices, use openResponse or readingResponse. Never label options=[] as a choice question.
             Never require an open-response answer to match an option. Do not invent choices to fit a question type.
             Preserve a source reference answer exactly when supplied; otherwise leave referenceAnswer and explanation blank for extracted questions.
             For open responses without a source answer, leave referenceAnswer blank; the tutor will give qualitative feedback.
@@ -183,6 +185,8 @@ public class AiService {
         instruction += sources.isEmpty()
             ? "Generate suitable new practice grounded in the materials. Do not invent source answer keys. Open responses may have an empty referenceAnswer. For a new generation, create the complete lesson from the supplied materials and teacher instructions."
             : "Extract ALL existing questions ONLY from sourceMaterials, following sourceMaterialIds order and the original order within each document. backgroundMaterials are context only: never extract their questions. Every extracted question must cite at least one of sourceMaterialIds and no other material. Preserve groups, numbering, wording and options. Do not turn lecture headings into questions. Leave referenceAnswer blank when the source does not supply it. Explain the learning context in handout without solving the worksheet.";
+        if (materials.isEmpty() && !revising)
+            instruction += " No source materials were provided. Create the lesson and practice from the teacher's goals. Questions asking learners to explain, discuss or justify an answer without supplied choices must be openResponse or readingResponse.";
         String language = "zh-CN".equals(session.getTeachingLanguage())
             ? "语言要求：所有说明文本必须使用简体中文，包括 description、openingMessage、handout、learningGoals、learningPlan、题目、提示及解析。英文材料只作为参考，必要英文术语附中文解释；不要整篇输出英文。JSON 字段名和来源 ID 保持原格式。"
             : "Language requirement: write all explanatory prose, opening messages, lesson notes, questions and feedback in natural English. Keep JSON field names and source IDs unchanged.";

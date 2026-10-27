@@ -1380,5 +1380,13 @@
   "No questions were extracted from the selected source materials.": "No questions were extracted from the selected source materials.",
   "Imported questions must reference only the selected question source materials. Review the model response and retry.": "Imported questions must reference only the selected question source materials. Review the model response and retry.",
   "Edit these fields directly, or describe changes in the conversation.": "Edit these fields directly, or describe changes in the conversation.",
-  "Save course configuration": "Save course configuration"
+  "Save course configuration": "Save course configuration",
+  "The record is being updated. Refresh and retry your changes.": "The record is being updated. Refresh and retry your changes.",
+  "PDF text extraction is restricted; all pages will be prepared as images.": "PDF text extraction is restricted; all pages will be prepared as images.",
+  "Elapsed: {0} seconds, including queue time.": "Elapsed: {0} seconds, including queue time.",
+  "Generation is taking longer than usual. You can leave this page and return later; avoid starting a duplicate request.": "Generation is taking longer than usual. You can leave this page and return later; avoid starting a duplicate request.",
+  "{0} questions had no answer choices and were retained as open responses. Review them before publishing.": "{0} questions had no answer choices and were retained as open responses. Review them before publishing.",
+  "Request timing": "Request timing",
+  "Local queue: {0} s; AI request: {1} s.": "Local queue: {0} s; AI request: {1} s.",
+  "First streamed response: {0} s; reconnects before answer output: {1}.": "First streamed response: {0} s; reconnects before answer output: {1}."
 }

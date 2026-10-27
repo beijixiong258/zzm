@@ -95,6 +95,12 @@ public class GenerationServiceImpl extends ServiceImpl<GenerationJobMapper, Gene
         result.put("expectedRevision", job.getExpectedRevision()); result.put("createdAt", job.getCreatedAt());
         var usage = job.getUsageJson() == null ? new JSONObject() : JSONUtil.parseObj(job.getUsageJson());
         result.put("progressCharacters", usage.getInt("charactersReceived", 0));
+        boolean active = Set.of("queued", "running").contains(job.getStatus());
+        LocalDateTime end = active ? LocalDateTime.now(ZoneOffset.UTC) : job.getUpdatedAt();
+        long elapsedSeconds = Math.max(0, Duration.between(job.getCreatedAt(), end).toSeconds());
+        result.put("elapsedSeconds", active ? elapsedSeconds : usage.getLong("elapsedSeconds", elapsedSeconds));
+        result.put("requestTiming", usage.get("requestTiming"));
+        result.put("correctedQuestions", usage.getInt("correctedQuestions", 0));
         result.put("usage", usage.containsKey("window") ? usage : null);
         JSONObject savedResult = job.getResultJson() == null ? null : JSONUtil.parseObj(job.getResultJson());
         result.put("diagnosticResponse", savedResult == null ? null : savedResult.getStr("rawResponse"));
@@ -140,8 +146,19 @@ public class GenerationServiceImpl extends ServiceImpl<GenerationJobMapper, Gene
                 ? ai.revise(session, courses.getById(session.getCourseId()), selected, input.getInstruction(), progress, received)
                 : ai.generate(session, courses.getById(session.getCourseId()), selected, "import".equals(job.getKind()), input.getSourceMaterialIds(), progress, received);
             TaskContent content = generated.content();
+            int correctedQuestions = 0;
+            if ("generate".equals(job.getKind()) && content.getQuestions() != null) {
+                for (TaskContent.Question question : content.getQuestions()) {
+                    if (question != null && Set.of("singleChoice", "multipleChoice").contains(Objects.toString(question.getType(), ""))
+                        && question.getOptions() != null && question.getOptions().isEmpty()) {
+                        question.setType("openResponse"); correctedQuestions++;
+                    }
+                }
+            }
+            Map<String, Object> usage = new LinkedHashMap<>(generated.usage());
+            usage.put("correctedQuestions", correctedQuestions);
             job.setStage("validating");
-            lambdaUpdate().eq(GenerationJob::getId, job.getId()).set(GenerationJob::getUsageJson, JSONUtil.toJsonStr(generated.usage())).set(GenerationJob::getStage, "validating").update();
+            lambdaUpdate().eq(GenerationJob::getId, job.getId()).set(GenerationJob::getUsageJson, JSONUtil.toJsonStr(usage)).set(GenerationJob::getStage, "validating").update();
             sessions.validateContent(content, ids, !"import".equals(job.getKind()));
             if ("import".equals(job.getKind())) {
                 if (content.getQuestions().isEmpty()) throw error(422, "No questions were extracted from the selected source materials.");
@@ -151,7 +168,9 @@ public class GenerationServiceImpl extends ServiceImpl<GenerationJobMapper, Gene
                 }
             }
             if (!"import".equals(job.getKind()) && (content.getHandout().isBlank() || content.getOpeningMessage().isBlank())) throw error(502, "AI did not return a complete handout and opening message. Retry generation.");
+            usage.put("elapsedSeconds", Math.max(0, Duration.between(job.getCreatedAt(), LocalDateTime.now(ZoneOffset.UTC)).toSeconds()));
             lambdaUpdate().eq(GenerationJob::getId, job.getId()).set(GenerationJob::getStatus, "succeeded").set(GenerationJob::getStage, "ready")
+                .set(GenerationJob::getUsageJson, JSONUtil.toJsonStr(usage))
                 .set(GenerationJob::getResultJson, JSONUtil.toJsonStr(content)).set(GenerationJob::getUpdatedAt, LocalDateTime.now(ZoneOffset.UTC)).update();
         } catch (Exception exception) {
             String prefix = switch (Objects.toString(job.getStage(), "")) {

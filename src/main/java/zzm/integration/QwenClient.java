@@ -29,6 +29,8 @@ import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import static zzm.exception.ApiErrors.error;
 
 @Slf4j
@@ -51,10 +53,15 @@ public class QwenClient {
     }
     private Completion complete(List<Message> messages, int output, boolean json, int images, int safetyReserve, java.util.function.IntConsumer progress) {
         Map<String, Object> measurement = budget.describe(messages, output, images, safetyReserve);
+        long startedNanos = System.nanoTime(), requestStartedNanos = 0;
+        AtomicLong firstResponseNanos = new AtomicLong();
+        AtomicInteger streamAttempts = new AtomicInteger(), charactersReceived = new AtomicInteger();
         boolean acquired = false;
+        boolean completed = false;
         try {
             acquired = slots.tryAcquire(10, TimeUnit.SECONDS);
             if (!acquired) throw error(429, "All AI request slots are busy. Your work is saved; try again shortly.");
+            requestStartedNanos = System.nanoTime();
             ChatResponse response;
             String text;
             String finish;
@@ -65,22 +72,26 @@ public class QwenClient {
                 String[] reason = new String[1];
                 int idleTimeout = Math.max(30, configuration().getInt("timeout_seconds", 180));
                 reactor.core.publisher.Flux.defer(() -> {
+                        streamAttempts.incrementAndGet();
                         content.setLength(0); last[0] = null; reason[0] = null; progress.accept(0);
                         return client(output, json).prompt(new Prompt(messages)).stream().chatResponse();
                     }).timeout(reactor.core.publisher.Mono.delay(Duration.ofMinutes(5)),
                         chunk -> reactor.core.publisher.Mono.delay(Duration.ofSeconds(idleTimeout)))
                     .doOnNext(chunk -> {
+                        firstResponseNanos.compareAndSet(0, System.nanoTime());
                         last[0] = chunk;
                         if (chunk.getResult() != null) {
                             String delta = chunk.getResult().getOutput().getText();
-                            if (delta != null) { content.append(delta); progress.accept(content.length()); }
+                            if (delta != null) { content.append(delta); charactersReceived.set(content.length()); progress.accept(content.length()); }
                             String ending = chunk.getResult().getMetadata().getFinishReason();
                             if (ending != null && !ending.isBlank()) reason[0] = ending;
                         }
                     }).takeUntil(chunk -> reason[0] != null && chunk.getMetadata() != null
                         && chunk.getMetadata().getUsage() != null && chunk.getMetadata().getUsage().getPromptTokens() > 0)
+                    // Replaying after answer output would discard work and repeat a potentially long generation.
                     .retryWhen(reactor.util.retry.Retry.backoff(1, Duration.ofSeconds(2))
-                        .filter(this::retryableStreamFailure).onRetryExhaustedThrow((spec, signal) -> signal.failure()))
+                        .filter(failure -> charactersReceived.get() == 0 && reason[0] == null && retryableStreamFailure(failure))
+                        .onRetryExhaustedThrow((spec, signal) -> signal.failure()))
                     .blockLast(Duration.ofMinutes(20));
                 response = last[0]; text = content.toString(); finish = reason[0];
                 if (finish == null) throw error(502, "AI response ended before completion. Retry generation.");
@@ -101,6 +112,15 @@ public class QwenClient {
                 measurement.put("totalTokensActual", usage.getTotalTokens());
             }
             measurement.put("charactersReceived", text.length());
+            charactersReceived.set(text.length());
+            Map<String, Object> timing = new LinkedHashMap<>();
+            timing.put("queueWaitMs", TimeUnit.NANOSECONDS.toMillis(requestStartedNanos - startedNanos));
+            timing.put("requestMs", TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - requestStartedNanos));
+            if (firstResponseNanos.get() != 0)
+                timing.put("firstResponseMs", TimeUnit.NANOSECONDS.toMillis(firstResponseNanos.get() - requestStartedNanos));
+            timing.put("streamRetries", Math.max(0, streamAttempts.get() - 1));
+            measurement.put("requestTiming", timing);
+            completed = true;
             return new Completion(text, measurement);
         } catch (InterruptedException exception) {
             Thread.currentThread().interrupt(); throw error(503, "AI request was interrupted. Try again when ready.");
@@ -122,7 +142,15 @@ public class QwenClient {
             log.warn("AI request failed: {} (cause: {})", exception.getClass().getSimpleName(),
                 exception.getCause() == null ? "none" : exception.getCause().getClass().getSimpleName());
             throw error(502, "AI connection or response processing failed (" + exception.getClass().getSimpleName() + "). No incomplete result was applied.");
-        } finally { if (acquired) slots.release(); }
+        } finally {
+            long finishedNanos = System.nanoTime();
+            log.info("AI request completed={}, queueMs={}, requestMs={}, firstResponseMs={}, streamRetries={}, characters={}", completed,
+                TimeUnit.NANOSECONDS.toMillis((requestStartedNanos == 0 ? finishedNanos : requestStartedNanos) - startedNanos),
+                requestStartedNanos == 0 ? 0 : TimeUnit.NANOSECONDS.toMillis(finishedNanos - requestStartedNanos),
+                firstResponseNanos.get() == 0 ? null : TimeUnit.NANOSECONDS.toMillis(firstResponseNanos.get() - requestStartedNanos),
+                Math.max(0, streamAttempts.get() - 1), charactersReceived.get());
+            if (acquired) slots.release();
+        }
     }
     private String providerError(int status, String body) {
         String reason = Objects.toString(body, "").strip();

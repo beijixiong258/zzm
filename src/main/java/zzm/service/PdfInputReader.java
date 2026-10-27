@@ -70,7 +70,7 @@ public class PdfInputReader {
         Report report = result.getReport();
         report.setPdfInputMode("inspecting");
         try (PDDocument document = Loader.loadPDF(source.toFile())) {
-            if (!document.getCurrentAccessPermission().canExtractContent()) throw new IOException("PDF extraction is restricted");
+            boolean extractText = document.getCurrentAccessPermission().canExtractContent();
             report.setUnitsTotal(document.getNumberOfPages());
             progress.accept(report);
             if (report.getUnitsTotal() == 0) throw new IOException("PDF has no pages");
@@ -82,16 +82,17 @@ public class PdfInputReader {
             }
             PDFRenderer renderer = new PDFRenderer(document);
             renderer.setSubsamplingAllowed(true);
-            PDFTextStripper stripper = new PDFTextStripper();
-            stripper.setSortByPosition(true);
+            PDFTextStripper stripper = extractText ? new PDFTextStripper() : null;
+            if (stripper != null) stripper.setSortByPosition(true);
             List<String> pages = new ArrayList<>();
-            boolean images = false, oversizedText = false;
+            boolean images = !extractText, oversizedText = false;
+            if (!extractText) report.getNotes().add("PDF text extraction is restricted; all pages will be prepared as images.");
             long characters = 0;
             for (int i = 0; i < document.getNumberOfPages(); i++) {
                 checkInterrupted();
                 report.setCurrentUnit("Page " + (i + 1));
                 String text = "";
-                try {
+                if (stripper != null) try {
                     stripper.setStartPage(i + 1); stripper.setEndPage(i + 1);
                     text = stripper.getText(document).strip();
                     // Graphics and annotations are not fully represented by a plain-text extraction.
@@ -178,7 +179,7 @@ public class PdfInputReader {
         if (!complete(report) || !"images".equals(report.getPdfInputMode()))
             throw error(422, "Reprocess the PDF with the current document parser before continuing.");
         try (PDDocument document = Loader.loadPDF(Path.of(material.getStoragePath()).toFile())) {
-            if (document.getNumberOfPages() != report.getUnitsTotal() || !document.getCurrentAccessPermission().canExtractContent())
+            if (document.getNumberOfPages() != report.getUnitsTotal())
                 throw new IOException("PDF changed after preparation");
             PDFRenderer renderer = new PDFRenderer(document); renderer.setSubsamplingAllowed(true);
             for (PageInput page : report.getPageInputs()) {

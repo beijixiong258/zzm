@@ -63,7 +63,8 @@ public class MaterialServiceImpl extends ServiceImpl<CourseMaterialMapper, Cours
         } catch (IOException exception) { throw error(409, "An existing attachment is unavailable. Remove it before uploading more files."); }
     }
     private CourseMaterial store(String courseId, MultipartFile file, String relativePath, String visibility, String ownerId, String recordId, String questionId) {
-        if (!Set.of("student", "teacher").contains(visibility) || file.isEmpty() || file.getSize() > 25L * 1024 * 1024) throw error(422, "Invalid file or visibility");
+        if (file.getSize() > 25L * 1024 * 1024) throw error(413, "Each file must be 25 MiB or smaller.");
+        if (!Set.of("student", "teacher").contains(visibility) || file.isEmpty()) throw error(422, "Invalid file or visibility");
         String name = Objects.requireNonNullElse(file.getOriginalFilename(), "material").replace('\\', '/');
         name = name.substring(name.lastIndexOf('/') + 1);
         if (name.isBlank() || name.length() > 255) throw error(422, "Invalid file name");

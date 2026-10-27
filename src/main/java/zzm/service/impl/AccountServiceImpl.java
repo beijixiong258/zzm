@@ -41,7 +41,7 @@ public class AccountServiceImpl extends ServiceImpl<AccountUserMapper, AccountUs
         return list().stream().map(this::publicUser).toList();
     }
 
-    @Override public Map<String, Object> createAccount(Requests.Account input, AccountUser operator) {
+    @Override @Transactional public Map<String, Object> createAccount(Requests.Account input, AccountUser operator) {
         requireAdmin(operator);
         return publicUser(create(input, input.getRole()));
     }
@@ -67,10 +67,10 @@ public class AccountServiceImpl extends ServiceImpl<AccountUserMapper, AccountUs
         return Map.of("id", user.getId(), "name", user.getName(), "email", Objects.toString(user.getEmail(), ""), "username", Objects.toString(user.getUsername(), ""), "invitationEnabled", Boolean.TRUE.equals(user.getInvitationEnabled()), "demo", Boolean.TRUE.equals(user.getDemo()), "role", user.getRole(),
             "mustChangePassword", Boolean.TRUE.equals(user.getMustChangePassword()), "archived", Boolean.TRUE.equals(user.getArchived()));
     }
-    @Override public AccountUser create(Requests.Account input, String role) {
+    @Override @Transactional public AccountUser create(Requests.Account input, String role) {
         return createMany(List.of(input), role).get(0);
     }
-    @Override public List<AccountUser> createMany(List<Requests.Account> input, String role) {
+    @Override @Transactional public List<AccountUser> createMany(List<Requests.Account> input, String role) {
         List<AccountUser> users = input.stream().map(value -> newAccount(value, role)).toList();
         saveBatch(users); return users;
     }

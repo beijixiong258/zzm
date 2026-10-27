@@ -908,6 +908,34 @@ void load();
               "
             />
             <strong v-else>{{ statusText(job.status) }}</strong>
+            <p v-if="job.elapsedSeconds != null" class="muted">
+              {{
+                t("Elapsed: {0} seconds, including queue time.", [
+                  job.elapsedSeconds,
+                ])
+              }}
+            </p>
+            <p v-if="active && (job.elapsedSeconds || 0) >= 120" class="notice">
+              {{
+                t(
+                  "Generation is taking longer than usual. You can leave this page and return later; avoid starting a duplicate request.",
+                )
+              }}
+            </p>
+            <p
+              v-if="
+                job.correctedQuestions &&
+                ['succeeded', 'applied'].includes(job.status)
+              "
+              class="notice"
+            >
+              {{
+                t(
+                  "{0} questions had no answer choices and were retained as open responses. Review them before publishing.",
+                  [job.correctedQuestions],
+                )
+              }}
+            </p>
             <p v-if="job.errorMessage" class="error">
               {{ systemText(job.errorMessage) }}
             </p>
@@ -920,6 +948,28 @@ void load();
             <details v-if="job.usage">
               <summary>{{ t("Provider usage") }}</summary>
               <ContextMeter :usage="job.usage" />
+            </details>
+            <details v-if="job.requestTiming">
+              <summary>{{ t("Request timing") }}</summary>
+              <p>
+                {{
+                  t("Local queue: {0} s; AI request: {1} s.", [
+                    (job.requestTiming.queueWaitMs / 1000).toFixed(1),
+                    (job.requestTiming.requestMs / 1000).toFixed(1),
+                  ])
+                }}
+              </p>
+              <p v-if="job.requestTiming.firstResponseMs != null">
+                {{
+                  t(
+                    "First streamed response: {0} s; reconnects before answer output: {1}.",
+                    [
+                      (job.requestTiming.firstResponseMs / 1000).toFixed(1),
+                      job.requestTiming.streamRetries,
+                    ],
+                  )
+                }}
+              </p>
             </details>
             <TButton
               theme="default"

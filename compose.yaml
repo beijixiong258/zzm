@@ -45,13 +45,26 @@ services:
       - uploads:/data/uploads
       - "${AICADEMIYA_TRASH_HOST_DIR:-C:/Users/user/Desktop/智能体回收站/垃圾桶/AIcademiya}:/data/recycle"
       - ./config.json:/config/config.json:ro
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "--show-error", "--max-time", "3", "http://127.0.0.1:8001/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 60s
   frontend:
     build: ./frontend
     restart: unless-stopped
     ports:
       - "127.0.0.1:5173:5173"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "--input-type=module", "-e", "try { const response = await fetch('http://127.0.0.1:5173/', { method: 'HEAD', signal: AbortSignal.timeout(3000) }); process.exit(response.ok ? 0 : 1); } catch { process.exit(1); }"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 15s
 volumes:
   mysql-data:
   uploads:

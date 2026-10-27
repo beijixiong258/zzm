@@ -157,6 +157,14 @@ export type Job = {
   status: string;
   stage: string;
   progressCharacters?: number;
+  elapsedSeconds?: number;
+  correctedQuestions?: number;
+  requestTiming?: {
+    queueWaitMs: number;
+    requestMs: number;
+    firstResponseMs?: number;
+    streamRetries: number;
+  } | null;
   errorMessage: string;
   diagnosticResponse?: string | null;
   result: TaskContent | null;
@@ -325,6 +333,12 @@ export function upload<T>(
         onProgress(Math.min(100, (event.loaded / event.total) * 100));
     };
     request.onload = () => {
+      if (request.status === 413) {
+        reject(
+          new RequestError(413, t("Each file must be 25 MiB or smaller.")),
+        );
+        return;
+      }
       let data: { detail?: string } & T;
       try {
         data = JSON.parse(request.responseText || "{}");
