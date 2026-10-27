@@ -45,6 +45,6 @@ app:
   trash-dir: ${AICADEMIYA_TRASH_DIR:}
   legacy-import: ${AICADEMIYA_LEGACY_IMPORT:}
 
-# 仅供 start.ps1 初始化 Docker MySQL；不会修改现有数据库密码。
+# 供 Docker MySQL 首次初始化使用；不会修改现有数据库密码。
 mysql:
   root-password: '9EF1A015A1FDA62ADEE14BA6D3F6F3FFFD7B19F23630CB1A'

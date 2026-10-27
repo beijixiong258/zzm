@@ -6,9 +6,9 @@ services:
     restart: unless-stopped
     environment:
       MYSQL_DATABASE: aicademiya
-      MYSQL_USER: ${MYSQL_USER:?Use start.ps1 -Component docker to read application.yaml}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?Use start.ps1 -Component docker to read application.yaml}
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Use start.ps1 -Component docker to read application.yaml}
+      MYSQL_USER: ${MYSQL_USER:?Set MYSQL_USER from spring.datasource.username in application.yaml}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?Set MYSQL_PASSWORD from spring.datasource.password in application.yaml}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Set MYSQL_ROOT_PASSWORD from mysql.root-password in application.yaml}
     ports:
       - "127.0.0.1:3306:3306"
     volumes:

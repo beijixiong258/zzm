@@ -39,22 +39,32 @@
 
 ```powershell
 Set-Location -LiteralPath 'C:\Users\user\Desktop\zzm'
-pwsh.exe -File .\setup.ps1
+npm.cmd --prefix .\frontend ci --include=dev --no-audit --no-fund
 ```
 
-分别在两个 PowerShell 7 窗口启动后端和前端：
+AI 配置仍放在 `.env`。直接运行 Java 时，先把其中的 `AICADEMIYA_AI_API_KEY`、`AICADEMIYA_AI_BASE_URL`、`AICADEMIYA_AI_MODEL` 设置到 IDEA 运行配置或当前终端的环境变量中。PowerShell 7 可在项目根目录执行以下命令，再运行 Maven：
 
 ```powershell
-pwsh.exe -File 'C:\Users\user\Desktop\zzm\start.ps1' -Component backend
-pwsh.exe -File 'C:\Users\user\Desktop\zzm\start.ps1' -Component frontend
+Get-Content -LiteralPath .env | ForEach-Object {
+    if ($_ -match '^\s*(AICADEMIYA_AI_(?:API_KEY|BASE_URL|MODEL))\s*=(.*)$') {
+        [Environment]::SetEnvironmentVariable($Matches[1], $Matches[2].Trim().Trim([char]34, [char]39), 'Process')
+    }
+}
+```
+
+后端可在 IDEA 中直接运行 Spring Boot 主类，也可在项目根目录执行 Maven；前端在另一个 PowerShell 7 窗口执行 npm：
+
+```powershell
+mvn.cmd spring-boot:run
+npm.cmd --prefix .\frontend run dev
 ```
 
 前端地址为 `http://127.0.0.1:5173`，后端 API 为 `http://127.0.0.1:8001/api`。开发前端直接请求后端，不经过开发代理。
 
-也可使用项目现有 Docker Compose 配置：
+也可直接使用 Docker Compose。Compose 自动读取 `.env` 中的 AI 配置；MySQL 三项环境变量分别使用 `application.yaml` 中 `spring.datasource.username`、`spring.datasource.password` 和 `mysql.root-password` 的值，在当前终端设置后执行：
 
 ```powershell
-pwsh.exe -File 'C:\Users\user\Desktop\zzm\start.ps1' -Component docker
+docker compose up -d --build
 ```
 
 该命令构建并启动 MySQL、后端和前端。Compose 项目名沿用原来的 `app`，目录迁移不改变原有 Compose 数据卷名称。Compose 映射数据库端口为 3306；现有本机 Java 配置连接 3307，两者按各自运行方式使用。不要在已有服务占用端口时重复启动另一套服务。
@@ -72,14 +82,14 @@ npm.cmd --prefix .\frontend run build
 | 配置                       | 位置与用途                                                                                                 |
 | -------------------------- | ---------------------------------------------------------------------------------------------------------- |
 | MySQL 地址、账号和明文密码 | `src/main/resources/application.yaml` 的 `spring.datasource`                                    |
-| Docker MySQL 初始化密码    | 同一 YAML 中的 `mysql.root-password`；启动脚本读取，不写入 `.env`，不更改已有库密码                        |
-| 硅基流动配置               | `.env` 中的 `AICADEMIYA_AI_API_KEY`、`AICADEMIYA_AI_BASE_URL`、`AICADEMIYA_AI_MODEL`，启动脚本自动加载 |
+| Docker MySQL 初始化参数    | 从同一 YAML 中取值，设置为当前终端的 `MYSQL_USER`、`MYSQL_PASSWORD`、`MYSQL_ROOT_PASSWORD`；不写入 `.env`，不更改已有库密码 |
+| 硅基流动配置               | `.env` 中的 `AICADEMIYA_AI_API_KEY`、`AICADEMIYA_AI_BASE_URL`、`AICADEMIYA_AI_MODEL`；Compose 自动读取，直接运行 Java 时设置到进程环境变量 |
 | 模型其他参数               | `config.json` 的 `ai` 节；非空 AI 环境变量优先。可用 `AICADEMIYA_CONFIG` 指定配置路径                  |
 | 上传目录                   | `AICADEMIYA_UPLOAD_DIR`，本机默认 `data-local/uploads`                                                 |
 | 文件回收目录               | `AICADEMIYA_TRASH_DIR`，本机默认用户桌面的 `智能体回收站/垃圾桶/AIcademiya`                                |
-| 演示数据                   | `AICADEMIYA_DEMO_ENABLED` 默认 `false`，启动脚本同样默认关闭                                               |
+| 演示数据                   | `AICADEMIYA_DEMO_ENABLED` 默认 `false`                                               |
 
-`setup.ps1` 只在 `config.json` 不存在时从 `config.defaults.json` 初始化配置，不覆盖已有配置。Java 业务配置以 `src/main/resources/application.yaml` 和 `AppProperties` 为准，模型模块读取 JSON 中的 `ai` 节。
+仅在 `config.json` 不存在时，使用 `Copy-Item -LiteralPath config.defaults.json -Destination config.json` 初始化，不覆盖已有配置。Java 业务配置以 `src/main/resources/application.yaml` 和 `AppProperties` 为准，模型模块读取 JSON 中的 `ai` 节。
 
 ## 目录
 
@@ -102,7 +112,7 @@ zzm/
 │  ├─ public/                   正式静态资源
 │  ├─ tests/brand-assets.mjs     图标生成工具，由 build:brand 调用
 │  └─ Dockerfile、static-server.mjs、构建配置
-├─ start.*、setup.*、compose.yaml、Dockerfile
+├─ compose.yaml、Dockerfile
 ├─ .env、config.json、config.defaults.json
 ├─ README.md
 └─ 测试用材料不要删/              用户原始材料
