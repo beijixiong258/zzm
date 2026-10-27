@@ -172,7 +172,7 @@ public class AiService {
             For open responses without a source answer, leave referenceAnswer blank; the tutor will give qualitative feedback.
             Do not add scoring, grades or rating levels.
             Use unique question IDs, faithful sourceMaterialIds, hints, options and answerSlots.
-            Single-choice answers match one option exactly; multiple-choice answers are option texts separated by newlines.
+            Single-choice answers match one option exactly. For multipleChoice, referenceAnswer is a string containing a JSON array of exact selected option texts; preserve line breaks inside each option. Use an empty string when the source supplies no answer.
             Never invent source IDs. illustrationMaterialIds and question.imageMaterialIds may use ONLY availableImageMaterialIds.
             PDF page images are reading references, not embeddable image files. Never put a PDF material ID into either image-ID array.
             Use question.sourceMaterialIds for PDF sources. If availableImageMaterialIds is empty, both image-ID arrays must be empty; do not create imageMatching questions.

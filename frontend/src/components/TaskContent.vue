@@ -5,7 +5,13 @@ import {
   Radio as TRadio,
 } from "tdesign-vue-next";
 import { t } from "../i18n";
-import { fileUrl, questionTypes, type Task } from "../classroom-api";
+import {
+  fileUrl,
+  multipleChoiceAnswers,
+  questionTypes,
+  type Question,
+  type Task,
+} from "../classroom-api";
 import RichText from "./RichText.vue";
 import DiagramView from "./DiagramView.vue";
 defineProps<{
@@ -15,11 +21,20 @@ defineProps<{
   preview?: boolean;
 }>();
 const emit = defineEmits<{ answer: [id: string, value: string] }>();
-function multiple(id: string, option: string, checked: boolean, answer = "") {
-  const selected = new Set(answer.split("\n").filter(Boolean));
+function multiple(
+  question: Question,
+  option: string,
+  checked: boolean,
+  answer = "",
+) {
+  const selected = new Set(multipleChoiceAnswers(answer, question.options));
   if (checked) selected.add(option);
   else selected.delete(option);
-  emit("answer", id, [...selected].join("\n"));
+  emit(
+    "answer",
+    question.id,
+    selected.size ? JSON.stringify([...selected]) : "",
+  );
 }
 </script>
 
@@ -68,7 +83,15 @@ function multiple(id: string, option: string, checked: boolean, answer = "") {
         </li>
       </ol>
     </section>
-    <p v-if="!task.content.learningPlan.length && preview" class="empty">
+    <p
+      v-if="
+        !task.content.learningPlan.length &&
+        !task.content.handout &&
+        !task.content.questions.length &&
+        preview
+      "
+      class="empty"
+    >
       {{ t("Generate a task to preview its learning plan and questions.") }}
     </p>
     <section
@@ -125,12 +148,13 @@ function multiple(id: string, option: string, checked: boolean, answer = "") {
           <TCheckbox
             v-if="question.type === 'multipleChoice'"
             :checked="
-              (answers?.[question.id] || '').split('\n').includes(option)
+              multipleChoiceAnswers(
+                answers?.[question.id],
+                question.options,
+              ).includes(option)
             "
             :disabled="readonly || preview"
-            @change="
-              multiple(question.id, option, $event, answers?.[question.id])
-            "
+            @change="multiple(question, option, $event, answers?.[question.id])"
             >{{ option }}</TCheckbox
           >
           <TRadio

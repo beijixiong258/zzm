@@ -280,10 +280,12 @@ export async function call<T>(
   path: string,
   method = "GET",
   body?: unknown,
+  signal?: AbortSignal,
 ): Promise<T> {
   const multipart = body instanceof FormData;
   const response = await fetch(`${apiBase}${path}`, {
     method,
+    signal,
     credentials: "include",
     headers:
       body == null || multipart ? {} : { "Content-Type": "application/json" },
@@ -384,6 +386,36 @@ export const versionParam = (id?: string) =>
   id ? `?versionId=${key(id)}` : "";
 export const fileUrl = (id: string, versionId?: string) =>
   `${apiBase}/materials/${key(id)}/file${versionParam(versionId)}`;
+export function multipleChoiceAnswers(
+  answer = "",
+  options: string[] = [],
+): string[] {
+  if (!answer.trim()) return [];
+  try {
+    const values: unknown = JSON.parse(answer);
+    if (
+      Array.isArray(values) &&
+      values.every(
+        (value) =>
+          typeof value === "string" &&
+          (!options.length || options.includes(value)),
+      )
+    )
+      return values;
+  } catch {
+    // Existing records use newline-separated option text.
+  }
+  if (options.includes(answer)) return [answer];
+  return answer.split(/\r?\n/).filter((value) => value.length > 0);
+}
+export function answerText(
+  question: Question | undefined,
+  answer = "",
+): string {
+  return question?.type === "multipleChoice"
+    ? multipleChoiceAnswers(answer, question.options).join("\n\n")
+    : answer;
+}
 export function blankTask(courseId: string): Task {
   return {
     id: "",

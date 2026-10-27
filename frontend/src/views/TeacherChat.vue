@@ -40,6 +40,7 @@ const members = ref<Member[] | null>(null),
   saved = ref(false),
   error = ref("");
 let savedConfiguration = JSON.stringify(form.value);
+let disposed = false;
 watch(
   form,
   () => {
@@ -50,6 +51,7 @@ watch(
   { deep: true, flush: "sync" },
 );
 onBeforeUnmount(() => {
+  disposed = true;
   dirty.value = false;
 });
 const conversationKey = computed(
@@ -59,11 +61,13 @@ const courseTasks = computed(() =>
   (tasks.value[currentId.value] || []).filter((task) => !task.archived),
 );
 async function saveCourse() {
+  if (disposed) return;
   const course = await call<Course>(
     currentId.value ? "/courses/" + key(currentId.value) : "/courses",
     currentId.value ? "PUT" : "POST",
     form.value,
   );
+  if (disposed) return;
   currentId.value = course.id;
   savedConfiguration = JSON.stringify(form.value);
   dirty.value = false;
@@ -84,6 +88,7 @@ async function save() {
   }
 }
 async function configure(reply: TeacherReply) {
+  if (disposed) return;
   const courseFields = Object.keys(form.value) as (keyof typeof form.value)[];
   const changed = courseFields.filter((name) =>
     Object.hasOwn(reply.fields, name),
@@ -97,6 +102,7 @@ async function configure(reply: TeacherReply) {
       );
     } else {
       await saveCourse();
+      if (disposed) return;
       outcome = t("Course configuration saved.");
     }
   }

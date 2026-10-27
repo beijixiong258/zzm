@@ -194,7 +194,9 @@ public class SessionServiceImpl extends ServiceImpl<TeachingSessionMapper, Teach
 
                 if (Set.of("singleChoice", "multipleChoice", "trueFalse").contains(question.getType())) {
                     if (question.getOptions().size() < 2 || question.getOptions().stream().anyMatch(String::isBlank) || new HashSet<>(question.getOptions()).size() != question.getOptions().size()) throw error(422, "Choice questions need distinct non-empty options");
-                    String reference = Objects.toString(question.getReferenceAnswer(), ""); List<String> answers = reference.isBlank() ? List.of() : "multipleChoice".equals(question.getType()) ? reference.lines().toList() : List.of(reference);
+                    String reference = Objects.toString(question.getReferenceAnswer(), "");
+                    List<String> answers = reference.isBlank() ? List.of() : "multipleChoice".equals(question.getType())
+                        ? TaskContent.multipleChoiceAnswers(reference, question.getOptions()) : List.of(reference);
                     if (!question.getOptions().containsAll(answers)) throw error(422, "Question " + questionNumber + ": The correct answer must match an option");
                 }
                 if ("fillInBlank".equals(question.getType()) && (question.getAnswerSlots() == null || question.getAnswerSlots() < 1 || question.getAnswerSlots() > 20)) throw error(422, "Invalid number of blanks");

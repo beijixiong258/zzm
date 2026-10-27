@@ -4,6 +4,7 @@ import { computed, ref, watch } from "vue";
 import { t } from "../i18n";
 import {
   call,
+  answerText,
   dateText,
   fileUrl,
   key,
@@ -148,7 +149,14 @@ function toggle(event: Event) {
             <small>{{
               t("Question {0}", [questions.findIndex((q) => q.id === id) + 1])
             }}</small>
-            <RichText :text="answer" />
+            <RichText
+              :text="
+                answerText(
+                  questions.find((q) => q.id === id),
+                  answer,
+                )
+              "
+            />
           </div>
         </template>
         <TButton

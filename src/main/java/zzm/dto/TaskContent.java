@@ -1,5 +1,6 @@
 package zzm.dto;
 
+import cn.hutool.json.*;
 import lombok.Data;
 import java.util.ArrayList;
 import java.util.List;
@@ -18,6 +19,19 @@ public class TaskContent {
     private List<Diagram> diagrams = new ArrayList<>();
     private List<Question> questions = new ArrayList<>();
     private AiConfig aiConfig = new AiConfig();
+
+    public static List<String> multipleChoiceAnswers(String answer, List<String> options) {
+        if (answer == null || answer.isBlank()) return List.of();
+        if (answer.strip().startsWith("[")) {
+            try {
+                JSONArray values = JSONUtil.parseArray(answer);
+                if (values.stream().allMatch(value -> value instanceof String && (options == null || options.isEmpty() || options.contains(value))))
+                    return values.toList(String.class);
+            } catch (JSONException ignored) { /* Existing records use newline-separated option text. */ }
+        }
+        if (options != null && options.contains(answer)) return List.of(answer);
+        return answer.lines().filter(value -> !value.isEmpty()).toList();
+    }
 
     @Data public static class Diagram {
         private String id;

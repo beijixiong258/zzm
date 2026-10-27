@@ -21,7 +21,9 @@ public class TaskExporter {
             var question = content.getQuestions().get(index);
             heading(out, 3, chinese ? "第 " + (index + 1) + " 题" : "Question " + (index + 1));
             markdown(out, question.getPrompt());
-            markdown(out, answers.getStr(question.getId(), chinese ? "尚未作答" : "No answer yet"));
+            String answer = answers.getStr(question.getId(), chinese ? "尚未作答" : "No answer yet");
+            markdown(out, "multipleChoice".equals(question.getType())
+                ? String.join("\n\n", TaskContent.multipleChoiceAnswers(answer, question.getOptions())) : answer);
         }
         section(out, chinese ? "教师反馈" : "Teacher feedback", teacherNote);
         heading(out, 2, chinese ? "本次对话" : "Current conversation");

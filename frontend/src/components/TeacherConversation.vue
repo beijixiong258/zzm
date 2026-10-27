@@ -19,6 +19,8 @@ const messages = ref<ChatMessage[]>([]),
   error = ref("");
 const end = ref<HTMLElement | null>(null);
 let storageKey = "";
+let disposed = false;
+let request: AbortController | undefined;
 function persist() {
   if (!storageKey) return;
   try {
@@ -64,9 +66,13 @@ watch(
   { immediate: true },
 );
 watch([messages, prompt], persist, { deep: true });
-onBeforeUnmount(persist);
+onBeforeUnmount(() => {
+  disposed = true;
+  request?.abort();
+  persist();
+});
 async function send() {
-  if (busy.value || props.disabled || !prompt.value.trim()) return;
+  if (disposed || busy.value || props.disabled || !prompt.value.trim()) return;
   if (messages.value.length >= 1000) {
     error.value = t(
       "This conversation has reached its message limit. Start a new conversation to continue; your history will be kept.",
@@ -77,14 +83,22 @@ async function send() {
   busy.value = true;
   emit("pending", true);
   error.value = "";
+  request = new AbortController();
   try {
-    const response = await call<TeacherReply>("/teacher/assistant", "POST", {
-      ...props.context,
-      message,
-      history: messages.value,
-      locale: locale.value,
-    });
+    const response = await call<TeacherReply>(
+      "/teacher/assistant",
+      "POST",
+      {
+        ...props.context,
+        message,
+        history: messages.value,
+        locale: locale.value,
+      },
+      request.signal,
+    );
+    if (disposed) return;
     const outcome = await props.applyReply(response, message);
+    if (disposed) return;
     messages.value.push(
       { role: "user", content: message },
       {
@@ -97,10 +111,11 @@ async function send() {
     await nextTick();
     end.value?.scrollIntoView({ block: "nearest", behavior: "smooth" });
   } catch (e) {
-    error.value = systemText((e as Error).message);
+    if (!disposed) error.value = systemText((e as Error).message);
   } finally {
+    request = undefined;
     busy.value = false;
-    emit("pending", false);
+    if (!disposed) emit("pending", false);
   }
 }
 function enter(event: KeyboardEvent) {

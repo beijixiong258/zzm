@@ -35,6 +35,7 @@ public class MaterialServiceImpl extends ServiceImpl<CourseMaterialMapper, Cours
     private final SessionVersionMapper versions;
     private final TeachingSessionMapper sessions;
     private final LearningRecordMapper records;
+    private String recycleCursor;
     @Override public List<Map<String, Object>> library(String courseId, AccountUser user) {
         courses.requireAccess(courseId, user, true);
         return lambdaQuery().eq(CourseMaterial::getCourseId, courseId).isNull(CourseMaterial::getOwnerId).isNull(CourseMaterial::getFileRemovedAt).orderByAsc(CourseMaterial::getRelativePath).list().stream().map(this::view).toList();
@@ -215,7 +216,10 @@ public class MaterialServiceImpl extends ServiceImpl<CourseMaterialMapper, Cours
     @Override public synchronized void recycleRemovedAttachments() {
         List<CourseMaterial> removed = lambdaQuery().eq(CourseMaterial::getArchived, true)
             .isNotNull(CourseMaterial::getFileRemovedAt).isNull(CourseMaterial::getTrashPath).ne(CourseMaterial::getStatus, "processing")
-            .orderByAsc(CourseMaterial::getFileRemovedAt).page(new Page<CourseMaterial>(1, 50, false)).getRecords();
+            .gt(recycleCursor != null, CourseMaterial::getId, recycleCursor)
+            .orderByAsc(CourseMaterial::getId).page(new Page<CourseMaterial>(1, 50, false)).getRecords();
+        // Continue past shared or failed files, then revisit them on the next sweep.
+        recycleCursor = removed.size() == 50 ? removed.get(removed.size() - 1).getId() : null;
         for (CourseMaterial attachment : removed) {
             List<CourseMaterial> shared = lambdaQuery().eq(CourseMaterial::getStoragePath, attachment.getStoragePath()).list();
             if (shared.stream().anyMatch(file -> file.getFileRemovedAt() == null || "processing".equals(file.getStatus()))) continue;

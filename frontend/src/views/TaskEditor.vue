@@ -15,12 +15,14 @@ import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
 import { t, systemText } from "../i18n";
 import {
   blankTask,
+  answerText,
   questionTypes,
   call,
   fileUrl,
   key,
   statusText,
   studentTask,
+  versionParam,
   type Job,
   type Material,
   type Task,
@@ -91,6 +93,7 @@ const activeMaterials = computed(() =>
 );
 const students = ref<StudentRow[] | null>(null),
   observed = ref<Workspace | null>(null);
+const progressVersionId = ref("");
 const studentProgressPanel = ref<HTMLElement | null>(null);
 const conversationKey = computed(
   () =>
@@ -108,13 +111,18 @@ let polling = false;
 const active = computed(
   () => job.value && ["queued", "running"].includes(job.value.status),
 );
+const hasContent = computed(
+  () =>
+    !!draft.value.content.handout?.trim() ||
+    draft.value.content.questions.length > 0,
+);
 const selected = computed(() =>
   materials.value.filter(
     (m) => !m.archived && draft.value.materialIds.includes(m.id),
   ),
 );
 const taskActions = computed<DropdownOption[]>(() => [
-  ...(draft.value.content.handout
+  ...(hasContent.value
     ? [
         {
           content: t("Revise with these instructions"),
@@ -295,6 +303,7 @@ async function saveDraft() {
     draft.value.id ? "PUT" : "POST",
     draft.value,
   );
+  if (disposed) return result;
   accept(result);
   retainTaskAddress(result.id);
   await refreshCourses();
@@ -327,6 +336,7 @@ async function generate(
   let started = false;
   await action(async () => {
     await saveDraft();
+    if (disposed) return;
     job.value = await call<Job>(
       `/sessions/${key(draft.value.id)}/generations`,
       "POST",
@@ -384,7 +394,9 @@ async function poll() {
 async function publish() {
   await action(async () => {
     if (dirty.value || !draft.value.id) await saveDraft();
+    if (disposed) return;
     if (!(await confirmAction(t("Publish this task to students?")))) return;
+    if (disposed) return;
     await call(`/sessions/${key(draft.value.id)}/publish`, "POST", {
       revision: draft.value.revision,
     });
@@ -462,11 +474,15 @@ function saveSelection() {
   );
   cancelSelection();
 }
-async function viewProgress() {
+async function viewProgress(versionId = progressVersionId.value) {
   if (!draft.value.id) throw Error(t("Save the task before viewing progress."));
-  students.value = await call<StudentRow[]>(
-    `/sessions/${key(draft.value.id)}/students`,
+  const selectedVersion = versionId || draft.value.publishedVersionId || "";
+  const rows = await call<StudentRow[]>(
+    `/sessions/${key(draft.value.id)}/students${versionParam(selectedVersion)}`,
   );
+  if (disposed) return;
+  progressVersionId.value = selectedVersion;
+  students.value = rows;
 }
 async function observe(recordId: string | null) {
   if (!recordId) return;
@@ -506,6 +522,7 @@ async function approveObserved(message: ChatMessage) {
   });
 }
 async function configure(reply: TeacherReply, message: string) {
+  if (disposed) return;
   const fields = [
     "title",
     "description",
@@ -540,6 +557,7 @@ async function configure(reply: TeacherReply, message: string) {
   if (changed) {
     if (draft.value.title.trim()) {
       await saveDraft();
+      if (disposed) return;
       outcome = t("Task configuration saved to the draft.");
     } else
       outcome = t(
@@ -630,7 +648,7 @@ void load();
           <TButton
             theme="default"
             variant="outline"
-            v-if="draft.content.handout"
+            v-if="hasContent"
             type="button"
             :disabled="busy || chatBusy || !!active"
             @click="showPreview = true"
@@ -658,7 +676,7 @@ void load();
           <TButton
             theme="primary"
             variant="base"
-            v-if="draft.content.handout"
+            v-if="hasContent"
             type="button"
             class="primary"
             :disabled="busy || chatBusy || !!active"
@@ -914,12 +932,12 @@ void load();
               {{ t("Refresh generation status") }}
             </TButton>
           </section>
-          <section
-            v-if="draft.content.handout"
-            class="conversation-result lesson-result"
-          >
+          <section v-if="hasContent" class="conversation-result lesson-result">
             <h2>{{ draft.title }}</h2>
-            <RichText :text="draft.content.handout" />
+            <RichText
+              v-if="draft.content.handout"
+              :text="draft.content.handout"
+            />
             <details v-if="draft.content.questions.length">
               <summary>
                 {{ t("Questions and reference answers") }} ·
@@ -950,7 +968,7 @@ void load();
                 </p>
                 <RichText
                   v-if="question.referenceAnswer"
-                  :text="question.referenceAnswer"
+                  :text="answerText(question, question.referenceAnswer)"
                 />
                 <p v-else class="muted">
                   {{
@@ -968,6 +986,27 @@ void load();
             class="conversation-result"
           >
             <strong>{{ t("Student progress") }}</strong>
+            <label v-if="versions.length" class="form-stack">
+              {{ t("Version") }}
+              <TSelect
+                :value="progressVersionId"
+                :disabled="busy || chatBusy"
+                @change="
+                  (value) =>
+                    action(async () => {
+                      await viewProgress(String(value));
+                      observed = null;
+                    })
+                "
+              >
+                <TOption
+                  v-for="version in versions"
+                  :key="version.id"
+                  :value="version.id"
+                  :label="version.label"
+                />
+              </TSelect>
+            </label>
             <TButton
               theme="default"
               variant="outline"
@@ -1195,7 +1234,7 @@ void load();
       {{ t("Save and refresh preview") }}
     </TButton>
     <StudentTask
-      v-if="draft.id && draft.content.handout && !dirty"
+      v-if="draft.id && hasContent && !dirty"
       :key="draft.id + '-' + previewKey"
       :task-id="draft.id"
       preview
