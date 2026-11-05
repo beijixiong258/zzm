@@ -1,16 +1,11 @@
-# Keep the existing Compose project and volume names after moving to the root.
+# Deployment services reuse the existing database volume.
 name: app
 services:
   mysql:
     image: mysql:8.4
     restart: unless-stopped
-    environment:
-      MYSQL_DATABASE: aicademiya
-      MYSQL_USER: ${MYSQL_USER:?Set MYSQL_USER from spring.datasource.username in application.yaml}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?Set MYSQL_PASSWORD from spring.datasource.password in application.yaml}
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Set MYSQL_ROOT_PASSWORD from mysql.root-password in application.yaml}
     ports:
-      - "127.0.0.1:3306:3306"
+      - "127.0.0.1:3307:3306"
     volumes:
       - mysql-data:/var/lib/mysql
     healthcheck:
@@ -26,9 +21,8 @@ services:
       mysql:
         condition: service_healthy
     ports:
-      - "127.0.0.1:8001:8001"
+      - "8001:8001"
     environment:
-      MYSQL_URL: jdbc:mysql://mysql:3306/aicademiya?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC
       AICADEMIYA_CONFIG: /config/config.json
       AICADEMIYA_UPLOAD_DIR: /data/uploads
       AICADEMIYA_TRASH_DIR: /data/recycle
@@ -37,14 +31,20 @@ services:
       AICADEMIYA_DOCUMENT_IMAGE_MAX_EDGE: ${AICADEMIYA_DOCUMENT_IMAGE_MAX_EDGE:-2000}
       AICADEMIYA_DEMO_ENABLED: ${AICADEMIYA_DEMO_ENABLED:-false}
       AICADEMIYA_COOKIE_SECURE: "false"
-      AICADEMIYA_ALLOWED_ORIGINS: http://localhost:5173,http://127.0.0.1:5173
+      AICADEMIYA_ALLOWED_ORIGINS: ${AICADEMIYA_ALLOWED_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173}
       AICADEMIYA_AI_BASE_URL: ${AICADEMIYA_AI_BASE_URL:-}
       AICADEMIYA_AI_MODEL: ${AICADEMIYA_AI_MODEL:-}
       AICADEMIYA_AI_API_KEY: ${AICADEMIYA_AI_API_KEY:-}
     volumes:
       - uploads:/data/uploads
-      - "${AICADEMIYA_TRASH_HOST_DIR:-C:/Users/user/Desktop/智能体回收站/垃圾桶/AIcademiya}:/data/recycle"
+      - recycle:/data/recycle
       - ./config.json:/config/config.json:ro
+      - type: bind
+        source: ./application.yaml
+        target: /app/config/application.yaml
+        read_only: true
+        bind:
+          create_host_path: false
     healthcheck:
       test: ["CMD", "curl", "--fail", "--silent", "--show-error", "--max-time", "3", "http://127.0.0.1:8001/api/health"]
       interval: 10s
@@ -55,7 +55,7 @@ services:
     build: ./frontend
     restart: unless-stopped
     ports:
-      - "127.0.0.1:5173:5173"
+      - "5173:5173"
     depends_on:
       backend:
         condition: service_healthy
@@ -67,5 +67,7 @@ services:
       start_period: 15s
 volumes:
   mysql-data:
+    external: true
+    name: app_mysql-data
   uploads:
   recycle:

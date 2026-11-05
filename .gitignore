@@ -5,6 +5,10 @@ target/
 *.tsbuildinfo
 .env
 config.json
+/application.yaml
+/.idea/
+/测试用材料不要删/
+/cys的测试材料/
 data-local/
 .env.*
 local-settings*.json

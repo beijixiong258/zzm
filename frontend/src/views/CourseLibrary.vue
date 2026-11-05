@@ -10,12 +10,15 @@ import {
 import { computed, ref } from "vue";
 import { t } from "../i18n";
 import { call, key, type Material } from "../classroom-api";
-import { navigate } from "../classroom-state";
+import { courses, navigate } from "../classroom-state";
 import { useCourseMaterials } from "../useCourseMaterials";
 import FileUploader from "../components/FileUploader.vue";
 import MaterialTree from "../components/MaterialTree.vue";
 import CourseMaterialPreview from "../components/CourseMaterialPreview.vue";
 const props = defineProps<{ courseId: string }>();
+const course = computed(() =>
+  courses.value.find((item) => item.id === props.courseId),
+);
 const {
   materials,
   error: materialError,
@@ -110,7 +113,7 @@ void load();
   </nav>
   <header class="page-heading compact-heading">
     <div>
-      <p class="eyebrow">{{ t("COURSE LIBRARY") }}</p>
+      <p class="eyebrow">{{ course?.title }}</p>
       <h1>{{ t("Course materials") }}</h1>
       <p class="muted">
         {{

@@ -65,7 +65,7 @@ public final class Requests {
         @NotNull @Size(max = 10000) private String topic = "";
         @NotNull @Size(max = 20000) private String learningGoals = "";
         @NotNull @Size(max = 20000) private String additionalInstructions = "";
-        @NotBlank @Pattern(regexp = "zh-CN|en") private String teachingLanguage = "zh-CN";
+        @NotBlank @Pattern(regexp = "auto|zh-CN|en") private String teachingLanguage = "zh-CN";
         @NotNull @Size(max = 100) private List<String> materialIds = new ArrayList<>();
         @NotNull @Valid private TaskContent content = new TaskContent();
         @NotNull @Min(0) private Long revision = 0L;

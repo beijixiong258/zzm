@@ -141,7 +141,7 @@ export type Task = {
   topic: string;
   learningGoals: string;
   additionalInstructions?: string;
-  teachingLanguage: "zh-CN" | "en";
+  teachingLanguage: "auto" | "zh-CN" | "en";
   materialIds: string[];
   content: TaskContent;
   materials: Material[];
@@ -440,7 +440,7 @@ export function blankTask(courseId: string): Task {
     topic: "",
     learningGoals: "",
     additionalInstructions: "",
-    teachingLanguage: "zh-CN",
+    teachingLanguage: "auto",
     materialIds: [],
     content: {
       description: "",

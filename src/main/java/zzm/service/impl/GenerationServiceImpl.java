@@ -45,6 +45,7 @@ public class GenerationServiceImpl extends ServiceImpl<GenerationJobMapper, Gene
 
     @Override @Transactional public GenerationJob start(String sessionId, Requests.Generation input, AccountUser user) {
         TeachingSession session = sessions.require(sessionId, user, true);
+        if (Boolean.TRUE.equals(session.getArchived())) throw error(409, "Restore the task before generating a lesson.");
         if (!session.getRevision().equals(input.getRevision())) throw error(409, "Save or reload the latest task before generating");
         if (lambdaQuery().eq(GenerationJob::getSessionId, sessionId).in(GenerationJob::getStatus, "queued", "running").count() > 0) throw error(409, "Generation is already running");
         List<String> ids = JSONUtil.toList(session.getMaterialIdsJson(), String.class);
@@ -70,6 +71,7 @@ public class GenerationServiceImpl extends ServiceImpl<GenerationJobMapper, Gene
         if ("applied".equals(job.getStatus())) return session;
         if (!"succeeded".equals(job.getStatus())) throw error(409, "Generation is not ready to apply");
         if (!session.getRevision().equals(job.getExpectedRevision())) throw error(409, "Task was edited during generation. The generated result has been retained; reload and generate again.");
+        GeneratedLesson settings = JSONUtil.toBean(job.getResultJson(), GeneratedLesson.class);
         TaskContent generated = JSONUtil.toBean(job.getResultJson(), TaskContent.class);
         if ("import".equals(job.getKind())) {
             TaskContent current = JSONUtil.toBean(session.getContentJson(), TaskContent.class);
@@ -80,6 +82,11 @@ public class GenerationServiceImpl extends ServiceImpl<GenerationJobMapper, Gene
             if (current.getHandout().isBlank()) current.setHandout(generated.getHandout()); if (current.getOpeningMessage().isBlank()) current.setOpeningMessage(generated.getOpeningMessage()); if (current.getLearningPlan().isEmpty()) current.setLearningPlan(generated.getLearningPlan());
             if (current.getAiConfig() == null || current.getAiConfig().getTeachingApproach() == null) current.setAiConfig(generated.getAiConfig());
             generated = current;
+        } else {
+            if (settings.getTaskTitle() != null && !settings.getTaskTitle().isBlank()) session.setTitle(settings.getTaskTitle());
+            if (Set.of("zh-CN", "en").contains(Objects.toString(settings.getTeachingLanguage(), ""))) session.setTeachingLanguage(settings.getTeachingLanguage());
+            if (Set.of("tutor", "assignment").contains(Objects.toString(settings.getSessionType(), ""))) session.setSessionType(settings.getSessionType());
+            if (settings.getTaskInstructions() != null && !settings.getTaskInstructions().isBlank()) session.setAdditionalInstructions(settings.getTaskInstructions());
         }
         sessions.validateContent(generated, JSONUtil.toList(session.getMaterialIdsJson(), String.class), false);
         session.setContentJson(JSONUtil.toJsonStr(generated)); session.setLearningGoals(String.join("\n", generated.getLearningGoals()));

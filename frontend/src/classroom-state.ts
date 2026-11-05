@@ -35,6 +35,26 @@ function readRoute(): Route {
 }
 export const route = ref<Route>(readRoute());
 export const routeKey = ref(0);
+function courseRoute(value: Route): Route {
+  if (
+    !user.value ||
+    !staff.value ||
+    !["course", "task", "materials"].includes(value.page) ||
+    (value.page === "course" && !value.courseId)
+  )
+    return value;
+  if (
+    courses.value.some(
+      (course) => course.id === value.courseId && !course.workspace,
+    )
+  )
+    return tasks.value[value.courseId]?.some(
+      (task) => task.id === value.taskId && task.archived,
+    )
+      ? { page: "archives", courseId: "", taskId: "" }
+      : value;
+  return { page: "home", courseId: "", taskId: "" };
+}
 export async function navigate(next: Partial<Route>) {
   if (
     dirty.value &&
@@ -42,7 +62,12 @@ export async function navigate(next: Partial<Route>) {
   )
     return false;
   dirty.value = false;
-  const value: Route = { page: "home", courseId: "", taskId: "", ...next };
+  const value = courseRoute({
+    page: "home",
+    courseId: "",
+    taskId: "",
+    ...next,
+  });
   route.value = value;
   routeKey.value++;
   const query = new URLSearchParams();
@@ -69,7 +94,9 @@ export function retainCourseAddress(courseId: string) {
   history.replaceState(null, "", `#${query}`);
 }
 window.addEventListener("popstate", async () => {
-  const next = readRoute();
+  const requested = readRoute();
+  const next = courseRoute(requested);
+  if (next !== requested) history.replaceState(null, "", `#page=${next.page}`);
   // Cancelling browser Back restores the current address and raises popstate again.
   if (
     Object.entries(next).every(
@@ -98,7 +125,7 @@ export async function refreshCourses() {
   courses.value = await call<Course[]>("/courses");
   const entries = await Promise.all(
     courses.value
-      .filter((c) => !c.archived)
+      .filter((c) => staff.value || !c.archived)
       .map(
         async (course) =>
           [
@@ -108,6 +135,8 @@ export async function refreshCourses() {
       ),
   );
   tasks.value = Object.fromEntries(entries);
+  const resolved = courseRoute(route.value);
+  if (resolved !== route.value) await navigate(resolved);
 }
 export async function initialize() {
   setLocale(savedLocale() || "zh-CN");

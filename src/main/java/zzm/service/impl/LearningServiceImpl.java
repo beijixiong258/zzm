@@ -187,9 +187,16 @@ public class LearningServiceImpl extends ServiceImpl<LearningRecordMapper, Learn
     }
     @Override public List<Map<String, Object>> history(AccountUser user) {
         if (Boolean.TRUE.equals(user.getMustChangePassword())) throw error(403, "Password change required");
+        List<String> courseIds = courses.mine(user).stream().filter(course -> !Boolean.TRUE.equals(course.get("archived")))
+            .map(course -> Objects.toString(course.get("id"))).toList();
+        if (courseIds.isEmpty()) return List.of();
+        List<String> sessionIds = sessions.lambdaQuery().in(TeachingSession::getCourseId, courseIds)
+            .eq(TeachingSession::getArchived, false).list().stream().map(TeachingSession::getId).toList();
+        if (sessionIds.isEmpty()) return List.of();
         return lambdaQuery().select(LearningRecord::getId, LearningRecord::getSessionId, LearningRecord::getVersionId,
             LearningRecord::getUserId, LearningRecord::getStatus, LearningRecord::getUpdatedAt)
-            .eq(LearningRecord::getUserId, user.getId()).eq(LearningRecord::getPreview, false).orderByDesc(LearningRecord::getUpdatedAt)
+            .eq(LearningRecord::getUserId, user.getId()).eq(LearningRecord::getPreview, false)
+            .in(LearningRecord::getSessionId, sessionIds).orderByDesc(LearningRecord::getUpdatedAt)
             .list().stream().map(record -> {
                 Map<String, Object> item = new LinkedHashMap<>();
                 item.put("id", record.getId()); item.put("sessionId", record.getSessionId()); item.put("versionId", record.getVersionId());
@@ -286,7 +293,8 @@ public class LearningServiceImpl extends ServiceImpl<LearningRecordMapper, Learn
         String system = """
             You are the AI tutor for this learning task. Use teachingLanguage and follow the saved course information,
             student profile, general instructions, task-specific instructions and rubric. Adapt the actual teaching
-            actions to the learner's responses. In autonomous mode, propose and guide the next useful activity,
+            actions to the learner's responses. Current task-specific instructions take precedence over inferred aiConfig
+            when the teacher has edited the lesson. In autonomous mode, propose and guide the next useful activity,
             without requiring a fixed worksheet. Use explanations, examples, questions, hints and formative feedback. Respond in Markdown rich text; do not claim to generate image files.
             Give qualitative feedback on relevance, reasoning, accuracy and clarity. Do not assign scores, grades or rating levels.
             For open responses, use the source reference answer when provided. An empty referenceAnswer is valid:

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Textarea as TTextarea, Button as TButton } from "tdesign-vue-next";
-import { nextTick, onBeforeUnmount, ref, watch } from "vue";
+import { nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { call, type ChatMessage, type TeacherReply } from "../classroom-api";
 import { locale, systemText, t } from "../i18n";
 import RichText from "./RichText.vue";
@@ -17,10 +17,16 @@ const messages = ref<ChatMessage[]>([]),
   prompt = ref(""),
   busy = ref(false),
   error = ref("");
-const end = ref<HTMLElement | null>(null);
+const transcript = ref<HTMLElement | null>(null);
 let storageKey = "";
 let disposed = false;
 let request: AbortController | undefined;
+function scrollToLatest(behavior: ScrollBehavior = "auto") {
+  transcript.value?.scrollTo({
+    top: transcript.value.scrollHeight,
+    behavior,
+  });
+}
 function persist() {
   if (!storageKey) return;
   try {
@@ -66,6 +72,7 @@ watch(
   { immediate: true },
 );
 watch([messages, prompt], persist, { deep: true });
+onMounted(() => scrollToLatest());
 onBeforeUnmount(() => {
   disposed = true;
   request?.abort();
@@ -109,7 +116,7 @@ async function send() {
     );
     prompt.value = "";
     await nextTick();
-    end.value?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    scrollToLatest("smooth");
   } catch (e) {
     if (!disposed) error.value = systemText((e as Error).message);
   } finally {
@@ -127,64 +134,68 @@ function enter(event: KeyboardEvent) {
 </script>
 <template>
   <section class="teacher-conversation">
-    <div
-      class="teacher-transcript"
-      role="log"
-      :aria-label="t('Teaching conversation')"
-    >
-      <div v-if="!messages.length" class="conversation-welcome">
-        <span class="conversation-mark" aria-hidden="true">✦</span>
-        <h1>{{ t("What would you like to prepare?") }}</h1>
-        <p>{{ welcome }}</p>
-      </div>
-      <article
-        v-for="(message, index) in messages"
-        :key="index"
-        :class="['conversation-message', message.role]"
-      >
-        <small>{{ t(message.role === "user" ? "You" : "AI assistant") }}</small>
-        <RichText :text="message.content" />
-        <details v-if="message.usage" class="conversation-usage">
-          <summary>{{ t("Usage and local estimate") }}</summary>
-          <ContextMeter :usage="message.usage" />
-        </details>
-      </article>
-      <p v-if="busy" role="status" class="muted">{{ t("Thinking…") }}</p>
-      <div ref="end" />
-    </div>
     <slot name="results" />
-    <p v-if="error" class="error" role="alert">{{ error }}</p>
-    <div class="conversation-composer">
-      <form @submit.prevent="send">
-        <TTextarea
-          v-control-attrs="{
-            rows: '3',
-            'aria-label': t('Message to the teaching assistant'),
-          }"
-          :autosize="{ minRows: 3, maxRows: 10 }"
-          v-model="prompt"
-          maxlength="10000"
-          :disabled="busy || disabled"
-          :placeholder="
-            t('Describe what to create or change. AI will help configure it.')
-          "
-          @keydown="(_, { e }) => e.key === 'Enter' && enter(e)"
-        />
-        <div class="row spread">
-          <small class="muted">{{
-            t("Enter to send · Shift+Enter for a new line")
-          }}</small>
-          <TButton
-            theme="primary"
-            variant="base"
-            type="submit"
-            class="primary"
-            :disabled="busy || disabled || !prompt.trim()"
-          >
-            {{ t("Send") }} ↑
-          </TButton>
+    <div class="conversation-panel">
+      <div
+        ref="transcript"
+        class="teacher-transcript"
+        role="log"
+        tabindex="0"
+        :aria-label="t('Teaching conversation')"
+      >
+        <div v-if="!messages.length" class="conversation-welcome">
+          <strong>{{ t("Course assistant") }}</strong>
+          <p>{{ welcome }}</p>
         </div>
-      </form>
+        <article
+          v-for="(message, index) in messages"
+          :key="index"
+          :class="['conversation-message', message.role]"
+        >
+          <small>{{
+            t(message.role === "user" ? "You" : "AI assistant")
+          }}</small>
+          <RichText :text="message.content" />
+          <details v-if="message.usage" class="conversation-usage">
+            <summary>{{ t("Usage and local estimate") }}</summary>
+            <ContextMeter :usage="message.usage" />
+          </details>
+        </article>
+        <p v-if="busy" role="status" class="muted">{{ t("Thinking…") }}</p>
+      </div>
+      <p v-if="error" class="error" role="alert">{{ error }}</p>
+      <div class="conversation-composer">
+        <form @submit.prevent="send">
+          <TTextarea
+            v-control-attrs="{
+              rows: '2',
+              'aria-label': t('Message to the teaching assistant'),
+            }"
+            :autosize="{ minRows: 2, maxRows: 8 }"
+            v-model="prompt"
+            maxlength="10000"
+            :disabled="busy || disabled"
+            :placeholder="
+              t('Describe what to create or change. AI will help configure it.')
+            "
+            @keydown="(_, { e }) => e.key === 'Enter' && enter(e)"
+          />
+          <div class="row spread">
+            <small class="muted">{{
+              t("Enter to send · Shift+Enter for a new line")
+            }}</small>
+            <TButton
+              theme="primary"
+              variant="base"
+              type="submit"
+              class="primary"
+              :disabled="busy || disabled || !prompt.trim()"
+            >
+              {{ t("Send") }} ↑
+            </TButton>
+          </div>
+        </form>
+      </div>
     </div>
     <small class="conversation-footnote">{{
       t(

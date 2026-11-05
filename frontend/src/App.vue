@@ -47,6 +47,9 @@ const StudentTask = defineAsyncComponent(
 const CourseLibrary = defineAsyncComponent(
   () => import("./views/CourseLibrary.vue"),
 );
+const ArchivedTasks = defineAsyncComponent(
+  () => import("./views/ArchivedTasks.vue"),
+);
 const ready = ref(false),
   busy = ref(false),
   error = ref(""),
@@ -87,6 +90,9 @@ const historyRows = ref<LearningRecordSummary[]>([]),
 const accountForm = ref({ name: "", email: "", password: "", role: "student" });
 const course = computed(() =>
   courses.value.find((c) => c.id === route.value.courseId),
+);
+const activeCourses = computed(() =>
+  courses.value.filter((item) => !item.archived && !item.workspace),
 );
 const pageKey = routeKey;
 const componentLocale = computed(
@@ -458,12 +464,12 @@ void boot();
           @click="open('home')"
         >
           {{ staff ? "＋" : "⌂" }}
-          {{ t(staff ? "New course conversation" : "Home") }}
+          {{ t(staff ? "New course" : "Home") }}
         </TButton>
         <p class="nav-caption">{{ t("MY COURSES") }}</p>
         <div class="course-navigation">
           <details
-            v-for="item in courses.filter((c) => !c.archived)"
+            v-for="item in activeCourses"
             :key="item.id"
             :open="item.id === route.courseId"
           >
@@ -477,13 +483,12 @@ void boot();
                 menuOpen = false;
               "
             >
-              {{
-                t(staff ? "Course conversation" : "Course overview")
-              }}</TButton
+              {{ t(staff ? "Course information" : "Course overview") }}</TButton
             ><template v-if="staff"
               ><TButton
-                theme="default"
-                variant="outline"
+                theme="primary"
+                variant="base"
+                class="course-create-task"
                 type="button"
                 :disabled="
                   route.page === 'course' && route.courseId === item.id && dirty
@@ -503,7 +508,7 @@ void boot();
                   menuOpen = false;
                 "
               >
-                {{ t("Materials") }}
+                {{ t("Course materials") }}
               </TButton></template
             ><TButton
               theme="default"
@@ -525,11 +530,20 @@ void boot();
               >{{ task.title }}
             </TButton>
           </details>
-          <p v-if="!courses.length" class="muted small">
+          <p v-if="!activeCourses.length" class="muted small">
             {{ t("Your courses will appear here.") }}
           </p>
         </div>
         <nav class="secondary-nav">
+          <TButton
+            v-if="staff"
+            theme="default"
+            variant="outline"
+            type="button"
+            @click="open('archives')"
+          >
+            {{ t("Archived tasks") }}
+          </TButton>
           <TButton
             theme="default"
             variant="outline"
@@ -648,6 +662,10 @@ void boot();
               </TButton>
             </form></template
           >
+          <ArchivedTasks
+            v-else-if="staff && route.page === 'archives'"
+            :key="pageKey"
+          />
           <TeacherChat
             v-else-if="staff && ['home', 'course'].includes(route.page)"
             :key="pageKey"

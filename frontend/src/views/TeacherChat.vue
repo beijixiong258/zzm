@@ -5,6 +5,7 @@ import {
   Textarea as TTextarea,
 } from "tdesign-vue-next";
 import { computed, onBeforeUnmount, ref, watch } from "vue";
+import { Save } from "lucide-vue-next";
 import {
   call,
   key,
@@ -19,7 +20,6 @@ import {
   navigate,
   refreshCourses,
   retainCourseAddress,
-  tasks,
   user,
 } from "../classroom-state";
 import TeacherConversation from "../components/TeacherConversation.vue";
@@ -56,9 +56,6 @@ onBeforeUnmount(() => {
 });
 const conversationKey = computed(
   () => `${user.value?.id}:course:${currentId.value || "new"}`,
-);
-const courseTasks = computed(() =>
-  (tasks.value[currentId.value] || []).filter((task) => !task.archived),
 );
 async function saveCourse() {
   if (disposed) return;
@@ -103,7 +100,7 @@ async function configure(reply: TeacherReply) {
     } else {
       await saveCourse();
       if (disposed) return;
-      outcome = t("Course configuration saved.");
+      outcome = t("Course information saved.");
     }
   }
   if (
@@ -155,90 +152,85 @@ async function configure(reply: TeacherReply) {
       "\n" +
       t(
         dirty.value
-          ? "Save the course configuration before starting a new task conversation."
-          : "Use New task conversation in the course header to configure the task.",
+          ? "Save the course information before creating a task."
+          : "Use Create task in the course header to upload materials and generate a lesson.",
       );
   else if (reply.action === "progress")
-    outcome +=
-      "\n" + t("Open a task conversation to view its student progress.");
+    outcome += "\n" + t("Open a task to view its student progress.");
   else if (["files", "selectFiles"].includes(reply.action))
     outcome +=
       "\n" +
-      t(
-        "Use File management in the course header to organize the course materials.",
-      );
+      t("Use Course materials in the sidebar to organize this course's files.");
   return outcome.trim();
 }
 </script>
 <template>
-  <div class="teacher-chat-page">
-    <header class="conversation-heading">
-      <div>
-        <p class="eyebrow">{{ t("Teaching conversation") }}</p>
-        <strong>{{ form.title || t("New course conversation") }}</strong>
-      </div>
-      <div v-if="currentId" class="row wrap">
-        <TButton
-          theme="primary"
-          variant="base"
-          type="button"
-          class="primary"
-          :disabled="chatting || saving || dirty"
-          :title="
-            dirty
-              ? t(
-                  'Save the course configuration before starting a new task conversation.',
-                )
-              : undefined
-          "
-          @click="navigate({ page: 'task', courseId: currentId })"
-        >
-          ＋ {{ t("New task conversation") }}
-        </TButton>
-        <TButton
-          theme="default"
-          variant="outline"
-          type="button"
-          :disabled="chatting || saving"
-          @click="navigate({ page: 'materials', courseId: currentId })"
-        >
-          {{ t("File management") }}
-        </TButton>
-      </div>
-    </header>
-    <TeacherConversation
-      :conversation-key="conversationKey"
-      :context="{
-        scope: 'course',
-        courseId: currentId || null,
-        courseDraft: form,
-      }"
-      :apply-reply="configure"
-      :disabled="saving"
-      @pending="chatting = $event"
-      :welcome="
-        t(
-          'Tell me the course you want to create, who the students are, and what you want them to learn. We can configure it together.',
-        )
-      "
-    >
-      <template #results>
-        <section class="conversation-result">
-          <strong>{{ t("Current course configuration") }}</strong>
-          <p class="muted">
-            {{
-              t(
-                "Edit these fields directly, or describe changes in the conversation.",
-              )
-            }}
+  <div class="teacher-chat-page course-editor-page">
+    <section class="course-editor-card">
+      <header class="conversation-heading course-editor-heading">
+        <div>
+          <p class="eyebrow">
+            {{ t(currentId ? "Course information" : "New course") }}
           </p>
-          <form @submit.prevent="save">
-            <fieldset :disabled="chatting || saving">
-              <dl class="configuration-summary">
-                <dt>
-                  <label for="course-title">{{ t("Course name") }}</label>
-                </dt>
-                <dd>
+          <h1>{{ form.title || t("Course basics") }}</h1>
+        </div>
+        <div class="row wrap course-editor-actions">
+          <TButton
+            v-if="currentId"
+            theme="primary"
+            variant="base"
+            type="button"
+            class="primary"
+            :disabled="chatting || saving || dirty"
+            :title="
+              dirty
+                ? t('Save the course information before creating a task.')
+                : undefined
+            "
+            @click="navigate({ page: 'task', courseId: currentId })"
+          >
+            ＋ {{ t("Create task") }}
+          </TButton>
+          <TButton
+            theme="default"
+            variant="outline"
+            type="submit"
+            form="course-information-form"
+            class="course-save-button"
+            :aria-label="t('Save course information')"
+            :title="t('Save course information')"
+            :disabled="chatting || saving || (!!currentId && !dirty)"
+          >
+            <Save :size="17" aria-hidden="true" />
+            {{ t(saving ? "Saving…" : "Save") }}
+          </TButton>
+        </div>
+      </header>
+      <TeacherConversation
+        :conversation-key="conversationKey"
+        :context="{
+          scope: 'course',
+          courseId: currentId || null,
+          courseDraft: form,
+        }"
+        :apply-reply="configure"
+        :disabled="saving"
+        @pending="chatting = $event"
+        :welcome="
+          t(
+            'Describe the course information, students and teaching requirements. You can also edit the fields above.',
+          )
+        "
+      >
+        <template #results>
+          <section class="course-information-section">
+            <form id="course-information-form" @submit.prevent="save">
+              <fieldset
+                class="course-information-fields"
+                :disabled="chatting || saving"
+              >
+                <label for="course-title"
+                  >{{ t("Course name") }}
                   <TInput
                     :disabled="chatting || saving"
                     v-control-attrs="{ id: 'course-title', required: true }"
@@ -246,11 +238,9 @@ async function configure(reply: TeacherReply) {
                     @blur="form.title = form.title.trim()"
                     maxlength="300"
                   />
-                </dd>
-                <dt>
-                  <label for="course-code">{{ t("Course code") }}</label>
-                </dt>
-                <dd>
+                </label>
+                <label for="course-code"
+                  >{{ t("Course code") }}
                   <TInput
                     :disabled="chatting || saving"
                     v-control-attrs="{ id: 'course-code', required: true }"
@@ -258,104 +248,64 @@ async function configure(reply: TeacherReply) {
                     @blur="form.code = form.code.trim()"
                     maxlength="100"
                   />
-                </dd>
-                <dt>
-                  <label for="course-information">{{
-                    t("Course information")
-                  }}</label>
-                </dt>
-                <dd>
+                </label>
+                <label for="course-information" class="course-information-wide"
+                  >{{ t("Course information") }}
                   <TTextarea
                     :disabled="chatting || saving"
-                    v-control-attrs="{ id: 'course-information', rows: '3' }"
-                    :autosize="{ minRows: 3, maxRows: 10 }"
+                    v-control-attrs="{ id: 'course-information', rows: '2' }"
+                    :autosize="{ minRows: 2, maxRows: 8 }"
                     v-model="form.courseInformation"
                     maxlength="20000"
                   />
-                </dd>
-                <dt>
-                  <label for="course-student-profile">{{
-                    t("Student profile")
-                  }}</label>
-                </dt>
-                <dd>
+                </label>
+                <label for="course-student-profile"
+                  >{{ t("Student profile") }}
                   <TTextarea
                     :disabled="chatting || saving"
                     v-control-attrs="{
                       id: 'course-student-profile',
-                      rows: '3',
+                      rows: '2',
                     }"
-                    :autosize="{ minRows: 3, maxRows: 10 }"
+                    :autosize="{ minRows: 2, maxRows: 8 }"
                     v-model="form.studentProfile"
                     maxlength="20000"
                   />
-                </dd>
-                <dt>
-                  <label for="course-instructions">{{
-                    t("Course instructions")
-                  }}</label>
-                </dt>
-                <dd>
+                </label>
+                <label for="course-instructions"
+                  >{{ t("Course instructions") }}
                   <TTextarea
                     :disabled="chatting || saving"
-                    v-control-attrs="{ id: 'course-instructions', rows: '3' }"
-                    :autosize="{ minRows: 3, maxRows: 10 }"
+                    v-control-attrs="{ id: 'course-instructions', rows: '2' }"
+                    :autosize="{ minRows: 2, maxRows: 8 }"
                     v-model="form.systemInstructions"
                     maxlength="20000"
                   />
-                </dd>
-              </dl>
-              <div class="row wrap end configuration-actions">
+                </label>
+              </fieldset>
+              <div class="course-information-state">
                 <small v-if="!currentId || dirty" class="muted">
-                  {{
-                    t(
-                      "Save the course configuration before starting a new task conversation.",
-                    )
-                  }}
+                  {{ t("Save the course information before creating a task.") }}
                 </small>
-                <TButton
-                  :disabled="chatting || saving"
-                  theme="primary"
-                  variant="base"
-                  class="primary"
-                  type="submit"
-                >
-                  {{ t(saving ? "Saving…" : "Save course configuration") }}
-                </TButton>
               </div>
-            </fieldset>
-            <p v-if="saved" class="success" role="status">
-              {{ t("Course configuration saved.") }}
+              <p v-if="saved" class="success" role="status">
+                {{ t("Course information saved.") }}
+              </p>
+              <p v-if="error" class="error" role="alert">{{ error }}</p>
+            </form>
+          </section>
+          <section v-if="members" class="conversation-result">
+            <strong>{{ t("Class members") }}</strong>
+            <p v-for="member in members" :key="member.id">
+              {{ member.name }} · {{ member.username || member.email }} ·
+              {{ t(member.role === "student" ? "Student" : "Teacher") }}
             </p>
-            <p v-if="error" class="error" role="alert">{{ error }}</p>
-          </form>
-          <div v-if="courseTasks.length" class="conversation-task-links">
-            <TButton
-              theme="default"
-              variant="outline"
-              type="button"
-              v-for="task in courseTasks"
-              :key="task.id"
-              :disabled="chatting || saving"
-              @click="
-                navigate({ page: 'task', courseId: currentId, taskId: task.id })
-              "
-            >
-              {{ task.title }} →
-            </TButton>
-          </div>
-        </section>
-        <section v-if="members" class="conversation-result">
-          <strong>{{ t("Class members") }}</strong>
-          <p v-for="member in members" :key="member.id">
-            {{ member.name }} · {{ member.username || member.email }} ·
-            {{ t(member.role === "student" ? "Student" : "Teacher") }}
-          </p>
-          <p v-if="!members.length" class="muted">
-            {{ t("No students have joined this course yet.") }}
-          </p>
-        </section>
-      </template>
-    </TeacherConversation>
+            <p v-if="!members.length" class="muted">
+              {{ t("No students have joined this course yet.") }}
+            </p>
+          </section>
+        </template>
+      </TeacherConversation>
+    </section>
   </div>
 </template>

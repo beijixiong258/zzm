@@ -31,4 +31,5 @@ public class SessionController {
     @GetMapping("/sessions/{id}/versions") public Object versions(@PathVariable String id, HttpServletRequest request) { return sessions.versions(id, accounts.current(request)); }
     @PostMapping("/sessions/{id}/versions/{versionId}/restore") public void restore(@PathVariable String id, @PathVariable String versionId, @Valid @RequestBody Requests.Revision input, HttpServletRequest request) { sessions.restore(id, versionId, input.getRevision(), accounts.current(request)); }
     @PostMapping("/sessions/{id}/archive") public void archive(@PathVariable String id, @RequestParam boolean archived, HttpServletRequest request) { sessions.archive(id, archived, accounts.current(request)); }
+    @DeleteMapping("/sessions/{id}") public void delete(@PathVariable String id, HttpServletRequest request) { sessions.deleteArchived(id, accounts.current(request)); }
 }

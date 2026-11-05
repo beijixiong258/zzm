@@ -102,6 +102,11 @@ public class MaterialServiceImpl extends ServiceImpl<CourseMaterialMapper, Cours
         if (material.getOwnerId() != null) {
             if (!material.getOwnerId().equals(user.getId()) && "student".equals(user.getRole())) throw error(403, "Attachment access denied");
             if (Boolean.TRUE.equals(material.getArchived())) throw error(410, "This attachment has been removed.");
+            if ("student".equals(user.getRole())) {
+                LearningRecord record = records.selectById(material.getRecordId());
+                TeachingSession task = record == null ? null : sessions.selectById(record.getSessionId());
+                if (task == null || Boolean.TRUE.equals(task.getArchived())) throw error(404, "Task not found");
+            }
             return material;
         }
         if (!"student".equals(user.getRole())) return material;
@@ -109,6 +114,7 @@ public class MaterialServiceImpl extends ServiceImpl<CourseMaterialMapper, Cours
         SessionVersion version = versions.selectById(versionId);
         if (version == null || !version.getCourseId().equals(material.getCourseId())) throw error(403, "Material access denied");
         TeachingSession session = sessions.selectById(version.getSessionId());
+        if (session == null || Boolean.TRUE.equals(session.getArchived())) throw error(404, "Task not found");
         boolean current = session != null && !Boolean.TRUE.equals(session.getArchived()) && versionId.equals(session.getPublishedVersionId());
         boolean studied = records.selectCount(Wrappers.<LearningRecord>lambdaQuery().eq(LearningRecord::getVersionId, versionId).eq(LearningRecord::getUserId, user.getId())) > 0;
         if (!current && !studied) throw error(403, "Material access denied");
@@ -145,6 +151,15 @@ public class MaterialServiceImpl extends ServiceImpl<CourseMaterialMapper, Cours
         if (published) throw error(409, "Material is retained by a published version. Archive it to preserve existing learning records.");
         lambdaUpdate().eq(CourseMaterial::getId, id).set(CourseMaterial::getArchived, true)
             .set(CourseMaterial::getFileRemovedAt, LocalDateTime.now(ZoneOffset.UTC)).set(CourseMaterial::getRemovedBy, user.getId()).update();
+    }
+    @Override @Transactional public void removeTaskAttachments(List<String> recordIds, AccountUser user) {
+        if (recordIds.isEmpty()) return;
+        lambdaUpdate().in(CourseMaterial::getRecordId, recordIds).isNull(CourseMaterial::getFileRemovedAt)
+            .set(CourseMaterial::getFileRemovedAt, LocalDateTime.now(ZoneOffset.UTC)).set(CourseMaterial::getRemovedBy, user.getId()).update();
+        // Retain file locations until the existing recycling worker has safely moved the originals.
+        lambdaUpdate().in(CourseMaterial::getRecordId, recordIds).set(CourseMaterial::getArchived, true)
+            .set(CourseMaterial::getStatus, "taskDeleted").set(CourseMaterial::getTextContent, "")
+            .set(CourseMaterial::getExtractionReportJson, null).set(CourseMaterial::getErrorMessage, "").update();
     }
     @Override public void retry(String id, AccountUser user) {
         CourseMaterial material = requireFile(id, null, user);
@@ -234,6 +249,14 @@ public class MaterialServiceImpl extends ServiceImpl<CourseMaterialMapper, Cours
             } catch (IOException | RuntimeException exception) {
                 log.warn("Attachment {} could not be recycled ({}); the background job will retry", attachment.getId(), exception.getClass().getSimpleName());
             }
+        }
+        List<CourseMaterial> recycled = lambdaQuery().eq(CourseMaterial::getStatus, "taskDeleted")
+            .isNotNull(CourseMaterial::getFileRemovedAt).isNotNull(CourseMaterial::getTrashPath)
+            .orderByAsc(CourseMaterial::getId).page(new Page<CourseMaterial>(1, 50, false)).getRecords();
+        for (CourseMaterial attachment : recycled) {
+            if (attachment.getRecordId() != null && records.selectById(attachment.getRecordId()) == null
+                && Files.isRegularFile(Path.of(attachment.getTrashPath()), LinkOption.NOFOLLOW_LINKS))
+                removeById(attachment.getId());
         }
     }
     @Override public void reportStorageUsage() {

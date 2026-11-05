@@ -22,11 +22,14 @@ public class SessionServiceImpl extends ServiceImpl<TeachingSessionMapper, Teach
     private final MaterialService materials;
     private final SessionVersionMapper versionMapper;
     private final LearningRecordMapper records;
+    private final LearningRecordHistoryMapper histories;
+    private final GenerationJobMapper jobs;
 
     @Override public TeachingSession require(String id, AccountUser user, boolean teacher) {
         TeachingSession session = getById(id);
         if (session == null) throw error(404, "Task not found");
         courses.requireAccess(session.getCourseId(), user, teacher);
+        if (!teacher && Boolean.TRUE.equals(session.getArchived())) throw error(404, "Task not found");
         return session;
     }
     @Override public List<Map<String, Object>> listCourse(String courseId, AccountUser user) {
@@ -44,13 +47,17 @@ public class SessionServiceImpl extends ServiceImpl<TeachingSessionMapper, Teach
         return versionMapper.selectByIds(ids).stream().map(v -> studentProjection(JSONUtil.parseObj(v.getContentJson()))).toList();
     }
     @Override @Transactional public TeachingSession create(String courseId, Requests.SessionInput input, AccountUser user) {
-        Course course = courses.requireAccess(courseId, user, true);
-        if (Boolean.TRUE.equals(course.getArchived())) throw error(409, "Restore the course before creating tasks");
+        requireTaskCourse(courseId, user);
         TeachingSession session = new TeachingSession(); session.setCourseId(courseId); session.setRevision(0L); session.setArchived(false);
         fill(session, input); save(session); return session;
     }
+    private void requireTaskCourse(String courseId, AccountUser user) {
+        Course course = courses.requireAccess(courseId, user, true);
+        if (Boolean.TRUE.equals(course.getWorkspace())) throw error(409, "Create a course before creating tasks.");
+        if (Boolean.TRUE.equals(course.getArchived())) throw error(409, "Restore the course before creating tasks");
+    }
     @Override @Transactional public TeachingSession copy(String id, String courseId, AccountUser user) {
-        TeachingSession original = require(id, user, true); courses.requireAccess(courseId, user, true);
+        TeachingSession original = require(id, user, true); requireTaskCourse(courseId, user);
         Requests.SessionInput input = JSONUtil.toBean(JSONUtil.toJsonStr(view(original, true)), Requests.SessionInput.class);
         Map<String,String> replacements = new HashMap<>();
         for (CourseMaterial source : materials.selected(original.getCourseId(), input.getMaterialIds())) {
@@ -72,6 +79,7 @@ public class SessionServiceImpl extends ServiceImpl<TeachingSessionMapper, Teach
     }
     @Override @Transactional public TeachingSession edit(String id, Requests.SessionInput input, AccountUser user) {
         TeachingSession session = require(id, user, true);
+        if (Boolean.TRUE.equals(session.getArchived())) throw error(409, "Restore the task before editing it.");
         if (!session.getRevision().equals(input.getRevision())) throw error(409, "Task changed. Reload before saving.");
         fill(session, input);
         if (!updateById(session)) throw error(409, "Task changed. Reload before saving.");
@@ -122,6 +130,7 @@ public class SessionServiceImpl extends ServiceImpl<TeachingSessionMapper, Teach
         List<CourseMaterial> selected = materials.selected(session.getCourseId(), ids);
         materials.requireProcessed(selected);
         TaskContent content = validateContent(JSONUtil.toBean(session.getContentJson(), TaskContent.class), ids, true);
+        if (!Set.of("zh-CN", "en").contains(session.getTeachingLanguage())) throw error(422, "Generate the lesson or choose its teaching language before publishing.");
         if ("assignment".equals(session.getSessionType()) && content.getQuestions().isEmpty()) throw error(422, "An assignment must contain questions");
         SessionVersion version = new SessionVersion(); version.setId(IdUtil.fastSimpleUUID()); version.setSessionId(id);
         version.setCourseId(session.getCourseId()); version.setRevision(revision + 1); version.setLabel("V" + (revision + 1)); version.setCreatedAt(LocalDateTime.now(ZoneOffset.UTC));
@@ -139,9 +148,38 @@ public class SessionServiceImpl extends ServiceImpl<TeachingSessionMapper, Teach
         current.setContentJson(JSONUtil.toJsonStr(input.getContent())); fill(current, input);
         if (!updateById(current)) throw error(409, "Task changed. Reload before restoring.");
     }
-    @Override public void archive(String id, boolean archived, AccountUser user) {
-        TeachingSession session = require(id, user, true); session.setArchived(archived);
+    @Override @Transactional public void archive(String id, boolean archived, AccountUser user) {
+        TeachingSession session = lockTask(id, user);
+        if (archived) requireIdleTask(id);
+        else requireTaskCourse(session.getCourseId(), user);
+        session.setArchived(archived);
         if (!updateById(session)) throw error(409, "Task changed. Reload before saving.");
+    }
+    @Override @Transactional public void deleteArchived(String id, AccountUser user) {
+        TeachingSession session = lockTask(id, user);
+        if (!Boolean.TRUE.equals(session.getArchived())) throw error(409, "Archive the task before deleting it permanently.");
+        requireIdleTask(id);
+        List<String> recordIds = records.selectList(Wrappers.<LearningRecord>lambdaQuery()
+            .eq(LearningRecord::getSessionId, id).last("FOR UPDATE")).stream().map(LearningRecord::getId).toList();
+        if (!recordIds.isEmpty()) {
+            materials.removeTaskAttachments(recordIds, user);
+            histories.delete(Wrappers.<LearningRecordHistory>lambdaQuery().in(LearningRecordHistory::getRecordId, recordIds));
+            records.delete(Wrappers.<LearningRecord>lambdaQuery().in(LearningRecord::getId, recordIds));
+        }
+        jobs.delete(Wrappers.<GenerationJob>lambdaQuery().eq(GenerationJob::getSessionId, id));
+        versionMapper.delete(Wrappers.<SessionVersion>lambdaQuery().eq(SessionVersion::getSessionId, id));
+        baseMapper.deleteById(id);
+    }
+    private TeachingSession lockTask(String id, AccountUser user) {
+        require(id, user, true);
+        TeachingSession session = lambdaQuery().eq(TeachingSession::getId, id).last("FOR UPDATE").one();
+        if (session == null) throw error(404, "Task not found");
+        return session;
+    }
+    private void requireIdleTask(String id) {
+        if (jobs.selectCount(Wrappers.<GenerationJob>lambdaQuery().eq(GenerationJob::getSessionId, id)
+            .in(GenerationJob::getStatus, "queued", "running")) > 0)
+            throw error(409, "Wait for generation to finish before archiving or deleting the task.");
     }
     @Override public List<Map<String, Object>> versions(String id, AccountUser user) {
         require(id, user, true);

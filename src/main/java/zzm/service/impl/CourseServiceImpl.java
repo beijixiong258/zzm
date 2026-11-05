@@ -33,7 +33,7 @@ public class CourseServiceImpl extends ServiceImpl<CourseMapper, Course> impleme
         List<String> ids = members.selectList(Wrappers.<CourseMember>lambdaQuery().eq(CourseMember::getUserId, user.getId())
             .eq(CourseMember::getArchived, false)).stream().map(CourseMember::getCourseId).toList();
         if (ids.isEmpty()) return List.of();
-        return lambdaQuery().eq(Course::getWorkspace, false).in(Course::getId, ids).eq("student".equals(user.getRole()), Course::getArchived, false)
+        return lambdaQuery().in(Course::getId, ids).eq("student".equals(user.getRole()), Course::getArchived, false)
             .orderByAsc(Course::getTitle).list().stream().map(c -> view(c, user)).toList();
     }
     @Override @Transactional public Course create(Requests.CourseInput input, AccountUser user) {

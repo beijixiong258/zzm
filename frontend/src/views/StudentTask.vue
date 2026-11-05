@@ -692,7 +692,11 @@ void load();
               )
             }}
           </p>
-          <form v-if="!readonly" class="form-stack" @submit.prevent="chat">
+          <form
+            v-if="!readonly"
+            class="form-stack tutor-composer"
+            @submit.prevent="chat"
+          >
             <TTextarea
               v-control-attrs="{
                 rows: '3',
@@ -705,30 +709,34 @@ void load();
               :placeholder="
                 t('Ask about this task or describe where you are stuck.')
               "
-            /><ContextMeter :usage="usage" :loading="checking" /><TButton
-              theme="primary"
-              variant="base"
-              type="submit"
-              class="primary"
-              :disabled="
-                busy ||
-                pendingUploads > 0 ||
-                awaiting ||
-                record.conversationLimitReached ||
-                !prompt.trim() ||
-                usage?.materialsReady === false ||
-                attachmentIds.some(
-                  (id) =>
-                    !attachments.some(
-                      (f) =>
-                        f.id === id &&
-                        ['ready', 'needsReview'].includes(f.status),
-                    ),
-                )
-              "
-            >
-              {{ t(busy ? "Thinking…" : "Send") }}
-            </TButton>
+            />
+            <div class="row end">
+              <TButton
+                theme="primary"
+                variant="base"
+                type="submit"
+                class="primary"
+                :disabled="
+                  busy ||
+                  pendingUploads > 0 ||
+                  awaiting ||
+                  record.conversationLimitReached ||
+                  !prompt.trim() ||
+                  usage?.materialsReady === false ||
+                  attachmentIds.some(
+                    (id) =>
+                      !attachments.some(
+                        (f) =>
+                          f.id === id &&
+                          ['ready', 'needsReview'].includes(f.status),
+                      ),
+                  )
+                "
+              >
+                {{ t(busy ? "Thinking…" : "Send") }}
+              </TButton>
+            </div>
+            <ContextMeter :usage="usage" :loading="checking" />
           </form>
         </template>
       </aside>
