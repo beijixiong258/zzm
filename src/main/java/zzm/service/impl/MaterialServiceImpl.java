@@ -115,10 +115,9 @@ public class MaterialServiceImpl extends ServiceImpl<CourseMaterialMapper, Cours
         SessionVersion version = versions.selectById(versionId);
         if (version == null || !version.getCourseId().equals(material.getCourseId())) throw error(403, "Material access denied");
         TeachingSession session = sessions.selectById(version.getSessionId());
-        if (session == null || Boolean.TRUE.equals(session.getArchived())) throw error(404, "Task not found");
-        boolean current = session != null && !Boolean.TRUE.equals(session.getArchived()) && versionId.equals(session.getPublishedVersionId());
-        boolean studied = records.selectCount(Wrappers.<LearningRecord>lambdaQuery().eq(LearningRecord::getVersionId, versionId).eq(LearningRecord::getUserId, user.getId())) > 0;
-        if (!current && !studied) throw error(403, "Material access denied");
+        if (session == null || Boolean.TRUE.equals(session.getArchived()) || session.getPublishedVersionId() == null) throw error(404, "Task not found");
+        version = versions.selectById(session.getPublishedVersionId());
+        if (version == null) throw error(403, "Material access denied");
         JSONArray snapshotMaterials = JSONUtil.parseObj(version.getContentJson()).getJSONArray("materials");
         boolean allowed = snapshotMaterials != null && snapshotMaterials.stream().map(JSONUtil::parseObj)
             .anyMatch(m -> id.equals(m.getStr("id")) && "student".equals(m.getStr("visibility")));
@@ -144,7 +143,8 @@ public class MaterialServiceImpl extends ServiceImpl<CourseMaterialMapper, Cours
         List<String> references = drafts.stream().filter(task -> JSONUtil.toList(task.getMaterialIdsJson(), String.class).contains(id))
             .map(TeachingSession::getTitle).toList();
         if (!references.isEmpty()) throw error(409, "Material is used by tasks. Remove its references or archive it: " + String.join(", ", references));
-        boolean published = versions.selectList(Wrappers.<SessionVersion>lambdaQuery().eq(SessionVersion::getCourseId, material.getCourseId())).stream()
+        List<String> publishedIds = drafts.stream().map(TeachingSession::getPublishedVersionId).filter(Objects::nonNull).toList();
+        boolean published = !publishedIds.isEmpty() && versions.selectByIds(publishedIds).stream()
             .anyMatch(version -> {
                 JSONArray source = JSONUtil.parseObj(version.getContentJson()).getJSONArray("materialIds");
                 return source != null && source.contains(id);

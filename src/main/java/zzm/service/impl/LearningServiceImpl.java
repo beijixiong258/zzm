@@ -40,25 +40,25 @@ public class LearningServiceImpl extends ServiceImpl<LearningRecordMapper, Learn
         JSONArray messages = JSONUtil.parseArray(record.getMessagesJson());
         filterPrivateFeedback(messages);
         List<Map<String, Object>> files = attachments(id, user);
-        return exporter.exportResult(task, JSONUtil.parseObj(record.getAnswersJson()), messages,
+        return exporter.exportResult(task, currentAnswers(record), messages,
             record.getTeacherNote(), files, materialBaseUrl);
     }
     @Override public Map<String, Object> workspace(String sessionId, String versionId, AccountUser user) {
         Map<String, Object> task = sessions.published(sessionId, versionId, user);
-        String selected = Objects.toString(task.get("versionId"));
-        LearningRecord record = lambdaQuery().eq(LearningRecord::getSessionId, sessionId).eq(LearningRecord::getUserId, user.getId()).eq(LearningRecord::getVersionId, selected).one();
+        LearningRecord record = latestRecord(sessionId, user.getId());
         Map<String, Object> result = new LinkedHashMap<>(); result.put("task", task); result.put("record", record == null ? null : view(record)); return result;
     }
     @Override public LearningRecord start(String sessionId, String versionId, AccountUser user) {
         if (!"student".equals(user.getRole())) throw error(403, "Student access required");
         Map<String, Object> task = sessions.published(sessionId, versionId, user);
         String selected = Objects.toString(task.get("versionId"));
-        LearningRecord existing = lambdaQuery().eq(LearningRecord::getSessionId, sessionId).eq(LearningRecord::getUserId, user.getId()).eq(LearningRecord::getVersionId, selected).one();
+        LearningRecord existing = latestRecord(sessionId, user.getId());
         if (existing != null) {
             if ("notStarted".equals(existing.getStatus())) { existing.setStatus("inProgress"); existing.setStartedAt(LocalDateTime.now(ZoneOffset.UTC)); saveRevision(existing, existing.getRevision()); }
             return existing;
         }
         LearningRecord record = new LearningRecord(); record.setSessionId(sessionId); record.setUserId(user.getId()); record.setVersionId(selected);
+        record.setSnapshotJson(JSONUtil.toJsonStr(task));
         record.setPreview(false); record.setStatus("inProgress"); record.setAnswersJson("{}"); record.setMessagesJson("[]"); record.setRevision(0L);
         record.setTeacherNote(""); record.setStartedAt(LocalDateTime.now(ZoneOffset.UTC)); record.setUpdatedAt(record.getStartedAt());
         JSONObject content = JSONUtil.parseObj(task.get("content"));
@@ -68,9 +68,14 @@ public class LearningServiceImpl extends ServiceImpl<LearningRecordMapper, Learn
             record.setMessagesJson(JSONUtil.toJsonStr(List.of(message)));
         }
         try { save(record); } catch (DuplicateKeyException exception) {
-            return lambdaQuery().eq(LearningRecord::getSessionId, sessionId).eq(LearningRecord::getUserId, user.getId()).eq(LearningRecord::getVersionId, selected).one();
+            return latestRecord(sessionId, user.getId());
         }
         return record;
+    }
+    private LearningRecord latestRecord(String sessionId, String userId) {
+        return lambdaQuery().eq(LearningRecord::getSessionId, sessionId).eq(LearningRecord::getUserId, userId)
+            .eq(LearningRecord::getPreview, false).orderByDesc(LearningRecord::getUpdatedAt).orderByDesc(LearningRecord::getId)
+            .last("LIMIT 1").one();
     }
     private LearningRecord owned(String id, AccountUser user, boolean editable) {
         LearningRecord record = getById(id);
@@ -89,8 +94,12 @@ public class LearningServiceImpl extends ServiceImpl<LearningRecordMapper, Learn
         LearningRecord record = owned(id, user, true);
         TaskContent content = snapshot(record).getBean("content", TaskContent.class);
         Set<String> ids = new HashSet<>(); content.getQuestions().forEach(q -> ids.add(q.getId()));
-        if (!ids.containsAll(input.getAnswers().keySet()) || input.getAnswers().values().stream().anyMatch(v -> v == null || v.length() > 20000)) throw error(422, "Invalid answer data");
-        Map<String, String> answers = new LinkedHashMap<>(input.getAnswers());
+        JSONObject savedAnswers = JSONUtil.parseObj(record.getAnswersJson());
+        Set<String> knownIds = new HashSet<>(ids); knownIds.addAll(savedAnswers.keySet());
+        if (!knownIds.containsAll(input.getAnswers().keySet()) || input.getAnswers().values().stream().anyMatch(v -> v == null || v.length() > 20000)) throw error(422, "Invalid answer data");
+        Map<String, String> answers = new LinkedHashMap<>();
+        currentAnswers(record, content).forEach((key, value) -> answers.put(key, Objects.toString(value, "")));
+        input.getAnswers().forEach((key, value) -> { if (ids.contains(key)) answers.put(key, value); });
         for (TaskContent.Question question : content.getQuestions()) {
             if (!"multipleChoice".equals(question.getType()) || !answers.containsKey(question.getId())) continue;
             List<String> selected = TaskContent.multipleChoiceAnswers(answers.get(question.getId()), question.getOptions());
@@ -99,8 +108,10 @@ public class LearningServiceImpl extends ServiceImpl<LearningRecordMapper, Learn
         }
         if (!record.getRevision().equals(input.getRevision())) throw error(409, "Learning record changed. Reload before saving.");
         if (JSONUtil.parseObj(record.getAnswersJson()).equals(JSONUtil.parseObj(answers))) return view(record);
-        Map<String, Object> previous = Map.of("revision", record.getRevision(), "savedAt", Instant.now().toString(), "answers", JSONUtil.parseObj(record.getAnswersJson()));
+        Map<String, Object> previous = Map.of("revision", record.getRevision(), "savedAt", Instant.now().toString(),
+            "answers", JSONUtil.parseObj(record.getAnswersJson()), "questions", historyQuestions(record));
         // 在检查历史记录外键前，先更新带版本号的父记录并取得行锁。
+        record.setSnapshotJson(snapshot(record).toString());
         record.setAnswersJson(JSONUtil.toJsonStr(answers)); saveRevision(record, input.getRevision());
         appendHistory(record, "answer", previous, null); return view(record);
     }
@@ -142,7 +153,7 @@ public class LearningServiceImpl extends ServiceImpl<LearningRecordMapper, Learn
     @Override public Map<String, Object> submit(String id, long revision, AccountUser user) {
         LearningRecord record = owned(id, user, true);
         TaskContent content = snapshot(record).getBean("content", TaskContent.class);
-        JSONObject answers = JSONUtil.parseObj(record.getAnswersJson());
+        JSONObject answers = currentAnswers(record, content);
         List<CourseMaterial> submittedFiles = materials.lambdaQuery().eq(CourseMaterial::getRecordId,id).eq(CourseMaterial::getOwnerId,user.getId())
             .eq(CourseMaterial::getArchived,false).in(CourseMaterial::getStatus,"ready","needsReview").list();
         materials.requireProcessed(submittedFiles);
@@ -152,11 +163,13 @@ public class LearningServiceImpl extends ServiceImpl<LearningRecordMapper, Learn
     }
     @Override public List<Map<String, Object>> roster(String sessionId, String versionId, AccountUser user) {
         TeachingSession session = sessions.require(sessionId, user, true);
-        String selected = versionId == null || versionId.isBlank() ? session.getPublishedVersionId() : versionId;
+        String selected = session.getPublishedVersionId();
         TaskContent content = selected == null ? JSONUtil.toBean(session.getContentJson(), TaskContent.class)
             : JSONUtil.parseObj(sessions.version(sessionId, selected).getContentJson()).getBean("content", TaskContent.class);
         Map<String, LearningRecord> recordsByUser = new HashMap<>();
-        if (selected != null) lambdaQuery().eq(LearningRecord::getSessionId, sessionId).eq(LearningRecord::getPreview, false).eq(LearningRecord::getVersionId, selected).list().forEach(r -> recordsByUser.put(r.getUserId(), r));
+        lambdaQuery().eq(LearningRecord::getSessionId, sessionId).eq(LearningRecord::getPreview, false)
+            .orderByDesc(LearningRecord::getUpdatedAt).orderByDesc(LearningRecord::getId).list()
+            .forEach(record -> recordsByUser.putIfAbsent(record.getUserId(), record));
         Map<String,Set<String>> attachmentAnswers = new HashMap<>();
         if(!recordsByUser.isEmpty()) materials.lambdaQuery().in(CourseMaterial::getRecordId,recordsByUser.values().stream().map(LearningRecord::getId).toList())
             .eq(CourseMaterial::getArchived,false).in(CourseMaterial::getStatus,"ready","needsReview").list().forEach(file -> {
@@ -168,7 +181,7 @@ public class LearningServiceImpl extends ServiceImpl<LearningRecordMapper, Learn
             result.put("recordId", record == null ? null : record.getId()); result.put("versionId", selected);
             result.put("status", record == null || "notStarted".equals(record.getStatus()) ? "notStarted" : "confirmed".equals(record.getStatus()) ? "completed" : "inProgress");
             result.put("submissionStatus", record == null ? "notStarted" : record.getStatus()); result.put("total", content.getQuestions().size());
-            JSONObject answers = record == null ? new JSONObject() : JSONUtil.parseObj(record.getAnswersJson());
+            JSONObject answers = record == null ? new JSONObject() : currentAnswers(record, content);
             result.put("answered", content.getQuestions().stream().filter(q -> !answers.getStr(q.getId(), "").isBlank() || record != null && attachmentAnswers.getOrDefault(record.getId(),Set.of()).contains(q.getId())).count());
             result.put("lastActive", record == null ? null : record.getUpdatedAt()); return result;
         }).toList();
@@ -193,11 +206,12 @@ public class LearningServiceImpl extends ServiceImpl<LearningRecordMapper, Learn
         List<String> sessionIds = sessions.lambdaQuery().in(TeachingSession::getCourseId, courseIds)
             .eq(TeachingSession::getArchived, false).list().stream().map(TeachingSession::getId).toList();
         if (sessionIds.isEmpty()) return List.of();
+        Set<String> seenTasks = new HashSet<>();
         return lambdaQuery().select(LearningRecord::getId, LearningRecord::getSessionId, LearningRecord::getVersionId,
             LearningRecord::getUserId, LearningRecord::getStatus, LearningRecord::getUpdatedAt)
             .eq(LearningRecord::getUserId, user.getId()).eq(LearningRecord::getPreview, false)
-            .in(LearningRecord::getSessionId, sessionIds).orderByDesc(LearningRecord::getUpdatedAt)
-            .list().stream().map(record -> {
+            .in(LearningRecord::getSessionId, sessionIds).orderByDesc(LearningRecord::getUpdatedAt).orderByDesc(LearningRecord::getId)
+            .list().stream().filter(record -> seenTasks.add(record.getSessionId())).map(record -> {
                 Map<String, Object> item = new LinkedHashMap<>();
                 item.put("id", record.getId()); item.put("sessionId", record.getSessionId()); item.put("versionId", record.getVersionId());
                 item.put("userId", record.getUserId()); item.put("status", record.getStatus()); item.put("updatedAt", record.getUpdatedAt()); return item;
@@ -205,7 +219,46 @@ public class LearningServiceImpl extends ServiceImpl<LearningRecordMapper, Learn
     }
     private JSONObject snapshot(LearningRecord record) {
         return JSONUtil.parseObj(Boolean.TRUE.equals(record.getPreview()) ? record.getSnapshotJson()
-            : sessions.version(record.getSessionId(), record.getVersionId()).getContentJson());
+            : sessions.version(record.getSessionId(), null).getContentJson());
+    }
+    private JSONObject currentAnswers(LearningRecord record) {
+        return currentAnswers(record, snapshot(record).getBean("content", TaskContent.class));
+    }
+    private JSONObject currentAnswers(LearningRecord record, TaskContent content) {
+        JSONObject saved = JSONUtil.parseObj(record.getAnswersJson()), result = new JSONObject();
+        for (TaskContent.Question question : content.getQuestions()) {
+            if (!saved.containsKey(question.getId())) continue;
+            String answer = saved.getStr(question.getId(), "");
+            boolean valid = answer.isBlank() || switch (question.getType()) {
+                case "singleChoice", "trueFalse" -> question.getOptions().contains(answer);
+                case "multipleChoice" -> question.getOptions().containsAll(TaskContent.multipleChoiceAnswers(answer, question.getOptions()));
+                default -> true;
+            };
+            if (valid) result.set(question.getId(), answer);
+        }
+        return result;
+    }
+    private List<LearningRecord> relatedRecords(LearningRecord record) {
+        if (Boolean.TRUE.equals(record.getPreview())) return List.of(record);
+        return lambdaQuery().eq(LearningRecord::getSessionId, record.getSessionId()).eq(LearningRecord::getUserId, record.getUserId())
+            .eq(LearningRecord::getPreview, false).orderByDesc(LearningRecord::getUpdatedAt).orderByDesc(LearningRecord::getId).list();
+    }
+    private List<Map<String, Object>> historyQuestions(LearningRecord record) {
+        JSONObject original = record.getSnapshotJson() == null
+            ? JSONUtil.parseObj(sessions.version(record.getSessionId(), record.getVersionId()).getContentJson())
+            : JSONUtil.parseObj(record.getSnapshotJson());
+        Map<String, Map<String, Object>> questions = new LinkedHashMap<>();
+        for (JSONObject source : List.of(original, snapshot(record))) {
+            JSONArray items = source.getJSONObject("content").getJSONArray("questions");
+            if (items == null) continue;
+            for (Object item : items) {
+                JSONObject question = JSONUtil.parseObj(item);
+                Map<String, Object> visible = new LinkedHashMap<>(question);
+                visible.remove("referenceAnswer"); visible.remove("explanation");
+                questions.putIfAbsent(question.getStr("id"), visible);
+            }
+        }
+        return new ArrayList<>(questions.values());
     }
     @Override public Map<String, Object> previewWorkspace(String id, AccountUser user) {
         var session = sessions.require(id, user, true);
@@ -285,7 +338,7 @@ public class LearningServiceImpl extends ServiceImpl<LearningRecordMapper, Learn
         String language = "zh-CN".equals(snapshot.getStr("teachingLanguage"))
             ? "\n请用规范、自然的中国大陆简体中文书面语回答学生。worksheet 译为‘练习单’，handout 译为‘讲义’，AI tutor 译为‘AI 助教’。必要英文术语附中文解释，不要因原始材料为英文而改用英文作答；引用原题、选项和学生作答时保留原文。"
             : "\nRespond to the learner in natural, standard British English, using British spelling and idiomatic phrasing, regardless of the source material's language. Preserve the original wording when quoting source questions, options and the student's answers.";
-        JSONObject answers = JSONUtil.parseObj(record.getAnswersJson());
+        JSONObject answers = currentAnswers(record, snapshot.getBean("content", TaskContent.class));
         for (TaskContent.Question question : snapshot.getBean("content", TaskContent.class).getQuestions()) {
             if ("multipleChoice".equals(question.getType()) && answers.containsKey(question.getId()))
                 answers.set(question.getId(), TaskContent.multipleChoiceAnswers(answers.getStr(question.getId()), question.getOptions()));
@@ -357,18 +410,57 @@ public class LearningServiceImpl extends ServiceImpl<LearningRecordMapper, Learn
     }
     private Map<String, Object> historyPage(LearningRecord record, String kind, int page, int size) {
         size = pageSize(page, size, "answer".equals(kind) ? properties.answerPageLimit() : properties.conversationPageLimit());
-        JSONArray legacy = legacyHistory(record, kind);
+        List<LearningRecord> sources = relatedRecords(record);
+        Map<String, LearningRecord> sourcesById = new HashMap<>(); sources.forEach(source -> sourcesById.put(source.getId(), source));
+        List<String> recordIds = new ArrayList<>(sourcesById.keySet());
+        List<Map<String, Object>> legacy = new ArrayList<>();
+        if ("answer".equals(kind)) {
+            JSONObject earlier = JSONUtil.parseObj(record.getAnswersJson()), current = currentAnswers(record);
+            current.keySet().forEach(earlier::remove);
+            if (!earlier.isEmpty()) legacy.add(new LinkedHashMap<>(Map.of("id", "record-answer-" + record.getId(),
+                "savedAt", Objects.toString(record.getUpdatedAt(), ""), "answers", earlier, "questions", historyQuestions(record))));
+        }
+        for (LearningRecord source : sources) {
+            if (!source.getId().equals(record.getId())) {
+                if ("answer".equals(kind)) {
+                    List<Map<String, Object>> files = materials.lambdaQuery().eq(CourseMaterial::getRecordId, source.getId())
+                        .eq(CourseMaterial::getArchived, false).select(CourseMaterial::getId, CourseMaterial::getTitle).list().stream()
+                        .map(file -> Map.<String, Object>of("id", file.getId(), "title", file.getTitle())).toList();
+                    JSONObject answers = JSONUtil.parseObj(source.getAnswersJson());
+                    if (!answers.isEmpty() || !files.isEmpty()) legacy.add(new LinkedHashMap<>(Map.of(
+                        "id", "record-answer-" + source.getId(), "savedAt", Objects.toString(source.getUpdatedAt(), ""),
+                        "answers", answers, "questions", historyQuestions(source), "attachments", files)));
+                } else {
+                    JSONArray messages = JSONUtil.parseArray(source.getMessagesJson());
+                    if (!messages.isEmpty()) legacy.add(new LinkedHashMap<>(Map.of("id", "record-conversation-" + source.getId(),
+                        "archivedAt", Objects.toString(source.getUpdatedAt(), ""), "messageCount", messages.size())));
+                }
+            }
+            JSONArray previous = legacyHistory(source, kind);
+            for (int index = previous.size() - 1; index >= 0; index--) {
+                JSONObject entry = previous.getJSONObject(index);
+                Map<String, Object> item = "answer".equals(kind) ? new LinkedHashMap<>(entry) : new LinkedHashMap<>();
+                item.put("id", "legacy-" + kind + "-" + source.getId() + "-" + index);
+                if ("answer".equals(kind)) item.putIfAbsent("questions", historyQuestions(source));
+                else {
+                    item.put("archivedAt", entry.getStr("archivedAt", ""));
+                    item.put("messageCount", entry.getJSONArray("messages") == null ? 0 : entry.getJSONArray("messages").size());
+                }
+                legacy.add(item);
+            }
+        }
         long storedCount = histories.selectCount(Wrappers.<LearningRecordHistory>lambdaQuery()
-            .eq(LearningRecordHistory::getRecordId, record.getId()).eq(LearningRecordHistory::getKind, kind));
+            .in(LearningRecordHistory::getRecordId, recordIds).eq(LearningRecordHistory::getKind, kind));
         long offset = (long) (page - 1) * size;
         List<Map<String, Object>> items = new ArrayList<>();
         if (offset < storedCount) {
-            var query = Wrappers.<LearningRecordHistory>lambdaQuery().eq(LearningRecordHistory::getRecordId, record.getId())
+            var query = Wrappers.<LearningRecordHistory>lambdaQuery().in(LearningRecordHistory::getRecordId, recordIds)
                 .eq(LearningRecordHistory::getKind, kind).orderByDesc(LearningRecordHistory::getId);
-            if ("conversation".equals(kind)) query.select(LearningRecordHistory::getId, LearningRecordHistory::getCreatedAt, LearningRecordHistory::getMessageCount);
+            if ("conversation".equals(kind)) query.select(LearningRecordHistory::getId, LearningRecordHistory::getRecordId, LearningRecordHistory::getCreatedAt, LearningRecordHistory::getMessageCount);
             for (LearningRecordHistory entry : histories.selectPage(new Page<LearningRecordHistory>(page, size, false), query).getRecords()) {
                 Map<String, Object> item = "answer".equals(kind) ? new LinkedHashMap<>(JSONUtil.parseObj(entry.getPayloadJson())) : new LinkedHashMap<>();
                 item.put("id", entry.getId().toString());
+                if ("answer".equals(kind)) item.putIfAbsent("questions", historyQuestions(sourcesById.get(entry.getRecordId())));
                 if ("conversation".equals(kind)) {
                     item.put("archivedAt", entry.getCreatedAt().toInstant(ZoneOffset.UTC).toString());
                     item.put("messageCount", Objects.requireNonNullElse(entry.getMessageCount(), 0));
@@ -377,16 +469,7 @@ public class LearningServiceImpl extends ServiceImpl<LearningRecordMapper, Learn
             }
         }
         for (long index = Math.max(0, offset - storedCount); index < legacy.size() && items.size() < size; index++) {
-            int sourceIndex = legacy.size() - 1 - (int) index;
-            JSONObject entry = legacy.getJSONObject(sourceIndex);
-            Map<String, Object> item = "answer".equals(kind) ? new LinkedHashMap<>(entry) : new LinkedHashMap<>();
-            item.put("id", "legacy-" + kind + "-" + sourceIndex);
-            if ("conversation".equals(kind)) {
-                item.put("archivedAt", entry.getStr("archivedAt", ""));
-                JSONArray messages = entry.getJSONArray("messages");
-                item.put("messageCount", messages == null ? 0 : messages.size());
-            }
-            items.add(item);
+            items.add(legacy.get((int) index));
         }
         return pageResult(items, storedCount + legacy.size(), page, size, record.getRevision());
     }
@@ -395,7 +478,7 @@ public class LearningServiceImpl extends ServiceImpl<LearningRecordMapper, Learn
         if ("attachment".equals(kind)) {
             sessions.require(record.getSessionId(), user, true);
             size = pageSize(page, size, 50);
-            var result = materials.lambdaQuery().eq(CourseMaterial::getRecordId, id).eq(CourseMaterial::getArchived, true)
+            var result = materials.lambdaQuery().in(CourseMaterial::getRecordId, relatedRecords(record).stream().map(LearningRecord::getId).toList()).eq(CourseMaterial::getArchived, true)
                 .isNotNull(CourseMaterial::getOwnerId).orderByDesc(CourseMaterial::getFileRemovedAt).orderByDesc(CourseMaterial::getId)
                 .page(new Page<CourseMaterial>(page, size));
             List<String> actorIds = result.getRecords().stream().map(CourseMaterial::getRemovedBy).filter(Objects::nonNull).distinct().toList();
@@ -413,8 +496,15 @@ public class LearningServiceImpl extends ServiceImpl<LearningRecordMapper, Learn
     @Override public Map<String, Object> historyMessages(String id, String historyId, int page, int size, Long revision, AccountUser user) {
         LearningRecord record = readableRecord(id, revision, user);
         size = pageSize(page, size, 50);
+        Map<String, LearningRecord> sources = new HashMap<>(); relatedRecords(record).forEach(source -> sources.put(source.getId(), source));
+        LearningRecord source = record;
         JSONArray messages;
         if ("current".equals(historyId)) messages = JSONUtil.parseArray(record.getMessagesJson());
+        else if (historyId.startsWith("record-conversation-")) {
+            source = sources.get(historyId.substring("record-conversation-".length()));
+            if (source == null) throw error(404, "History entry not found");
+            messages = JSONUtil.parseArray(source.getMessagesJson());
+        }
         else if (historyId.matches("legacy-conversation-\\d+")) {
             JSONArray legacy = legacyHistory(record, "conversation");
             int index;
@@ -422,13 +512,25 @@ public class LearningServiceImpl extends ServiceImpl<LearningRecordMapper, Learn
             catch (NumberFormatException exception) { throw error(404, "History entry not found"); }
             if (index >= legacy.size()) throw error(404, "History entry not found");
             messages = legacy.getJSONObject(index).getJSONArray("messages");
+        } else if (historyId.startsWith("legacy-conversation-")) {
+            int separator = historyId.lastIndexOf('-');
+            if (separator < "legacy-conversation-".length()) throw error(404, "History entry not found");
+            source = sources.get(historyId.substring("legacy-conversation-".length(), separator));
+            if (source == null) throw error(404, "History entry not found");
+            int index;
+            try { index = Integer.parseInt(historyId.substring(separator + 1)); }
+            catch (NumberFormatException exception) { throw error(404, "History entry not found"); }
+            JSONArray legacy = legacyHistory(source, "conversation");
+            if (index < 0 || index >= legacy.size()) throw error(404, "History entry not found");
+            messages = legacy.getJSONObject(index).getJSONArray("messages");
         } else {
             long historyKey;
             try { historyKey = Long.parseLong(historyId); }
             catch (NumberFormatException exception) { throw error(404, "History entry not found"); }
             LearningRecordHistory entry = histories.selectOne(Wrappers.<LearningRecordHistory>lambdaQuery()
-                .eq(LearningRecordHistory::getId, historyKey).eq(LearningRecordHistory::getRecordId, id).eq(LearningRecordHistory::getKind, "conversation"));
+                .eq(LearningRecordHistory::getId, historyKey).in(LearningRecordHistory::getRecordId, sources.keySet()).eq(LearningRecordHistory::getKind, "conversation"));
             if (entry == null) throw error(404, "History entry not found");
+            source = sources.get(entry.getRecordId());
             messages = JSONUtil.parseObj(entry.getPayloadJson()).getJSONArray("messages");
         }
         if (messages == null) messages = new JSONArray();
@@ -436,7 +538,7 @@ public class LearningServiceImpl extends ServiceImpl<LearningRecordMapper, Learn
         JSONArray visible = JSONUtil.parseArray(messages.subList(start, Math.min(start + size, messages.size())));
         if ("student".equals(user.getRole())) filterPrivateFeedback(visible);
         Map<String, Object> result = new LinkedHashMap<>(pageResult(visible, messages.size(), page, size, record.getRevision()));
-        result.put("removedAttachments", removedAttachments(record, visible));
+        result.put("removedAttachments", removedAttachments(source, visible));
         return result;
     }
     private Map<String, String> removedAttachments(LearningRecord record, JSONArray messages) {
@@ -458,7 +560,7 @@ public class LearningServiceImpl extends ServiceImpl<LearningRecordMapper, Learn
     private Map<String, Object> recordView(LearningRecord record, boolean teacher) {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("id", record.getId()); result.put("sessionId", record.getSessionId()); result.put("versionId", record.getVersionId()); result.put("userId", record.getUserId());
-        result.put("status", record.getStatus()); result.put("revision", record.getRevision()); result.put("answers", JSONUtil.parseObj(record.getAnswersJson()));
+        result.put("status", record.getStatus()); result.put("revision", record.getRevision()); result.put("answers", currentAnswers(record));
         JSONArray allMessages = JSONUtil.parseArray(record.getMessagesJson());
         int limit = properties.conversationMessageLimit();
         JSONArray messages = JSONUtil.parseArray(allMessages.subList(Math.max(0, allMessages.size() - limit), allMessages.size()));

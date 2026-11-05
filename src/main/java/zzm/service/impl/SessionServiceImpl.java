@@ -83,6 +83,7 @@ public class SessionServiceImpl extends ServiceImpl<TeachingSessionMapper, Teach
         if (!session.getRevision().equals(input.getRevision())) throw error(409, "Task changed. Reload before saving.");
         fill(session, input);
         if (!updateById(session)) throw error(409, "Task changed. Reload before saving.");
+        if (input.isUpdatePublished() && session.getPublishedVersionId() != null) storePublishedContent(session);
         return session;
     }
     private void fill(TeachingSession session, Requests.SessionInput input) {
@@ -109,44 +110,52 @@ public class SessionServiceImpl extends ServiceImpl<TeachingSessionMapper, Teach
         return teacher ? result : studentProjection(result);
     }
     @Override public SessionVersion version(String sessionId, String versionId) {
+        if (versionId == null || versionId.isBlank()) {
+            TeachingSession session = getById(sessionId);
+            if (session == null || session.getPublishedVersionId() == null) throw error(404, "Task is not published");
+            versionId = session.getPublishedVersionId();
+        }
         SessionVersion version = versionMapper.selectById(versionId);
-        if (version == null || !version.getSessionId().equals(sessionId)) throw error(404, "Task version not found");
+        if (version == null || !version.getSessionId().equals(sessionId)) throw error(404, "Task not found");
         return version;
     }
     @Override public Map<String, Object> published(String id, String versionId, AccountUser user) {
         TeachingSession session = require(id, user, false);
-        String selected = versionId == null || versionId.isBlank() ? session.getPublishedVersionId() : versionId;
-        if (selected == null) throw error(404, "Task is not published");
-        if ("student".equals(user.getRole()) && (Boolean.TRUE.equals(session.getArchived()) || !selected.equals(session.getPublishedVersionId()))) {
-            if (records.selectCount(Wrappers.<LearningRecord>lambdaQuery().eq(LearningRecord::getSessionId, id).eq(LearningRecord::getUserId, user.getId()).eq(LearningRecord::getVersionId, selected)) == 0) throw error(403, "Task version access denied");
-        }
-        return studentProjection(JSONUtil.parseObj(version(id, selected).getContentJson()));
+        if (session.getPublishedVersionId() == null) throw error(404, "Task is not published");
+        // 兼容旧链接，但学生始终读取当前任务内容。
+        if (versionId != null && !versionId.isBlank()) version(id, versionId);
+        return studentProjection(JSONUtil.parseObj(version(id, null).getContentJson()));
     }
     @Override @Transactional public SessionVersion publish(String id, long revision, AccountUser user) {
         TeachingSession session = require(id, user, true);
         if (Boolean.TRUE.equals(session.getArchived()) || Boolean.TRUE.equals(courses.getById(session.getCourseId()).getArchived())) throw error(409, "Restore the course and task before publishing");
         if (session.getRevision() != revision) throw error(409, "Task changed. Reload before publishing.");
+        if (session.getPublishedVersionId() == null) session.setPublishedVersionId(IdUtil.fastSimpleUUID());
+        if (!updateById(session)) throw error(409, "Task changed. Reload before publishing.");
+        return storePublishedContent(session);
+    }
+    /** 复用同一份发布内容；学习记录继续使用原记录，不随更新另起一份。 */
+    private SessionVersion storePublishedContent(TeachingSession session) {
         List<String> ids = JSONUtil.toList(session.getMaterialIdsJson(), String.class);
-        List<CourseMaterial> selected = materials.selected(session.getCourseId(), ids);
-        materials.requireProcessed(selected);
+        materials.requireProcessed(materials.selected(session.getCourseId(), ids));
         TaskContent content = validateContent(JSONUtil.toBean(session.getContentJson(), TaskContent.class), ids, true);
         if (!Set.of("zh-CN", "en").contains(session.getTeachingLanguage())) throw error(422, "Generate the lesson or choose its teaching language before publishing.");
         if ("assignment".equals(session.getSessionType()) && content.getQuestions().isEmpty()) throw error(422, "An assignment must contain questions");
-        SessionVersion version = new SessionVersion(); version.setId(IdUtil.fastSimpleUUID()); version.setSessionId(id);
-        version.setCourseId(session.getCourseId()); version.setRevision(revision + 1); version.setLabel("V" + (revision + 1)); version.setCreatedAt(LocalDateTime.now(ZoneOffset.UTC));
-        session.setPublishedVersionId(version.getId());
-        if (!updateById(session)) throw error(409, "Task changed. Reload before publishing.");
-        Map<String, Object> snapshot = view(session, true); snapshot.put("versionId", version.getId());
-        version.setContentJson(JSONUtil.toJsonStr(snapshot)); versionMapper.insert(version); return version;
-    }
-    @Override @Transactional public void restore(String id, String versionId, long revision, AccountUser user) {
-        TeachingSession current = require(id, user, true);
-        if (current.getRevision() != revision) throw error(409, "Task changed. Reload before restoring.");
-        JSONObject snapshot = JSONUtil.parseObj(version(id, versionId).getContentJson());
-        Requests.SessionInput input = snapshot.toBean(Requests.SessionInput.class); input.setRevision(revision);
-        // 同时恢复已保存的 AI 策略和面向学生的内容，不执行发布。
-        current.setContentJson(JSONUtil.toJsonStr(input.getContent())); fill(current, input);
-        if (!updateById(current)) throw error(409, "Task changed. Reload before restoring.");
+        SessionVersion published = versionMapper.selectById(session.getPublishedVersionId());
+        boolean creating = published == null;
+        if (creating) {
+            published = new SessionVersion(); published.setId(session.getPublishedVersionId()); published.setSessionId(session.getId());
+            published.setCourseId(session.getCourseId()); published.setCreatedAt(LocalDateTime.now(ZoneOffset.UTC));
+        } else {
+            // 仅补齐旧学习记录的题目背景，不更改作答、对话或并发修订值。
+            records.update(null, Wrappers.<LearningRecord>lambdaUpdate().eq(LearningRecord::getSessionId, session.getId())
+                .eq(LearningRecord::getVersionId, published.getId()).eq(LearningRecord::getPreview, false)
+                .isNull(LearningRecord::getSnapshotJson).set(LearningRecord::getSnapshotJson, published.getContentJson()));
+        }
+        Map<String, Object> snapshot = view(session, true); snapshot.put("versionId", published.getId());
+        published.setRevision(session.getRevision()); published.setLabel(""); published.setContentJson(JSONUtil.toJsonStr(snapshot));
+        if (creating) versionMapper.insert(published); else versionMapper.updateById(published);
+        return published;
     }
     @Override @Transactional public void archive(String id, boolean archived, AccountUser user) {
         TeachingSession session = lockTask(id, user);
@@ -180,11 +189,6 @@ public class SessionServiceImpl extends ServiceImpl<TeachingSessionMapper, Teach
         if (jobs.selectCount(Wrappers.<GenerationJob>lambdaQuery().eq(GenerationJob::getSessionId, id)
             .in(GenerationJob::getStatus, "queued", "running")) > 0)
             throw error(409, "Wait for generation to finish before archiving or deleting the task.");
-    }
-    @Override public List<Map<String, Object>> versions(String id, AccountUser user) {
-        require(id, user, true);
-        return versionMapper.selectList(Wrappers.<SessionVersion>lambdaQuery().eq(SessionVersion::getSessionId, id).orderByDesc(SessionVersion::getRevision))
-            .stream().map(v -> Map.<String, Object>of("id", v.getId(), "revision", v.getRevision(), "label", v.getLabel(), "createdAt", v.getCreatedAt())).toList();
     }
     @Override public TaskContent validateContent(TaskContent content, List<String> materialIds, boolean publishing) {
         if (content == null || content.getQuestions() == null || content.getLearningGoals() == null || content.getLearningPlan() == null) throw error(422, "Task content is incomplete");

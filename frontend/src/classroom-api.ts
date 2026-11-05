@@ -259,12 +259,6 @@ export type Member = User & {
   membershipRole: string;
   membershipArchived: boolean;
 };
-export type Version = {
-  id: string;
-  revision: number;
-  label: string;
-  createdAt: string;
-};
 export type Bootstrap = {
   needsSetup: boolean;
   defaultLocale: string;
