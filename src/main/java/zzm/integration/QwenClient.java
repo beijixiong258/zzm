@@ -23,6 +23,7 @@ import org.springframework.web.client.*;
 import org.springframework.web.server.ResponseStatusException;
 import java.io.IOException;
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.Semaphore;
