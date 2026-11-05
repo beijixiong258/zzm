@@ -1,4 +1,4 @@
-/* One shared vocabulary for controls, content and semantic states. */
+/* 控件、内容和状态共用一套样式变量。 */
 :root {
   --font-ui: var(--td-font-family);
   --font-display: var(--font-ui);

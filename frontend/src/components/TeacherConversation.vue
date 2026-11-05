@@ -50,7 +50,7 @@ watch(
       try {
         localStorage.removeItem("aicademiya.teacher-chat." + previous);
       } catch {
-        /* The new key retains the history. */
+        /* 历史记录已保存在新的存储键下。 */
       }
       return;
     }

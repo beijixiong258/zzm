@@ -15,7 +15,6 @@ data-v2
 logs
 .env
 .env.*
-/application.yaml
 /.idea/
 /cys的测试材料/
 local-settings*.json

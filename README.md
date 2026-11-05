@@ -31,7 +31,7 @@ SQL 初始化脚本关闭。数据库连接账号应具备程序正常读写及�
 | `config.json` | 模型参数，可按 `config.defaults.json` 填写 |
 | `.env` | AI 接口信息、访问来源及可选功能开关 |
 
-在根目录创建 `application.yaml`，填写数据库的实际账号密码：
+编辑根目录自带的 `application.yaml`，填写部署数据库的实际账号密码：
 
 ```yaml
 spring:

@@ -100,7 +100,7 @@ public class LearningServiceImpl extends ServiceImpl<LearningRecordMapper, Learn
         if (!record.getRevision().equals(input.getRevision())) throw error(409, "Learning record changed. Reload before saving.");
         if (JSONUtil.parseObj(record.getAnswersJson()).equals(JSONUtil.parseObj(answers))) return view(record);
         Map<String, Object> previous = Map.of("revision", record.getRevision(), "savedAt", Instant.now().toString(), "answers", JSONUtil.parseObj(record.getAnswersJson()));
-        // Acquire the versioned parent-row update before the history foreign-key check.
+        // 在检查历史记录外键前，先更新带版本号的父记录并取得行锁。
         record.setAnswersJson(JSONUtil.toJsonStr(answers)); saveRevision(record, input.getRevision());
         appendHistory(record, "answer", previous, null); return view(record);
     }
@@ -253,7 +253,7 @@ public class LearningServiceImpl extends ServiceImpl<LearningRecordMapper, Learn
         if (attachment == null || !id.equals(attachment.getRecordId()) || !user.getId().equals(attachment.getOwnerId()))
             throw error(404, "Attachment not found in this learning record");
         if (Boolean.TRUE.equals(attachment.getArchived())) return view(record);
-        // The worker can only see this tombstone after commit; a failed revision rolls it back.
+        // 后台任务只能在事务提交后看到此删除标记；修订失败时会一并回滚。
         materials.lambdaUpdate().eq(CourseMaterial::getId, attachmentId).set(CourseMaterial::getArchived, true)
             .set(CourseMaterial::getFileRemovedAt, LocalDateTime.now(ZoneOffset.UTC)).set(CourseMaterial::getRemovedBy, user.getId()).update();
         saveRevision(record, revision);
@@ -273,7 +273,7 @@ public class LearningServiceImpl extends ServiceImpl<LearningRecordMapper, Learn
             if (files.size() != attachmentIds.size()) throw error(403, "Attachment access denied");
             if (files.stream().anyMatch(file -> Boolean.TRUE.equals(file.getArchived()) && newAttachments.contains(file.getId())))
                 throw error(422, "This attachment has been removed. Reload the attachment list before sending.");
-            // Removed history references are valid tombstones, not missing or unauthorized files.
+            // 已移除的历史引用是有效的删除标记，不应按文件缺失或无权访问处理。
             selected.addAll(files.stream().filter(file -> !Boolean.TRUE.equals(file.getArchived())).toList());
         }
         materials.requireProcessed(selected);

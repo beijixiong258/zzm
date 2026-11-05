@@ -39,7 +39,7 @@ public class DocumentExtraction {
     @Data
     public static class Report {
         private String currentUnit = "";
-        // An absent mode identifies a legacy PDF transcription that must be reprocessed.
+        // 缺少模式字段说明这是旧版 PDF 转录结果，必须重新处理。
         private String pdfInputMode = "";
         private int unitsInspected;
         private int imageInputTokensEstimated;

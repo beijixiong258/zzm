@@ -1,7 +1,7 @@
 import type { Directive } from "vue";
 
-// TDesign places undeclared attributes on its wrapper. Keep native form and
-// accessible-name attributes on the actual input or textarea.
+// TDesign 会把未声明的属性放在外层容器上；原生表单属性和无障碍名称属性
+// 应传给实际的输入框或文本域。
 type ControlAttributes = Record<string, string | number | boolean | undefined>;
 const apply: Directive<HTMLElement, ControlAttributes> = {
   mounted: update,

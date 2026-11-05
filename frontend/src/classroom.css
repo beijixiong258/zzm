@@ -762,7 +762,7 @@ td button {
 .app-dialog-content {
   outline: 0;
 }
-/* Login uses its own responsive layout without changing the workspace shell. */
+/* 登录页使用独立的响应式布局，保留工作区外层结构。 */
 .login-page {
   min-height: 100vh;
   min-height: 100svh;
@@ -1392,7 +1392,7 @@ td button {
   }
 }
 
-/* Shared learning controls and the supplied light logo. */
+/* 学习界面共用控件与浅色标志。 */
 .brand-lockup {
   display: inline-flex;
   align-items: center;
@@ -1591,7 +1591,7 @@ td button {
   }
 }
 
-/* Task authoring keeps inputs separate from the live student workspace. */
+/* 任务编辑区与学生实时工作区分别管理输入。 */
 .page-return-bar {
   display: flex;
   align-items: center;
@@ -1717,7 +1717,7 @@ td button {
   margin-left: auto;
 }
 
-/* Conversational teacher workspace; student and file-management layouts stay scoped. */
+/* 教师对话工作区的样式仅作用于对应区域，学生界面和文件管理使用各自布局。 */
 .teacher-chat-page {
   max-width: 960px;
   margin: 0 auto;
@@ -2097,7 +2097,7 @@ td button {
   }
 }
 
-/* TDesign controls share the existing business layouts and brand theme. */
+/* TDesign 控件沿用现有业务布局和品牌主题。 */
 .t-button__text {
   min-width: 0;
 }

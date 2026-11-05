@@ -37,8 +37,8 @@ function materialInputTokens(material: Material): number | null {
     material.fileName.toLowerCase().endsWith(".pdf");
   if (isPdf && !["text", "images"].includes(report.pdfInputMode || ""))
     return null;
-  // Match the request gate: native/extracted text uses its conservative upper bound;
-  // PDF page images use the prepared image estimate, without legacy OCR usage.
+  // 与请求校验规则一致：原生文本和提取文本采用保守上界；
+  // PDF 页面图像使用处理后的图像估算值，不计入旧版文字识别用量。
   const tokens =
     isPdf && report.pdfInputMode === "images"
       ? report.imageInputTokensEstimated

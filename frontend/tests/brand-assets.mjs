@@ -1,4 +1,4 @@
-// Render original SVG favicon locally; no external assets or network.
+// 在本机渲染原始矢量网站图标，无需外部素材或网络。
 import { chromium } from "@playwright/test";
 import fs from "node:fs/promises";
 import path from "node:path";

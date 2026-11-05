@@ -3,7 +3,7 @@ package zzm.dto;
 import lombok.Getter;
 import lombok.Setter;
 
-/** Model output includes inferred task fields, applied to the existing session columns. */
+/** 模型输出包含推断的任务字段，应用到现有任务表的对应列。 */
 @Getter
 @Setter
 public class GeneratedLesson extends TaskContent {

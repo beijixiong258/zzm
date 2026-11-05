@@ -1,4 +1,4 @@
-# Deployment services reuse the existing database volume.
+# 部署服务复用现有数据库数据卷。
 name: app
 services:
   mysql:

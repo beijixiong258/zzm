@@ -27,7 +27,7 @@ public class TaskContent {
                 JSONArray values = JSONUtil.parseArray(answer);
                 if (values.stream().allMatch(value -> value instanceof String && (options == null || options.isEmpty() || options.contains(value))))
                     return values.toList(String.class);
-            } catch (JSONException ignored) { /* Existing records use newline-separated option text. */ }
+            } catch (JSONException ignored) { /* 旧记录使用换行分隔的选项文本。 */ }
         }
         if (options != null && options.contains(answer)) return List.of(answer);
         return answer.lines().filter(value -> !value.isEmpty()).toList();

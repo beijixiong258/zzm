@@ -30,7 +30,7 @@ import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import static zzm.exception.ApiErrors.error;
 
-/** Local PDF preparation only. No model dependency and no transcription. */
+/** 仅在本机准备 PDF 材料，不依赖模型或执行转录。 */
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -95,7 +95,7 @@ public class PdfInputReader {
                 if (stripper != null) try {
                     stripper.setStartPage(i + 1); stripper.setEndPage(i + 1);
                     text = stripper.getText(document).strip();
-                    // Graphics and annotations are not fully represented by a plain-text extraction.
+                    // 纯文本提取无法完整保留图形和批注。
                     if (!usableText(text) || hasGraphics(document.getPage(i), document.getPage(i).getResources(), 0)
                         || !document.getPage(i).getAnnotations().isEmpty()) images = true;
                     if (!images && text.isBlank()) {
@@ -110,7 +110,7 @@ public class PdfInputReader {
                 report.setUnitsInspected(i + 1);
                 progress.accept(report);
             }
-            // Empty documents also retain their complete page sequence as images.
+            // 空文档也按完整页序保留页面图像。
             if (pages.stream().allMatch(String::isBlank) && !oversizedText) images = true;
             report.setPdfInputMode(images ? "images" : "text");
             if (!images && oversizedText) {
@@ -173,7 +173,7 @@ public class PdfInputReader {
         }
         return result;
     }
-    /** Reproduce the prepared geometry only after the complete request has passed its budget gate. */
+    /** 仅在完整请求通过用量校验后，才按准备好的页面尺寸重新生成图像。 */
     public void images(CourseMaterial material, BiConsumer<PageInput, byte[]> consume) {
         Report report = report(material);
         if (!complete(report) || !"images".equals(report.getPdfInputMode()))

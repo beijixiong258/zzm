@@ -237,7 +237,7 @@ function uploaded(material: Material) {
 async function uploadsPending(count: number) {
   pendingUploads.value = count;
   if (count) return;
-  // The uploader emits its final material after updating the pending count.
+  // 上传组件先更新待处理数量，再发出最后一份材料的事件。
   await nextTick();
   if (pendingUploads.value || !uploadsChanged || disposed) return;
   await action(async () => {
@@ -466,7 +466,7 @@ function cancelSelection() {
 }
 function saveSelection() {
   const chosen = new Set(draft.value.materialIds);
-  // Only explicit choices in file management change the task's attachments.
+  // 只有在文件管理中明确选择材料时，才更改任务附件。
   for (const [id, checked] of selectionChanges) {
     if (checked) chosen.add(id);
     else chosen.delete(id);
