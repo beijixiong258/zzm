@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Button as TButton } from "tdesign-vue-next";
 import { ref, watch } from "vue";
-import { t } from "../i18n";
+import { systemText, t } from "../i18n";
 import { upload, type Material } from "../classroom-api";
 import ProgressStatus from "./ProgressStatus.vue";
 const props = withDefaults(
@@ -168,7 +168,7 @@ async function send(item: Upload) {
           :label="t(item.progress >= 100 ? 'Saving upload…' : 'Uploading')"
           :value="item.progress >= 100 ? null : item.progress"
         />
-        <span v-if="item.error" class="error">{{ item.error }}</span
+        <span v-if="item.error" class="error">{{ systemText(item.error) }}</span
         ><TButton
           theme="default"
           variant="outline"

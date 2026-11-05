@@ -67,7 +67,7 @@ watch(
       {{ systemText(visibleWarning) }}
     </p>
     <MaterialProgress :material="material" />
-    <p v-if="error" role="alert" class="error">{{ error }}</p>
+    <p v-if="error" role="alert" class="error">{{ systemText(error) }}</p>
     <p
       v-if="
         material.extractionReport &&

@@ -8,7 +8,7 @@ import {
   Input as TInput,
 } from "tdesign-vue-next";
 import { computed, ref } from "vue";
-import { t } from "../i18n";
+import { systemText, t } from "../i18n";
 import { call, key, type Material } from "../classroom-api";
 import { courses, navigate } from "../classroom-state";
 import { useCourseMaterials } from "../useCourseMaterials";
@@ -149,7 +149,7 @@ void load();
     }}
   </p>
   <p v-if="error || materialError" class="error" role="alert">
-    {{ error || materialError }}
+    {{ systemText(error || materialError) }}
   </p>
   <div class="library-layout">
     <aside class="panel">

@@ -19,7 +19,7 @@ public class TaskExporter {
         heading(out, 2, chinese ? "我的作答" : "My answers");
         for (int index = 0; index < content.getQuestions().size(); index++) {
             var question = content.getQuestions().get(index);
-            heading(out, 3, chinese ? "第 " + (index + 1) + " 题" : "Question " + (index + 1));
+            heading(out, 3, chinese ? "第" + (index + 1) + "题" : "Question " + (index + 1));
             markdown(out, question.getPrompt());
             String answer = answers.getStr(question.getId(), chinese ? "尚未作答" : "No answer yet");
             markdown(out, "multipleChoice".equals(question.getType())
@@ -30,11 +30,11 @@ public class TaskExporter {
         for (Object item : messages) {
             var message = JSONUtil.parseObj(item);
             if (message.getBool("pendingReview", false)) {
-                markdown(out, chinese ? "AI 反馈等待教师审核。" : "AI feedback is awaiting teacher review.");
+                markdown(out, chinese ? "AI 反馈正在等待教师审核。" : "AI feedback is awaiting teacher review.");
                 continue;
             }
             heading(out, 3, "user".equals(message.getStr("role"))
-                ? (chinese ? "学生" : "Student") : (chinese ? "AI 辅导教师" : "AI tutor"));
+                ? (chinese ? "学生" : "Student") : (chinese ? "AI 助教" : "AI tutor"));
             markdown(out, message.getStr("content", ""));
         }
         if (!attachments.isEmpty()) {
@@ -52,16 +52,16 @@ public class TaskExporter {
         var materials = JSONUtil.parseObj(snapshot).getJSONArray("materials");
         if (materials != null) materials.forEach(item -> {
             var material = JSONUtil.parseObj(item);
-            materialTitles.put(material.getStr("id"), material.getStr("title", material.getStr("fileName", "Material")));
+            materialTitles.put(material.getStr("id"), material.getStr("title", material.getStr("fileName", chinese ? "材料" : "Material")));
         });
         String versionId = Objects.toString(snapshot.get("versionId"), "");
         StringBuilder out = new StringBuilder();
         heading(out, 1, Objects.toString(snapshot.get("title"), chinese ? "学习任务" : "Learning task"));
         markdown(out, Objects.toString(snapshot.get("description"), ""));
-        section(out, chinese ? "开场白" : "Welcome", content.getOpeningMessage());
+        section(out, chinese ? "开场白" : "Welcome message", content.getOpeningMessage());
 
         if (!content.getLearningGoals().isEmpty()) {
-            heading(out, 2, chinese ? "学习目标" : "Learning goals");
+            heading(out, 2, chinese ? "学习目标" : "Learning objectives");
             content.getLearningGoals().forEach(goal -> markdown(out, "- " + goal.replace("\n", "\n  ")));
         }
         if (!content.getLearningPlan().isEmpty()) {
@@ -73,7 +73,7 @@ public class TaskExporter {
                 markdown(out, step.getDescription());
             }
         }
-        section(out, chinese ? "讲义" : "Lesson notes", content.getHandout());
+        section(out, chinese ? "讲义" : "Handout", content.getHandout());
         for (String id : content.getIllustrationMaterialIds())
             resource(out, id, materialTitles, materialBaseUrl, versionId, true);
 
@@ -101,7 +101,7 @@ public class TaskExporter {
             heading(out, 2, chinese ? "题目" : "Questions");
             for (int i = 0; i < content.getQuestions().size(); i++) {
                 var question = content.getQuestions().get(i);
-                heading(out, 3, chinese ? "第 " + (i + 1) + " 题" : "Question " + (i + 1));
+                heading(out, 3, chinese ? "第" + (i + 1) + "题" : "Question " + (i + 1));
                 markdown(out, question.getPrompt());
                 for (String id : question.getImageMaterialIds())
                     resource(out, id, materialTitles, materialBaseUrl, versionId, true);
@@ -114,8 +114,8 @@ public class TaskExporter {
         }
         if (!materialTitles.isEmpty()) {
             heading(out, 2, chinese ? "学习材料" : "Materials");
-            markdown(out, chinese ? "材料链接需要登录本平台并具备相应权限；文件未嵌入此 Markdown。"
-                : "Material links require access to this platform; files are not embedded in this Markdown document.");
+            markdown(out, chinese ? "材料以链接形式引用，需登录并具备相应权限才能访问；文件本身未嵌入此 Markdown 文档。"
+                : "To open material links, sign in to this platform with the appropriate permissions. The files themselves are not embedded in this Markdown document.");
             for (String id : materialTitles.keySet())
                 resource(out, id, materialTitles, materialBaseUrl, versionId, false);
         }

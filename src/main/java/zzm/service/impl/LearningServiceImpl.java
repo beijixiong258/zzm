@@ -283,8 +283,8 @@ public class LearningServiceImpl extends ServiceImpl<LearningRecordMapper, Learn
             "additionalInstructions", "teachingLanguage", "content", "courseInstructions", "courseInformation", "studentProfile"))
             if (snapshot.containsKey(field)) teaching.put(field, snapshot.get(field));
         String language = "zh-CN".equals(snapshot.getStr("teachingLanguage"))
-            ? "\n请用简体中文回答学生，必要英文术语附中文解释；不要因原始材料为英文而改用英文作答。"
-            : "\nRespond to the learner in natural English, regardless of the source material's language.";
+            ? "\n请用规范、自然的中国大陆简体中文书面语回答学生。worksheet 译为‘练习单’，handout 译为‘讲义’，AI tutor 译为‘AI 助教’。必要英文术语附中文解释，不要因原始材料为英文而改用英文作答；引用原题、选项和学生作答时保留原文。"
+            : "\nRespond to the learner in natural, standard British English, using British spelling and idiomatic phrasing, regardless of the source material's language. Preserve the original wording when quoting source questions, options and the student's answers.";
         JSONObject answers = JSONUtil.parseObj(record.getAnswersJson());
         for (TaskContent.Question question : snapshot.getBean("content", TaskContent.class).getQuestions()) {
             if ("multipleChoice".equals(question.getType()) && answers.containsKey(question.getId()))

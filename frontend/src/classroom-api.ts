@@ -1,4 +1,4 @@
-import { t, systemText } from "./i18n";
+import { t, systemText, dateLocale } from "./i18n";
 
 export type User = {
   id: string;
@@ -516,6 +516,6 @@ export function dateText(value?: string | null) {
         value.endsWith("Z") || /[+-]\d\d:\d\d$/.test(value)
           ? value
           : value + "Z",
-      ).toLocaleString()
+      ).toLocaleString(dateLocale())
     : "—";
 }

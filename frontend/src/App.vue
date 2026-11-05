@@ -20,7 +20,7 @@ import {
   Ellipsis,
   MessageSquare,
 } from "lucide-vue-next";
-import { locale, setLocale, systemText, t } from "./i18n";
+import { dateLocale, locale, setLocale, systemText, t } from "./i18n";
 import { confirmAction } from "./confirmAction";
 import {
   call,
@@ -145,9 +145,41 @@ async function deleteCourse(item: Course) {
   }
 }
 const pageKey = routeKey;
+const enGB = {
+  ...enUS,
+  input: { ...enUS.input, placeholder: "Enter text" },
+  select: {
+    ...enUS.select,
+    empty: "No results",
+    loadingText: "Loading…",
+    placeholder: "Select an option",
+  },
+  pagination: {
+    ...enUS.pagination,
+    itemsPerPage: "{size} per page",
+    jumpTo: "Go to",
+    page: "page",
+    total: "No items | 1 item | {count} items",
+  },
+  table: {
+    ...enUS.table,
+    empty: "No records",
+    loadingText: "Loading…",
+    loadingMoreText: "Loading more…",
+    sortAscendingOperationText: "Sort in ascending order",
+    sortDescendingOperationText: "Sort in descending order",
+    sortCancelOperationText: "Clear sorting",
+    columnConfigButtonText: "Choose columns",
+    columnConfigTitleText: "Table columns",
+    columnConfigDescriptionText: "Choose which columns to show in the table.",
+    selectAllText: "Select all",
+    searchResultText:
+      "No results for ‘{result}’. | 1 result for ‘{result}’. | {count} results for ‘{result}’.",
+  },
+};
 const componentLocale = computed(
   () =>
-    (locale.value === "en" ? enUS : zhCN) as unknown as GlobalConfigProvider,
+    (locale.value === "en" ? enGB : zhCN) as unknown as GlobalConfigProvider,
 );
 async function action(fn: () => Promise<void>) {
   busy.value = true;
@@ -264,7 +296,7 @@ void boot();
       <BrandLogo :wordmark="false" />
       <p>{{ t("Opening your workspace…") }}</p>
     </div>
-    <main v-else-if="!user" class="login-page" :lang="locale">
+    <main v-else-if="!user" class="login-page" :lang="dateLocale()">
       <div class="login-toolbar">
         <TSelect
           v-control-attrs="{ 'aria-label': t('Interface language') }"
@@ -272,7 +304,7 @@ void boot();
           @change="setLocale(String($event))"
         >
           <TOption value="zh-CN" label="中文" />
-          <TOption value="en" label="English" />
+          <TOption value="en" label="English (UK)" />
         </TSelect>
       </div>
       <div class="login-layout">
@@ -324,7 +356,7 @@ void boot();
               )
             }}
           </h2>
-          <p v-if="error" class="error" role="alert">{{ error }}</p>
+          <p v-if="error" class="error" role="alert">{{ systemText(error) }}</p>
           <TRadioGroup
             v-model="loginRole"
             class="login-role-tabs"
@@ -692,11 +724,11 @@ void boot();
             @change="setLocale(String($event))"
           >
             <TOption value="zh-CN" label="中文" />
-            <TOption value="en" label="English" />
+            <TOption value="en" label="English (UK)" />
           </TSelect>
         </header>
         <main class="page-body">
-          <p v-if="error" class="error" role="alert">{{ error }}</p>
+          <p v-if="error" class="error" role="alert">{{ systemText(error) }}</p>
           <template v-if="user.mustChangePassword || route.page === 'settings'"
             ><header class="page-heading">
               <div>

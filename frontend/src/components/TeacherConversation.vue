@@ -163,7 +163,7 @@ function enter(event: KeyboardEvent) {
         </article>
         <p v-if="busy" role="status" class="muted">{{ t("Thinking…") }}</p>
       </div>
-      <p v-if="error" class="error" role="alert">{{ error }}</p>
+      <p v-if="error" class="error" role="alert">{{ systemText(error) }}</p>
       <div class="conversation-composer">
         <form @submit.prevent="send">
           <TTextarea
