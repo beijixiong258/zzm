@@ -59,6 +59,7 @@ public final class Requests {
         @NotNull @Size(max = 20000) private String systemInstructions = "";
     }
     @Data public static class SessionInput {
+        private boolean updatePublished = true;
         @NotBlank @Size(max = 300) private String title;
         @NotNull @Size(max = 10000) private String description = "";
         @NotBlank @Pattern(regexp = "tutor|assignment") private String sessionType = "tutor";

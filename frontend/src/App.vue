@@ -824,7 +824,6 @@ void boot();
               <div class="grow">
                 <h3>{{ taskTitle(record.sessionId) }}</h3>
                 <p>{{ dateText(record.updatedAt) }}</p>
-                <small>{{ t("Version") }}: {{ record.versionId }}</small>
                 <div>
                   <span
                     class="badge status-label"
@@ -841,7 +840,6 @@ void boot();
                   navigate({
                     page: 'learn',
                     taskId: record.sessionId,
-                    versionId: record.versionId,
                   })
                 "
               >

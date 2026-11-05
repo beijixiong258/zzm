@@ -20,6 +20,8 @@ type Entry = {
   archivedAt?: string;
   revision?: number;
   answers?: Record<string, string>;
+  questions?: Question[];
+  attachments?: { id: string; title: string }[];
   messageCount?: number;
   title?: string;
   removedAt?: string;
@@ -101,6 +103,17 @@ async function load(page: number) {
     if (request === sequence) loading.value = false;
   }
 }
+function historyQuestion(entry: Entry, id: string) {
+  return (entry.questions || props.questions).find(
+    (question) => question.id === id,
+  );
+}
+function historyQuestionLabel(entry: Entry, id: string) {
+  const index = (entry.questions || props.questions).findIndex(
+    (question) => question.id === id,
+  );
+  return index < 0 ? t("Question") : t("Question {0}", [index + 1]);
+}
 async function loadMessages(id: string, page: number) {
   const request = ++sequence;
   loading.value = true;
@@ -146,18 +159,19 @@ function toggle(event: Event) {
         <template v-if="kind === 'answer'">
           <h4>{{ dateText(entry.savedAt) }}</h4>
           <div v-for="(answer, id) in entry.answers" :key="id">
-            <small>{{
-              t("Question {0}", [questions.findIndex((q) => q.id === id) + 1])
-            }}</small>
+            <small>{{ historyQuestionLabel(entry, String(id)) }}</small>
             <RichText
-              :text="
-                answerText(
-                  questions.find((q) => q.id === id),
-                  answer,
-                )
-              "
+              :text="historyQuestion(entry, String(id))?.prompt || ''"
+            />
+            <RichText
+              :text="answerText(historyQuestion(entry, String(id)), answer)"
             />
           </div>
+          <p v-for="attachment in entry.attachments || []" :key="attachment.id">
+            <a :href="fileUrl(attachment.id)" target="_blank" rel="noopener">{{
+              attachment.title
+            }}</a>
+          </p>
         </template>
         <TButton
           theme="default"

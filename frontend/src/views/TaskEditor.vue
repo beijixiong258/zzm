@@ -2,8 +2,6 @@
 import { confirmAction } from "../confirmAction";
 import {
   Button as TButton,
-  Select as TSelect,
-  Option as TOption,
   Dropdown as TDropdown,
   type DropdownOption,
 } from "tdesign-vue-next";
@@ -16,11 +14,9 @@ import {
   key,
   statusText,
   studentTask,
-  versionParam,
   type Job,
   type Material,
   type Task,
-  type Version,
   type ContextUsage,
   type StudentRow,
   type Workspace,
@@ -51,8 +47,7 @@ const props = defineProps<{
   taskId: string;
 }>();
 const draft = ref<Task>(blankTask(props.courseId)),
-  baseline = ref(""),
-  versions = ref<Version[]>([]);
+  baseline = ref("");
 const {
   materials,
   error: materialError,
@@ -64,6 +59,7 @@ const busy = ref(false),
   loading = ref(true),
   ready = ref(false),
   job = ref<Job | null>(null),
+  showGenerationState = ref(false),
   selectedMaterial = ref<Material | null>(null);
 const pendingUploads = ref(0);
 const taskActionsVisible = ref(false);
@@ -84,7 +80,6 @@ const activeMaterials = computed(() =>
 );
 const students = ref<StudentRow[] | null>(null),
   observed = ref<Workspace | null>(null);
-const progressVersionId = ref("");
 const studentProgressPanel = ref<HTMLElement | null>(null);
 const usage = ref<ContextUsage | null>(null),
   checkingContext = ref(false),
@@ -241,7 +236,7 @@ async function uploadsPending(count: number) {
   await nextTick();
   if (pendingUploads.value || !uploadsChanged || disposed) return;
   await action(async () => {
-    await saveDraft();
+    await saveDraft(false);
     uploadsChanged = false;
   });
 }
@@ -261,18 +256,14 @@ async function load() {
     if (!(await loadMaterials()) || disposed) return;
     if (props.taskId) {
       accept(await call<Task>(`/sessions/${key(props.taskId)}`));
-      versions.value = await call<Version[]>(
-        `/sessions/${key(props.taskId)}/versions`,
-      );
       const jobs = await call<Job[]>(
         `/sessions/${key(props.taskId)}/generations`,
       );
       job.value = jobs[0] || null;
-      if (
-        job.value &&
-        ["queued", "running", "succeeded"].includes(job.value.status)
-      )
-        schedulePoll();
+      showGenerationState.value =
+        !!job.value &&
+        ["queued", "running", "succeeded"].includes(job.value.status);
+      if (showGenerationState.value) schedulePoll();
     } else {
       accept(blankTask(props.courseId));
     }
@@ -296,16 +287,15 @@ async function action(fn: () => Promise<void>) {
     busy.value = false;
   }
 }
-async function saveDraft() {
+async function saveDraft(updatePublished = true) {
   if (!draft.value.title.trim()) draft.value.title = t("Untitled task");
   const path = draft.value.id
     ? `/sessions/${key(draft.value.id)}`
     : `/courses/${key(props.courseId)}/sessions`;
-  const result = await call<Task>(
-    path,
-    draft.value.id ? "PUT" : "POST",
-    draft.value,
-  );
+  const result = await call<Task>(path, draft.value.id ? "PUT" : "POST", {
+    ...draft.value,
+    updatePublished,
+  });
   if (disposed) return result;
   accept(result);
   retainTaskAddress(result.id);
@@ -337,7 +327,9 @@ async function archiveTask() {
 async function save() {
   await action(async () => {
     await saveDraft();
-    success.value = t("Draft saved.");
+    success.value = t(
+      draft.value.publishedVersionId ? "Task updated." : "Draft saved.",
+    );
   });
 }
 async function generate() {
@@ -353,7 +345,7 @@ async function generate() {
     return false;
   let started = false;
   await action(async () => {
-    await saveDraft();
+    await saveDraft(false);
     if (disposed) return;
     job.value = await call<Job>(
       `/sessions/${key(draft.value.id)}/generations`,
@@ -363,6 +355,7 @@ async function generate() {
         kind: "generate",
       },
     );
+    showGenerationState.value = true;
     accept(await call<Task>(`/sessions/${key(draft.value.id)}`));
     schedulePoll();
     started = true;
@@ -411,36 +404,21 @@ async function poll() {
 }
 async function publish() {
   await action(async () => {
-    if (dirty.value || !draft.value.id) await saveDraft();
+    if (dirty.value || !draft.value.id) await saveDraft(false);
     if (disposed) return;
-    if (!(await confirmAction(t("Publish this task to students?")))) return;
+    const updating = !!draft.value.publishedVersionId;
+    if (
+      !updating &&
+      !(await confirmAction(t("Publish this task to students?")))
+    )
+      return;
     if (disposed) return;
     await call(`/sessions/${key(draft.value.id)}/publish`, "POST", {
       revision: draft.value.revision,
     });
     accept(await call<Task>(`/sessions/${key(draft.value.id)}`));
-    versions.value = await call<Version[]>(
-      `/sessions/${key(draft.value.id)}/versions`,
-    );
     await refreshCourses();
-    success.value = t("Task published.");
-  });
-}
-async function restore(versionId: string) {
-  if (
-    !(await confirmAction(
-      t("Restore this version into the draft? Unsaved edits will be replaced."),
-    ))
-  )
-    return;
-  await action(async () => {
-    await call(
-      `/sessions/${key(draft.value.id)}/versions/${key(versionId)}/restore`,
-      "POST",
-      { revision: draft.value.revision },
-    );
-    accept(await call<Task>(`/sessions/${key(draft.value.id)}`));
-    success.value = t("Version restored into the draft.");
+    success.value = t(updating ? "Task updated." : "Task published.");
   });
 }
 async function openFileSelection() {
@@ -489,14 +467,12 @@ function saveSelection() {
   draft.value.materialIds = nextIds;
   cancelSelection();
 }
-async function viewProgress(versionId = progressVersionId.value) {
+async function viewProgress() {
   if (!draft.value.id) throw Error(t("Save the task before viewing progress."));
-  const selectedVersion = versionId || draft.value.publishedVersionId || "";
   const rows = await call<StudentRow[]>(
-    `/sessions/${key(draft.value.id)}/students${versionParam(selectedVersion)}`,
+    `/sessions/${key(draft.value.id)}/students`,
   );
   if (disposed) return;
-  progressVersionId.value = selectedVersion;
   students.value = rows;
 }
 async function observe(recordId: string | null) {
@@ -610,45 +586,6 @@ void load();
       <p v-if="success" role="status" class="success">
         {{ systemText(success) }}
       </p>
-      <section class="conversation-result task-upload">
-        <h2>{{ t("Upload your teaching materials") }}</h2>
-        <p class="muted">
-          {{
-            t(
-              "Upload all lesson materials, worksheets, answer keys and teaching instructions together. AI will organize them into a lesson for you to review and edit.",
-            )
-          }}
-        </p>
-        <FileUploader
-          :endpoint="'/courses/' + key(courseId) + '/materials'"
-          visibility="teacher"
-          :disabled="busy || !!active"
-          @pending="uploadsPending"
-          @uploaded="uploaded"
-          @settled="loadMaterials"
-        />
-        <div v-if="selected.length" class="selected-materials">
-          <small>{{ t("Selected materials: {0}", [selected.length]) }}</small>
-          <TButton
-            v-for="material in selected"
-            :key="material.id"
-            theme="default"
-            variant="outline"
-            type="button"
-            @click="selectedMaterial = material"
-          >
-            {{ material.title }}
-            <small>{{ statusText(material.status) }}</small>
-          </TButton>
-        </div>
-        <p v-if="selected.length && !materialsReady" class="muted">
-          {{
-            t(
-              "The lesson can be generated when all uploaded materials are ready.",
-            )
-          }}
-        </p>
-      </section>
       <details class="conversation-result">
         <summary>{{ t("Local token estimate") }}</summary>
         <ContextMeter
@@ -656,7 +593,10 @@ void load();
           :loading="checkingContext"
         /><AiConnection />
       </details>
-      <section v-if="job" class="conversation-result generation-state">
+      <section
+        v-if="showGenerationState && job"
+        class="conversation-result generation-state"
+      >
         <ProgressStatus
           v-if="active || job.status === 'succeeded'"
           :label="statusText(job.stage)"
@@ -744,6 +684,45 @@ void load();
           {{ t("Refresh generation status") }}
         </TButton>
       </section>
+      <section class="conversation-result task-upload">
+        <h2>{{ t("Upload your teaching materials") }}</h2>
+        <p class="muted">
+          {{
+            t(
+              "Upload all lesson materials, worksheets, answer keys and teaching instructions together. AI will organize them into a lesson for you to review and edit.",
+            )
+          }}
+        </p>
+        <FileUploader
+          :endpoint="'/courses/' + key(courseId) + '/materials'"
+          visibility="teacher"
+          :disabled="busy || !!active"
+          @pending="uploadsPending"
+          @uploaded="uploaded"
+          @settled="loadMaterials"
+        />
+        <div v-if="selected.length" class="selected-materials">
+          <small>{{ t("Selected materials: {0}", [selected.length]) }}</small>
+          <TButton
+            v-for="material in selected"
+            :key="material.id"
+            theme="default"
+            variant="outline"
+            type="button"
+            @click="selectedMaterial = material"
+          >
+            {{ material.title }}
+            <small>{{ statusText(material.status) }}</small>
+          </TButton>
+        </div>
+        <p v-if="selected.length && !materialsReady" class="muted">
+          {{
+            t(
+              "The lesson can be generated when all uploaded materials are ready.",
+            )
+          }}
+        </p>
+      </section>
       <section v-if="hasContent" class="conversation-result lesson-result">
         <h2>{{ draft.title }}</h2>
         <p>{{ draft.description }}</p>
@@ -771,27 +750,6 @@ void load();
         class="conversation-result"
       >
         <strong>{{ t("Student progress") }}</strong>
-        <label v-if="versions.length" class="form-stack">
-          {{ t("Version") }}
-          <TSelect
-            :value="progressVersionId"
-            :disabled="busy"
-            @change="
-              (value) =>
-                action(async () => {
-                  await viewProgress(String(value));
-                  observed = null;
-                })
-            "
-          >
-            <TOption
-              v-for="version in versions"
-              :key="version.id"
-              :value="version.id"
-              :label="version.label"
-            />
-          </TSelect>
-        </label>
         <TButton
           theme="default"
           variant="outline"
@@ -813,21 +771,6 @@ void load();
           {{ t("No students have joined this course yet.") }}
         </p>
       </section>
-      <details v-if="versions.length" class="conversation-result">
-        <summary>{{ t("Published versions") }}</summary>
-        <div v-for="version in versions" :key="version.id" class="row spread">
-          <span>{{ version.label }}</span
-          ><TButton
-            theme="default"
-            variant="outline"
-            type="button"
-            :disabled="busy || !!active"
-            @click="restore(version.id)"
-          >
-            {{ t("Restore to draft") }}
-          </TButton>
-        </div>
-      </details>
     </div>
     <section
       v-if="choosingFiles"
@@ -976,7 +919,7 @@ void load();
           :disabled="busy || !!active || !hasContent"
           @click="publish"
         >
-          {{ t("Publish task") }}
+          {{ t(draft.publishedVersionId ? "Update task" : "Publish task") }}
         </TButton>
       </div>
     </div>
