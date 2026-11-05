@@ -291,7 +291,9 @@ async function configure(reply: TeacherReply) {
               <p v-if="saved" class="success" role="status">
                 {{ t("Course information saved.") }}
               </p>
-              <p v-if="error" class="error" role="alert">{{ error }}</p>
+              <p v-if="error" class="error" role="alert">
+                {{ systemText(error) }}
+              </p>
             </form>
           </section>
           <section v-if="members" class="conversation-result">

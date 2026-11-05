@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Button as TButton } from "tdesign-vue-next";
 import { computed, ref, watch } from "vue";
-import { t } from "../i18n";
+import { systemText, t } from "../i18n";
 import {
   call,
   answerText,
@@ -134,7 +134,7 @@ function toggle(event: Event) {
 <template>
   <details class="record-history" @toggle="toggle">
     <summary>{{ title }}</summary>
-    <p v-if="error" class="error" role="alert">{{ error }}</p>
+    <p v-if="error" class="error" role="alert">{{ systemText(error) }}</p>
     <p v-if="loading" class="muted">{{ t("Loading history…") }}</p>
     <template v-if="entries">
       <p v-if="!entries.total" class="muted">{{ t("No history yet.") }}</p>

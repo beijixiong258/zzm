@@ -60,6 +60,6 @@ async function check(vision: boolean) {
       · {{ result.model }} · {{ result.elapsedMs }} ms
       <span v-if="result.detail">— {{ systemText(result.detail) }}</span>
     </p>
-    <p v-if="error" class="error" role="alert">{{ error }}</p>
+    <p v-if="error" class="error" role="alert">{{ systemText(error) }}</p>
   </div>
 </template>

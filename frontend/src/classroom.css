@@ -403,7 +403,7 @@ small {
   font-size: 12px;
 }
 .topbar .t-select__wrap {
-  width: 125px;
+  width: 160px;
   padding: 7px 10px;
   background: transparent;
 }
@@ -815,7 +815,7 @@ td button {
   width: min(100%, 1480px);
 }
 .login-toolbar .t-select__wrap {
-  width: 112px;
+  width: 160px;
   min-height: 38px;
   padding: 6px 10px;
   background: #ffffff80;

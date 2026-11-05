@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Input as TInput, Button as TButton } from "tdesign-vue-next";
 import { computed, ref } from "vue";
-import { t } from "../i18n";
+import { systemText, t } from "../i18n";
 import { call, key } from "../classroom-api";
 import { courses, navigate, refreshCourses, tasks } from "../classroom-state";
 
@@ -53,7 +53,7 @@ async function join() {
       </p>
     </div>
   </header>
-  <p v-if="error" class="error" role="alert">{{ error }}</p>
+  <p v-if="error" class="error" role="alert">{{ systemText(error) }}</p>
   <div v-if="!course" class="overview-grid">
     <div class="panel stat">
       <span>{{ t("My courses") }}</span

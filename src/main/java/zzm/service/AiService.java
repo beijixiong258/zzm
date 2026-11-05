@@ -230,10 +230,10 @@ public class AiService {
         if (materials.isEmpty() && !revising)
             instruction += " No source materials were provided. Create the lesson and practice from the teacher's goals. Questions asking learners to explain, discuss or justify an answer without supplied choices must be openResponse or readingResponse.";
         String language = "auto".equals(session.getTeachingLanguage())
-            ? "Infer teachingLanguage as en or zh-CN from the uploaded teaching instructions first, then from the main learning materials. Use that language for the surrounding lesson and guidance. Fill teachingLanguage with the resolved value, never auto. Keep source questions, choices and supplied answers in their original language."
+            ? "Infer teachingLanguage as en or zh-CN from the uploaded teaching instructions first, then from the main learning materials. For zh-CN, write the surrounding handout and guidance in natural, standard written Simplified Chinese as used in mainland China. For en, use natural, standard British English with British spelling and phrasing. Fill teachingLanguage with the resolved value, never auto. Keep source questions, choices and supplied answers in their original language."
             : "zh-CN".equals(session.getTeachingLanguage())
-            ? "语言要求：讲义与辅导说明使用简体中文，包括 description、openingMessage、handout、learningGoals、learningPlan 及新增提示。必要英文术语附中文解释。原题、原选项和原材料提供的参考答案保留原文。JSON 字段名和来源 ID 保持原格式。"
-            : "Language requirement: write all explanatory prose, opening messages, lesson notes, questions and feedback in natural English. Keep JSON field names and source IDs unchanged.";
+            ? "语言要求：讲义与辅导说明使用规范、自然的中国大陆简体中文书面语，包括 description、openingMessage、handout、learningGoals、learningPlan 及新增提示。worksheet 译为‘练习单’，handout 译为‘讲义’，AI tutor 译为‘AI 助教’，避免生硬直译。必要英文术语附中文解释。原题、原选项和原材料提供的参考答案保留原文。JSON 字段名和来源 ID 保持原格式。"
+            : "Language requirement: write all newly generated explanatory prose, opening messages, handouts, questions and feedback in natural, standard British English. Use British spelling and idiomatic phrasing, such as organise, colour and learning objectives. Use handout for the generated teaching document and model answer or answer key as appropriate. Keep JSON field names and source IDs unchanged.";
         language += " For source questions, preserve the original source language, wording, numbering, options and supplied answers; do not translate or reorder them. The teaching-language requirement applies to the surrounding lesson and guidance.";
         language += " Set teachingLanguage to the resolved teaching language (en or zh-CN). An explicitly saved teaching language takes precedence over the source language.";
         return includePdfPageLabels(List.of(new SystemMessage(instruction + "\n" + new BeanOutputConverter<>(GeneratedLesson.class).getFormat()
@@ -308,7 +308,10 @@ public class AiService {
     public Map<String, Object> configureTeacher(Requests.TeacherChat input, Map<String, Object> context) {
         String instruction = """
             You help a teacher configure a course or task by conversation. Return the JSON schema below.
-            Respond in the interface locale. The application applies and validates fields after your reply;
+            Respond in the interface locale: natural, standard written Simplified Chinese as used in mainland China
+            for zh-CN, or natural, standard British English with British spelling and phrasing for en.
+            In Chinese use 练习单 for worksheet, 讲义 for handout and AI 助教 for AI tutor.
+            Preserve quoted source content and technical identifiers. The application applies and validates fields after your reply;
             describe the requested changes without claiming that saving, publishing or generation already succeeded.
             Include ONLY fields the teacher explicitly asks to change or directly provides in this conversation.
             Do not repeat or overwrite unrelated fields. When required information is missing, ask a short question.

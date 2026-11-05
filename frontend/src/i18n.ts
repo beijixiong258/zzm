@@ -5,12 +5,14 @@ import zh from "./locales/zh-CN.json";
 export type Locale = "en" | "zh-CN";
 export const locale = ref<Locale>(savedLocale() || "zh-CN");
 const catalogs: Record<Locale, Record<string, string>> = { en, "zh-CN": zh };
-const englishByChinese = new Map(
-  Object.entries(zh).map(([key, text]) => [text, key]),
+const keyByTranslation = new Map(
+  [en, zh].flatMap((catalog) =>
+    Object.entries(catalog).map(([key, text]) => [text, key] as const),
+  ),
 );
 const escapePattern = (text: string) =>
   text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-const numericServerMessages = new Set([
+const parameterisedServerMessages = new Set([
   "Page {0}",
   "Slide {0}",
   "Image {0}",
@@ -22,24 +24,50 @@ const numericServerMessages = new Set([
   "{0} introductory/unassigned text blocks remain in source_text, not automatically converted into questions.",
   "Request failed ({0})",
   "Upload failed ({0})",
+  "Question {0}",
+  "Upstream AI request failed (HTTP {0})",
+  "AI connection or response processing failed ({0}). No incomplete result was applied.",
+  "Generation processing failed ({0})",
 ]);
-const systemPatterns = Object.entries(en).flatMap(([key]) => {
-  if (!numericServerMessages.has(key)) return [];
-  return [key, (zh as Record<string, string>)[key]].map((text) => {
-    const indexes: number[] = [];
-    const pattern = text
-      .split(/(\{\d+\})/g)
-      .map((part) => {
-        if (/^\{\d+\}$/.test(part)) {
-          indexes.push(Number(part.slice(1, -1)));
-          return "(\\d+)";
-        }
-        return escapePattern(part);
-      })
-      .join("");
-    return { key, indexes, pattern: new RegExp(`^${pattern}$`) };
-  });
-});
+const diagnosticPrefixes = [
+  "Question {0}",
+  "Upstream AI request failed (HTTP {0})",
+  "Material preparation failed",
+  "Model output parsing failed",
+  "Question validation failed",
+  "AI request failed",
+  "Material is used by tasks. Remove its references or archive it",
+];
+function messagePatterns(keys: Iterable<string>, prefix = false) {
+  return Array.from(keys).flatMap((key) =>
+    Array.from(new Set([key, catalogs.en[key], catalogs["zh-CN"][key]])).map(
+      (text) => {
+        const indexes: number[] = [];
+        const pattern = (prefix ? text.replace(/[。.]+$/, "") : text)
+          .split(/(\{\d+\})/g)
+          .map((part) => {
+            if (/^\{\d+\}$/.test(part)) {
+              indexes.push(Number(part.slice(1, -1)));
+              return key.includes("processing failed ({0})")
+                ? "([A-Za-z][A-Za-z0-9.$]*)"
+                : "(\\d+)";
+            }
+            return escapePattern(part);
+          })
+          .join("");
+        return {
+          key,
+          indexes,
+          pattern: new RegExp(
+            `^${pattern}${prefix ? "[：:]\\s*([\\s\\S]*)" : ""}$`,
+          ),
+        };
+      },
+    ),
+  );
+}
+const systemPatterns = messagePatterns(parameterisedServerMessages);
+const prefixPatterns = messagePatterns(diagnosticPrefixes, true);
 
 export function savedLocale(): Locale | null {
   try {
@@ -57,7 +85,7 @@ export function setLocale(value: string) {
     /* 仍可使用保存在内存中的选择。 */
   }
   if (typeof document !== "undefined")
-    document.documentElement.lang = locale.value;
+    document.documentElement.lang = dateLocale();
 }
 
 /** 此处只翻译界面消息，课程内容和模型响应保持原文。 */
@@ -71,32 +99,28 @@ export function t(key: string, values: readonly unknown[] = []): string {
 
 /** 翻译已知的服务端消息，保留无法识别的诊断信息。 */
 export function systemText(value: string): string {
-  const question = value.match(/^Question (\d+): ([\s\S]*)$/);
-  if (question)
-    return t("Question {0}", [question[1]]) + ": " + systemText(question[2]);
-  const upstream = value.match(
-    /^Upstream AI request failed \(HTTP (\d+)\): ([\s\S]*)$/,
-  );
-  if (upstream)
+  for (const item of prefixPatterns) {
+    const match = value.match(item.pattern);
+    if (!match) continue;
+    const values: string[] = [];
+    item.indexes.forEach((index, capture) => {
+      values[index] = match[capture + 1];
+    });
+    const detail = match[item.indexes.length + 1];
+    // 引用冲突后的内容是用户填写的任务名称，不作为界面消息翻译。
+    const translatedDetail = item.key.startsWith("Material is used by tasks.")
+      ? detail
+      : systemText(detail);
     return (
-      t("Upstream AI request failed (HTTP {0})", [upstream[1]]) +
-      ": " +
-      systemText(upstream[2])
+      t(item.key, values).replace(/[。.]+$/, "") +
+      (locale.value === "zh-CN" ? "：" : ": ") +
+      translatedDetail
     );
-  for (const prefix of [
-    "Material preparation failed",
-    "Model output parsing failed",
-    "Question validation failed",
-    "AI request failed",
-    "Material is used by tasks. Remove its references or archive it",
-  ]) {
-    if (value.startsWith(prefix + ": "))
-      return t(prefix) + ": " + systemText(value.slice(prefix.length + 2));
   }
   const translate = (part: string): string => {
     if (Object.hasOwn(en, part)) return t(part);
-    const english = englishByChinese.get(part);
-    if (english) return t(english);
+    const key = keyByTranslation.get(part);
+    if (key) return t(key);
     for (const item of systemPatterns) {
       const match = part.match(item.pattern);
       if (!match) continue;
@@ -112,11 +136,11 @@ export function systemText(value: string): string {
   if (whole !== value) return whole;
   // 部分已有接口警告由多个句子拼接而成，保留所有无法识别的部分。
   return value
-    .split(/((?<=\.)\s*;?\s+(?=[A-Z0-9]))/g)
+    .split(/((?<=\.)\s*;?\s+(?=[A-Z0-9])|(?<=。)\s*)/g)
     .map((part, index) => (index % 2 ? part : translate(part)))
     .join("");
 }
 
 export function dateLocale() {
-  return locale.value === "zh-CN" ? "zh-CN" : "en-US";
+  return locale.value === "zh-CN" ? "zh-CN" : "en-GB";
 }

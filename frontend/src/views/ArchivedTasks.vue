@@ -75,7 +75,7 @@ void refresh();
       >{{ t("Refresh") }}</TButton
     >
   </header>
-  <p v-if="error" class="error" role="alert">{{ error }}</p>
+  <p v-if="error" class="error" role="alert">{{ systemText(error) }}</p>
   <div class="task-list">
     <article
       v-for="task in archivedTasks"

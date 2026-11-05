@@ -10,7 +10,7 @@ import {
   Textarea as TTextarea,
 } from "tdesign-vue-next";
 import { computed, onBeforeUnmount, ref, watch } from "vue";
-import { t } from "../i18n";
+import { systemText, t } from "../i18n";
 import {
   call,
   download,
@@ -424,8 +424,10 @@ void load();
         {{ t(record ? "Start a new simulation" : "Start simulation") }}
       </TButton>
     </nav>
-    <p v-if="error" class="error" role="alert">{{ error }}</p>
-    <p v-if="success" class="success" role="status">{{ success }}</p>
+    <p v-if="error" class="error" role="alert">{{ systemText(error) }}</p>
+    <p v-if="success" class="success" role="status">
+      {{ systemText(success) }}
+    </p>
     <div v-if="workspace" class="learning-layout">
       <section v-show="!preview || previewPane === 'lesson'" class="panel">
         <div v-if="!preview" class="row end">
