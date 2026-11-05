@@ -5,14 +5,13 @@ target/
 *.tsbuildinfo
 .env
 config.json
-/application.yaml
 /.idea/
 /测试用材料不要删/
 /cys的测试材料/
 data-local/
 .env.*
 local-settings*.json
-# Course seed contains original materials/excerpts: private upload, not Git.
+# 课程示例包含原始材料或摘录，仅供本机上传，不纳入版本控制。
 sample_data/
 data/
 data-production/

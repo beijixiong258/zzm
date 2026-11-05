@@ -66,7 +66,7 @@ public class QwenClient {
             String text;
             String finish;
             if (output >= 8192) {
-                // Consume long responses incrementally so a healthy generation does not hit a first-byte timeout.
+                // 增量读取长响应，避免正常生成过程触发首字节等待超时。
                 StringBuilder content = new StringBuilder();
                 ChatResponse[] last = new ChatResponse[1];
                 String[] reason = new String[1];
@@ -88,7 +88,7 @@ public class QwenClient {
                         }
                     }).takeUntil(chunk -> reason[0] != null && chunk.getMetadata() != null
                         && chunk.getMetadata().getUsage() != null && chunk.getMetadata().getUsage().getPromptTokens() > 0)
-                    // Replaying after answer output would discard work and repeat a potentially long generation.
+                    // 已输出回答后重试会丢弃已有结果，并重复可能耗时较长的生成过程。
                     .retryWhen(reactor.util.retry.Retry.backoff(1, Duration.ofSeconds(2))
                         .filter(failure -> charactersReceived.get() == 0 && reason[0] == null && retryableStreamFailure(failure))
                         .onRetryExhaustedThrow((spec, signal) -> signal.failure()))
@@ -159,7 +159,7 @@ public class QwenClient {
             Object detail = response.get("error");
             reason = detail instanceof JSONObject problem ? problem.getStr("message", problem.toString())
                 : response.getStr("message", Objects.toString(detail, reason));
-        } catch (RuntimeException ignored) { /* Preserve non-JSON provider diagnostics. */ }
+        } catch (RuntimeException ignored) { /* 保留服务提供方返回的非结构化诊断信息。 */ }
         String key = environment("AICADEMIYA_AI_API_KEY", configuration().getStr("api_key", ""));
         if (!key.isBlank()) reason = reason.replace(key, "[redacted]");
         if (reason.length() > 2000) reason = reason.substring(0, 2000) + "…";

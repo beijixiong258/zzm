@@ -79,7 +79,7 @@ export async function navigate(next: Partial<Route>) {
   return true;
 }
 export function retainTaskAddress(taskId: string) {
-  // Saving a new task must retain its address without remounting an active generation form.
+  // 保存新任务时保留当前地址，避免重新挂载正在生成内容的表单。
   if (route.value.page !== "task" || route.value.taskId) return;
   route.value = { ...route.value, taskId };
   const query = new URLSearchParams(location.hash.slice(1));
@@ -97,7 +97,7 @@ window.addEventListener("popstate", async () => {
   const requested = readRoute();
   const next = courseRoute(requested);
   if (next !== requested) history.replaceState(null, "", `#page=${next.page}`);
-  // Cancelling browser Back restores the current address and raises popstate again.
+  // 取消浏览器后退时恢复当前地址，这会再次触发 popstate 事件。
   if (
     Object.entries(next).every(
       ([key, value]) => route.value[key as keyof Route] === value,

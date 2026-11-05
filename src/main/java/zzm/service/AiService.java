@@ -64,7 +64,7 @@ public class AiService {
         }
         throw error(502, "AI returned invalid structured content. No complete JSON object was returned.");
     }
-    /** References contain native text or image metadata, never legacy PDF transcriptions. */
+    /** 参考材料包含原生文本或图像元数据，不使用旧版 PDF 转录结果。 */
     public List<Map<String, Object>> materialInputs(List<CourseMaterial> materials) {
         return materials.stream().map(material -> {
             Map<String, Object> item = new LinkedHashMap<>();
@@ -105,7 +105,7 @@ public class AiService {
                 for (var page : report.getPageInputs())
                     if ("prepared".equals(page.getStatus())) pages.add(new UserMessage(pageLabel(material, page, report.getUnitsTotal())));
         }
-        // Place reference pages after the system prompt and before task instructions or chat history.
+        // 参考页面放在系统提示词之后、任务说明或对话历史之前。
         result.addAll(1, pages);
         return result;
     }
@@ -302,7 +302,7 @@ public class AiService {
         var messages = includePdfPageLabels(replyMessages(system, history, message), materials);
         int images = imageTokens(materials);
         Map<String,Object> result = budget.describe(messages, client.outputTokens("chat", 4096), images, ContextBudget.CHAT_SAFETY);
-        result.put("materialsReady", true); // The learning service validates every material before calling this method.
+        result.put("materialsReady", true); // 学习服务在调用此方法前会逐一校验材料。
         return result;
     }
     public Map<String, Object> configureTeacher(Requests.TeacherChat input, Map<String, Object> context) {

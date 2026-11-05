@@ -5,7 +5,7 @@ import org.springframework.stereotype.Service;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 
-/** Local estimates are advisory; only the provider decides request capacity. */
+/** 本地估算仅供参考，请求容量由服务提供方决定。 */
 @Service
 public class ContextBudget {
     public static final int WINDOW = 256000;
@@ -22,7 +22,7 @@ public class ContextBudget {
         return (int) Math.ceil(ascii / 3.5 + other * 1.5);
     }
     public int imageTokens(int width, int height) {
-        // SiliconFlow Qwen high-detail estimate: 28-pixel grid, 3136..12845056 pixels.
+        // 硅基流动通义千问的高清图像估算：28 像素网格，像素总数范围为 3136 至 12845056。
         double w = Math.max(28, Math.ceil(width / 28.0) * 28);
         double h = Math.max(28, Math.ceil(height / 28.0) * 28);
         double area = w * h;

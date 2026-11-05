@@ -417,7 +417,7 @@ export function multipleChoiceAnswers(
     )
       return values;
   } catch {
-    // Existing records use newline-separated option text.
+    // 旧记录使用换行分隔的选项文本。
   }
   if (options.includes(answer)) return [answer];
   return answer.split(/\r?\n/).filter((value) => value.length > 0);

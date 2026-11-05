@@ -19,7 +19,7 @@ export function useCourseMaterials(courseId: () => string) {
       const result = await call<Material[]>(
         `/courses/${key(courseId())}/materials`,
       );
-      // Upload completion can start another refresh before this one finishes.
+      // 当前刷新尚未完成时，上传完成事件可能触发下一次刷新。
       if (disposed || current !== sequence) return false;
       materials.value = result;
       error.value = "";

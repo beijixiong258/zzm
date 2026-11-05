@@ -45,7 +45,7 @@ public class MaterialServiceImpl extends ServiceImpl<CourseMaterialMapper, Cours
         return store(courseId, file, relativePath, visibility, null, null, null);
     }
     @Override public CourseMaterial uploadForRecord(String courseId, String recordId, String questionId, MultipartFile file, AccountUser user) {
-        // LearningService holds the record row lock across this check and the insert.
+        // 学习服务在此检查和插入期间始终持有记录行锁。
         List<CourseMaterial> active = lambdaQuery().eq(CourseMaterial::getRecordId, recordId).eq(CourseMaterial::getArchived, false).list();
         if (active.size() >= 100) throw error(422, "This learning record has reached its attachment limit");
         long bytes = 0;
@@ -156,7 +156,7 @@ public class MaterialServiceImpl extends ServiceImpl<CourseMaterialMapper, Cours
         if (recordIds.isEmpty()) return;
         lambdaUpdate().in(CourseMaterial::getRecordId, recordIds).isNull(CourseMaterial::getFileRemovedAt)
             .set(CourseMaterial::getFileRemovedAt, LocalDateTime.now(ZoneOffset.UTC)).set(CourseMaterial::getRemovedBy, user.getId()).update();
-        // Retain file locations until the existing recycling worker has safely moved the originals.
+        // 在现有回收任务安全移走原文件前，保留文件位置。
         lambdaUpdate().in(CourseMaterial::getRecordId, recordIds).set(CourseMaterial::getArchived, true)
             .set(CourseMaterial::getStatus, "taskDeleted").set(CourseMaterial::getTextContent, "")
             .set(CourseMaterial::getExtractionReportJson, null).set(CourseMaterial::getErrorMessage, "").update();
@@ -234,7 +234,7 @@ public class MaterialServiceImpl extends ServiceImpl<CourseMaterialMapper, Cours
             .isNotNull(CourseMaterial::getFileRemovedAt).isNull(CourseMaterial::getTrashPath).ne(CourseMaterial::getStatus, "processing")
             .gt(recycleCursor != null, CourseMaterial::getId, recycleCursor)
             .orderByAsc(CourseMaterial::getId).page(new Page<CourseMaterial>(1, 50, false)).getRecords();
-        // Continue past shared or failed files, then revisit them on the next sweep.
+        // 跳过共用文件或处理失败的文件，下一轮再处理。
         recycleCursor = removed.size() == 50 ? removed.get(removed.size() - 1).getId() : null;
         for (CourseMaterial attachment : removed) {
             List<CourseMaterial> shared = lambdaQuery().eq(CourseMaterial::getStoragePath, attachment.getStoragePath()).list();

@@ -8,7 +8,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.*;
 import static zzm.exception.ApiErrors.error;
 
-/** Markdown serialization of an authorized task snapshot; no document rendering or model calls. */
+/** 将已授权的任务快照序列化为 Markdown，不渲染文档或调用模型。 */
 @Component
 public class TaskExporter {
     public byte[] exportResult(Map<String, Object> task, cn.hutool.json.JSONObject answers,
@@ -148,7 +148,7 @@ public class TaskExporter {
     }
     private void markdown(StringBuilder out, String text) {
         if (text == null || text.isBlank()) return;
-        // Keep Markdown source intact, including indentation, fenced code, tables and math delimiters.
+        // 完整保留 Markdown 原文，包括缩进、围栏代码块、表格和数学公式分隔符。
         out.append(text);
         if (!text.endsWith("\n")) out.append('\n');
         out.append('\n');

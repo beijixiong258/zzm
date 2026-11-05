@@ -269,7 +269,7 @@ public class DocumentParser {
     }
 
     private void officeParts(Path source, boolean word, Context context) throws Exception {
-        // Keep chart data and equation structure that the plain-text Office extractors omit.
+        // 保留办公文档纯文本提取器遗漏的图表数据和公式结构。
         try (ZipFile archive = new ZipFile(source.toFile())) {
             var entries = archive.stream().filter(entry -> entry.getName().matches(
                 "(word|ppt|xl)/(charts/chart[0-9]+|diagrams/data[0-9]+)\\.xml")).toList();
@@ -470,7 +470,7 @@ public class DocumentParser {
             String chunk = "\n\n## " + label + "\n" + value.replace("\u0000", "").trim();
             int count = Math.min(remaining(), chunk.length());
             if (count < chunk.length()) truncate();
-            // Avoid ending with one half of a UTF-16 surrogate pair.
+            // 避免在 UTF-16 代理对中间截断文本。
             if (count > 0 && Character.isHighSurrogate(chunk.charAt(count - 1))) count--;
             text.append(chunk, 0, count);
         }

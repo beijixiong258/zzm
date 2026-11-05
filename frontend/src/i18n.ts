@@ -54,22 +54,22 @@ export function setLocale(value: string) {
   try {
     localStorage.setItem("aicademiya.ui-locale", locale.value);
   } catch {
-    /* In-memory choice remains usable. */
+    /* 仍可使用保存在内存中的选择。 */
   }
   if (typeof document !== "undefined")
     document.documentElement.lang = locale.value;
 }
 
-/** Only UI messages belong here. Course content and model responses stay verbatim. */
+/** 此处只翻译界面消息，课程内容和模型响应保持原文。 */
 export function t(key: string, values: readonly unknown[] = []): string {
   const message = catalogs[locale.value][key] ?? key;
-  // A callback keeps $&, braces and other user-supplied text literal.
+  // 使用回调，保留用户文本中的 $&、花括号等内容的原始含义。
   return message.replace(/\{(\d+)\}/g, (token, index: string) =>
     Number(index) < values.length ? String(values[Number(index)] ?? "") : token,
   );
 }
 
-/** Translate known server messages without hiding unfamiliar diagnostics. */
+/** 翻译已知的服务端消息，保留无法识别的诊断信息。 */
 export function systemText(value: string): string {
   const question = value.match(/^Question (\d+): ([\s\S]*)$/);
   if (question)
@@ -110,7 +110,7 @@ export function systemText(value: string): string {
   };
   const whole = translate(value);
   if (whole !== value) return whole;
-  // Some existing API warnings concatenate sentences. Keep every unknown part.
+  // 部分已有接口警告由多个句子拼接而成，保留所有无法识别的部分。
   return value
     .split(/((?<=\.)\s*;?\s+(?=[A-Z0-9]))/g)
     .map((part, index) => (index % 2 ? part : translate(part)))

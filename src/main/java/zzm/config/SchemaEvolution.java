@@ -7,7 +7,7 @@ import org.springframework.boot.sql.init.dependency.DependsOnDatabaseInitializat
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
-/** Additive, idempotent upgrades for existing local MySQL databases. */
+/** 为现有 MySQL 数据库执行可重复运行的增量结构升级。 */
 @Component
 @DependsOnDatabaseInitialization
 @RequiredArgsConstructor
