@@ -10,7 +10,7 @@ spring:
       pool:
         size: 3
   datasource:
-    url: jdbc:mysql://mysql:3306/aicademiya?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC
+    url: jdbc:mysql://127.0.0.1:3306/zzm?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC
     username: ''
     password: ''
   sql:
@@ -30,17 +30,17 @@ mybatis-plus:
     default-enum-type-handler: org.apache.ibatis.type.EnumTypeHandler
 app:
   config-path: ${AICADEMIYA_CONFIG:config.json}
-  upload-dir: ${AICADEMIYA_UPLOAD_DIR:/data/uploads}
+  upload-dir: ${user.home}/AppData/Local/AIcademiya/uploads
   document-max-units: ${AICADEMIYA_DOCUMENT_MAX_UNITS:300}
   document-max-characters: ${AICADEMIYA_DOCUMENT_MAX_CHARACTERS:300000}
   document-image-max-edge: ${AICADEMIYA_DOCUMENT_IMAGE_MAX_EDGE:2000}
   allowed-origins: ${AICADEMIYA_ALLOWED_ORIGINS:http://localhost:5173,http://127.0.0.1:5173}
   cookie-secure: ${AICADEMIYA_COOKIE_SECURE:false}
-  demo-enabled: ${AICADEMIYA_DEMO_ENABLED:false}
+  demo-enabled: ${AICADEMIYA_DEMO_ENABLED:true}
   history-max-answers: ${AICADEMIYA_HISTORY_MAX_ANSWERS:50}
   history-max-conversations: ${AICADEMIYA_HISTORY_MAX_CONVERSATIONS:10}
   history-max-messages: ${AICADEMIYA_HISTORY_MAX_MESSAGES:200}
   attachment-max-bytes: ${AICADEMIYA_ATTACHMENT_MAX_BYTES:524288000}
   upload-warning-bytes: ${AICADEMIYA_UPLOAD_WARNING_BYTES:10737418240}
-  trash-dir: ${AICADEMIYA_TRASH_DIR:/data/recycle}
+  trash-dir: ${user.home}/Desktop/智能体回收站/垃圾桶/AIcademiya
   legacy-import: ${AICADEMIYA_LEGACY_IMPORT:}
