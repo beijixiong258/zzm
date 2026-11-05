@@ -1443,5 +1443,12 @@
   "No archived tasks.": "No archived tasks.",
   "Archived tasks are hidden from students. Restore a task to make it available again, or permanently delete it.": "Archived tasks are hidden from students. Restore a task to make it available again, or permanently delete it.",
   "Archive {0}? Students will no longer see this task. You can restore it in Archived tasks. Unsaved changes will not be saved.": "Archive {0}? Students will no longer see this task. You can restore it in Archived tasks. Unsaved changes will not be saved.",
-  "Permanently delete {0}? This removes the task, published versions, generation records, student learning records and conversations. Course materials are kept; student attachments move to the recycle folder. This cannot be undone in the application.": "Permanently delete {0}? This removes the task, published versions, generation records, student learning records and conversations. Course materials are kept; student attachments move to the recycle folder. This cannot be undone in the application."
+  "Permanently delete {0}? This removes the task, published versions, generation records, student learning records and conversations. Course materials are kept; student attachments move to the recycle folder. This cannot be undone in the application.": "Permanently delete {0}? This removes the task, published versions, generation records, student learning records and conversations. Course materials are kept; student attachments move to the recycle folder. This cannot be undone in the application.",
+  "Course actions for {0}": "Course actions for {0}",
+  "Delete {0} and its {1} tasks? Published versions, learning records and conversations will also be deleted. Materials move to the recycle folder. This cannot be undone.": "Delete {0} and its {1} tasks? Published versions, learning records and conversations will also be deleted. Materials move to the recycle folder. This cannot be undone.",
+  "Only the course owner can delete this course.": "Only the course owner can delete this course.",
+  "The teaching workspace cannot be deleted.": "The teaching workspace cannot be deleted.",
+  "Wait for course generation to finish before deleting the course.": "Wait for course generation to finish before deleting the course.",
+  "Wait for course materials to finish processing before deleting the course.": "Wait for course materials to finish processing before deleting the course.",
+  "Course changed. Reload before deleting.": "Course changed. Reload before deleting."
 }

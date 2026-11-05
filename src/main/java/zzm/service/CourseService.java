@@ -13,6 +13,7 @@ public interface CourseService extends IService<Course> {
     Course create(Requests.CourseInput input, AccountUser user);
     Course edit(String id, Requests.CourseInput input, AccountUser user);
     void archive(String id, boolean archived, AccountUser user);
+    void deleteCourse(String id, AccountUser user);
     Map<String, Object> view(Course course, AccountUser user);
     List<Map<String, Object>> members(String id, AccountUser user);
     List<AccountUser> students(String courseId);

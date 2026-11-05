@@ -10,7 +10,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl fontconfig
 ENV JAVA_TOOL_OPTIONS="-Djava.awt.headless=true"
 WORKDIR /app
 COPY --from=build /build/target/aicademiya-server.jar ./app.jar
-RUN useradd --create-home --uid 10001 aicademiya && mkdir -p /data/uploads /data/recycle && chown -R aicademiya:aicademiya /data /app
+RUN useradd --create-home --uid 10001 aicademiya && mkdir -p /app/data/uploads /app/data/recycle && chown -R aicademiya:aicademiya /app
 USER aicademiya
 EXPOSE 8001
 CMD ["java", "-jar", "app.jar"]

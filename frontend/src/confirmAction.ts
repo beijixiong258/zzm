@@ -1,13 +1,19 @@
 import { DialogPlugin } from "tdesign-vue-next";
 import { t } from "./i18n";
 
-export function confirmAction(message: string): Promise<boolean> {
+export function confirmAction(
+  message: string,
+  options: { header?: string; confirmLabel?: string; danger?: boolean } = {},
+): Promise<boolean> {
   const trigger = document.activeElement as HTMLElement | null;
   return new Promise((resolve) => {
     const dialog = DialogPlugin.confirm({
-      header: t("Confirm"),
+      header: options.header || t("Confirm"),
       body: message,
-      confirmBtn: t("Confirm"),
+      confirmBtn: options.danger
+        ? { content: options.confirmLabel || t("Confirm"), theme: "danger" }
+        : options.confirmLabel || t("Confirm"),
+      theme: options.danger ? "danger" : "default",
       cancelBtn: t("Cancel"),
       placement: "center",
       width: "min(480px, calc(100vw - 32px))",

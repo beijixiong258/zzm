@@ -11,6 +11,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.util.*;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import static zzm.exception.ApiErrors.error;
 
 @Service
@@ -18,6 +20,9 @@ import static zzm.exception.ApiErrors.error;
 public class CourseServiceImpl extends ServiceImpl<CourseMapper, Course> implements CourseService {
     private final CourseMemberMapper members;
     private final AccountService accounts;
+    private final TeachingSessionMapper tasks;
+    private final GenerationJobMapper jobs;
+    private final CourseMaterialMapper materials;
     @Override public Course requireAccess(String id, AccountUser user, boolean teacher) {
         if (Boolean.TRUE.equals(user.getMustChangePassword())) throw error(403, "Password change required");
         if (teacher) accounts.requireStaff(user);
@@ -60,11 +65,37 @@ public class CourseServiceImpl extends ServiceImpl<CourseMapper, Course> impleme
     @Override public void archive(String id, boolean archived, AccountUser user) {
         requireAccess(id, user, true); lambdaUpdate().eq(Course::getId, id).set(Course::getArchived, archived).update();
     }
+    @Override @Transactional public void deleteCourse(String id, AccountUser user) {
+        requireAccess(id, user, true);
+        Course course = lambdaQuery().eq(Course::getId, id).last("FOR UPDATE").one();
+        if (course == null) throw error(404, "Course not found");
+        if (!course.getOwnerId().equals(user.getId())) throw error(403, "Only the course owner can delete this course.");
+        if (Boolean.TRUE.equals(course.getWorkspace())) throw error(409, "The teaching workspace cannot be deleted.");
+        List<String> taskIds = tasks.selectList(Wrappers.<TeachingSession>lambdaQuery()
+            .eq(TeachingSession::getCourseId, id).orderByAsc(TeachingSession::getId).last("FOR UPDATE"))
+            .stream().map(TeachingSession::getId).toList();
+        if (!taskIds.isEmpty() && !jobs.selectList(Wrappers.<GenerationJob>lambdaQuery().in(GenerationJob::getSessionId, taskIds)
+            .in(GenerationJob::getStatus, "queued", "running").last("FOR UPDATE")).isEmpty())
+            throw error(409, "Wait for course generation to finish before deleting the course.");
+        List<CourseMaterial> files = materials.selectList(Wrappers.<CourseMaterial>lambdaQuery()
+            .eq(CourseMaterial::getCourseId, id).orderByAsc(CourseMaterial::getId).last("FOR UPDATE"));
+        if (files.stream().anyMatch(file -> "processing".equals(file.getStatus())))
+            throw error(409, "Wait for course materials to finish processing before deleting the course.");
+        materials.update(Wrappers.<CourseMaterial>lambdaUpdate().eq(CourseMaterial::getCourseId, id)
+            .isNull(CourseMaterial::getFileRemovedAt).set(CourseMaterial::getFileRemovedAt, LocalDateTime.now(ZoneOffset.UTC))
+            .set(CourseMaterial::getRemovedBy, user.getId()));
+        materials.update(Wrappers.<CourseMaterial>lambdaUpdate().eq(CourseMaterial::getCourseId, id)
+            .set(CourseMaterial::getArchived, true).set(CourseMaterial::getStatus, "taskDeleted")
+            .set(CourseMaterial::getTextContent, "").set(CourseMaterial::getExtractionReportJson, null).set(CourseMaterial::getErrorMessage, ""));
+        // 任务、版本、学习记录和成员由外键级联删除，材料暂存于原有文件回收队列。
+        if (baseMapper.deleteById(id) != 1) throw error(409, "Course changed. Reload before deleting.");
+    }
     @Override public Map<String, Object> view(Course course, AccountUser user) {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("id", course.getId()); result.put("code", course.getCode()); result.put("title", course.getTitle());
         result.put("description", course.getDescription()); result.put("archived", course.getArchived());
         result.put("workspace", Boolean.TRUE.equals(course.getWorkspace()));
+        result.put("canDelete", !Boolean.TRUE.equals(course.getWorkspace()) && course.getOwnerId().equals(user.getId()));
         if (!"student".equals(user.getRole())) {
             result.put("courseInformation", Objects.toString(course.getCourseInformation(), "")); result.put("studentProfile", Objects.toString(course.getStudentProfile(), "")); result.put("systemInstructions", course.getSystemInstructions()); result.put("joinCode", course.getJoinCode());
         }

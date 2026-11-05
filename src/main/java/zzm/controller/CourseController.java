@@ -21,6 +21,7 @@ public class CourseController {
         var user = accounts.current(request); return courses.view(courses.edit(id, input, user), user);
     }
     @PostMapping("/courses/{id}/archive") public void archive(@PathVariable String id, @RequestParam boolean archived, HttpServletRequest request) { courses.archive(id, archived, accounts.current(request)); }
+    @DeleteMapping("/courses/{id}") public void delete(@PathVariable String id, HttpServletRequest request) { courses.deleteCourse(id, accounts.current(request)); }
     @PostMapping("/courses/join") public void join(@RequestParam String code, HttpServletRequest request) { courses.join(code, accounts.current(request)); }
     @GetMapping("/courses/{id}/members") public Object members(@PathVariable String id, HttpServletRequest request) { return courses.members(id, accounts.current(request)); }
     @PostMapping("/courses/{id}/members") public void add(@PathVariable String id, @Valid @RequestBody Requests.Account input, HttpServletRequest request) { courses.addMember(id, input, accounts.current(request)); }

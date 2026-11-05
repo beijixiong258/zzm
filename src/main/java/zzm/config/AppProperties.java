@@ -43,6 +43,19 @@ public class AppProperties {
         if (trashDir != null && !trashDir.isBlank()) return java.nio.file.Path.of(trashDir).toAbsolutePath().normalize();
         return java.nio.file.Path.of(System.getProperty("user.home"), "Desktop", "智能体回收站", "垃圾桶", "AIcademiya").toAbsolutePath().normalize();
     }
+    public java.nio.file.Path uploadRoot() {
+        return java.nio.file.Path.of(uploadDir).toAbsolutePath().normalize();
+    }
+    public java.nio.file.Path uploadPath(String storedPath) { return resolveStoredPath(uploadRoot(), storedPath); }
+    public java.nio.file.Path recycledPath(String storedPath) { return resolveStoredPath(recycleRoot(), storedPath); }
+    private java.nio.file.Path resolveStoredPath(java.nio.file.Path root, String storedPath) {
+        if (storedPath == null || storedPath.isBlank()) throw new IllegalArgumentException("Stored file path is missing");
+        java.nio.file.Path relative = java.nio.file.Path.of(storedPath.replace('\\', '/'));
+        java.nio.file.Path resolved = root.resolve(relative).normalize();
+        if (relative.isAbsolute() || storedPath.matches("^[A-Za-z]:.*") || resolved.equals(root) || !resolved.startsWith(root))
+            throw new IllegalArgumentException("Stored file path must be relative to its storage directory");
+        return resolved;
+    }
     public int answerPageLimit() { return Math.max(1, Math.min(50, historyMaxAnswers)); }
     public int conversationPageLimit() { return Math.max(1, Math.min(10, historyMaxConversations)); }
     public int conversationMessageLimit() { return Math.max(4, Math.min(2000, historyMaxMessages)); }

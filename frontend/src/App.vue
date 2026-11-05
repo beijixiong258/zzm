@@ -7,19 +7,29 @@ import {
   ConfigProvider as TConfigProvider,
   RadioGroup as TRadioGroup,
   Table as TTable,
+  Dropdown as TDropdown,
   type GlobalConfigProvider,
 } from "tdesign-vue-next";
-import { computed, defineAsyncComponent, ref, watch } from "vue";
+import { computed, defineAsyncComponent, nextTick, ref, watch } from "vue";
 import zhCN from "tdesign-vue-next/es/locale/zh_CN";
 import enUS from "tdesign-vue-next/es/locale/en_US";
-import { ArrowRight, Compass, MessageSquare } from "lucide-vue-next";
-import { locale, setLocale, t } from "./i18n";
+import {
+  ArrowRight,
+  ChevronRight,
+  Compass,
+  Ellipsis,
+  MessageSquare,
+} from "lucide-vue-next";
+import { locale, setLocale, systemText, t } from "./i18n";
+import { confirmAction } from "./confirmAction";
 import {
   call,
+  key,
   dateText,
   statusText,
   type LearningRecordSummary,
   type User,
+  type Course,
 } from "./classroom-api";
 import {
   bootstrap,
@@ -94,6 +104,46 @@ const course = computed(() =>
 const activeCourses = computed(() =>
   courses.value.filter((item) => !item.archived && !item.workspace),
 );
+const deletingCourse = ref("");
+async function deleteCourse(item: Course) {
+  if (deletingCourse.value) return;
+  deletingCourse.value = item.id;
+  error.value = "";
+  try {
+    if (
+      !(await confirmAction(
+        t(
+          "Delete {0} and its {1} tasks? Published versions, learning records and conversations will also be deleted. Materials move to the recycle folder. This cannot be undone.",
+          [item.title, (tasks.value[item.id] || []).length],
+        ),
+        {
+          header: t("Delete course"),
+          confirmLabel: t("Delete course"),
+          danger: true,
+        },
+      ))
+    )
+      return;
+    await call(`/courses/${key(item.id)}`, "DELETE");
+    if (route.value.courseId === item.id) {
+      dirty.value = false;
+      await navigate({ page: "home" });
+      await nextTick();
+    }
+    await refreshCourses();
+    try {
+      localStorage.removeItem(
+        `aicademiya.teacher-chat.${user.value?.id}:course:${item.id}`,
+      );
+    } catch {
+      /* 浏览器存储不可用时，课程删除仍已完成。 */
+    }
+  } catch (e) {
+    error.value = systemText((e as Error).message);
+  } finally {
+    deletingCourse.value = "";
+  }
+}
 const pageKey = routeKey;
 const componentLocale = computed(
   () =>
@@ -473,7 +523,46 @@ void boot();
             :key="item.id"
             :open="item.id === route.courseId"
           >
-            <summary>{{ item.title }}</summary>
+            <summary>
+              <ChevronRight
+                :size="15"
+                class="course-disclosure"
+                aria-hidden="true"
+              />
+              <span class="course-title">{{ item.title }}</span>
+              <span
+                v-if="staff && item.canDelete"
+                class="course-actions"
+                @click.stop
+                @keydown.stop
+              >
+                <TDropdown
+                  trigger="click"
+                  placement="bottom-right"
+                  :disabled="!!deletingCourse"
+                  :options="[
+                    {
+                      content: t('Delete course'),
+                      value: 'delete',
+                      theme: 'error',
+                    },
+                  ]"
+                  @click="deleteCourse(item)"
+                >
+                  <TButton
+                    theme="default"
+                    variant="text"
+                    class="course-action-trigger"
+                    type="button"
+                    :aria-label="t('Course actions for {0}', [item.title])"
+                    :title="t('Course actions for {0}', [item.title])"
+                    :loading="deletingCourse === item.id"
+                    :disabled="!!deletingCourse"
+                    ><Ellipsis :size="18" aria-hidden="true"
+                  /></TButton>
+                </TDropdown>
+              </span>
+            </summary>
             <TButton
               theme="default"
               variant="outline"

@@ -1443,5 +1443,12 @@
   "No archived tasks.": "暂无已归档任务。",
   "Archived tasks are hidden from students. Restore a task to make it available again, or permanently delete it.": "已归档任务对学生不可见。恢复后可继续使用，也可在此彻底删除。",
   "Archive {0}? Students will no longer see this task. You can restore it in Archived tasks. Unsaved changes will not be saved.": "归档“{0}”？学生将无法查看此任务，你可以在“已归档任务”中恢复。未保存的修改不会保存。",
-  "Permanently delete {0}? This removes the task, published versions, generation records, student learning records and conversations. Course materials are kept; student attachments move to the recycle folder. This cannot be undone in the application.": "彻底删除“{0}”？这将删除任务、发布版本、生成记录、学生学习记录和对话。课程材料保留，学生附件移入回收目录。此操作无法在程序内撤销。"
+  "Permanently delete {0}? This removes the task, published versions, generation records, student learning records and conversations. Course materials are kept; student attachments move to the recycle folder. This cannot be undone in the application.": "彻底删除“{0}”？这将删除任务、发布版本、生成记录、学生学习记录和对话。课程材料保留，学生附件移入回收目录。此操作无法在程序内撤销。",
+  "Course actions for {0}": "课程“{0}”的操作",
+  "Delete {0} and its {1} tasks? Published versions, learning records and conversations will also be deleted. Materials move to the recycle folder. This cannot be undone.": "确定删除课程“{0}”及其全部 {1} 个任务吗？已发布版本、学习记录和对话将一并删除，材料文件移入回收目录。此操作无法在程序内撤销。",
+  "Only the course owner can delete this course.": "只有课程创建者可以删除此课程。",
+  "The teaching workspace cannot be deleted.": "教学工作区不能删除。",
+  "Wait for course generation to finish before deleting the course.": "课程中有任务正在生成，请完成后再删除课程。",
+  "Wait for course materials to finish processing before deleting the course.": "课程材料正在处理，请完成后再删除课程。",
+  "Course changed. Reload before deleting.": "课程已发生变化，请刷新后再删除。"
 }

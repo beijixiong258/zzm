@@ -178,7 +178,7 @@ public class PdfInputReader {
         Report report = report(material);
         if (!complete(report) || !"images".equals(report.getPdfInputMode()))
             throw error(422, "Reprocess the PDF with the current document parser before continuing.");
-        try (PDDocument document = Loader.loadPDF(Path.of(material.getStoragePath()).toFile())) {
+        try (PDDocument document = Loader.loadPDF(properties.uploadPath(material.getStoragePath()).toFile())) {
             if (document.getNumberOfPages() != report.getUnitsTotal())
                 throw new IOException("PDF changed after preparation");
             PDFRenderer renderer = new PDFRenderer(document); renderer.setSubsamplingAllowed(true);

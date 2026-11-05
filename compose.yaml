@@ -23,8 +23,8 @@ services:
       mysql:
         condition: service_healthy
     volumes:
-      - uploads:/data/uploads
-      - recycle:/data/recycle
+      - uploads:/app/data/uploads
+      - recycle:/app/data/recycle
       - type: bind
         source: ./application.yaml
         target: /app/config/application.yaml

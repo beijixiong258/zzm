@@ -12,6 +12,7 @@ export type User = {
   archived: boolean;
 };
 export type Course = {
+  canDelete?: boolean;
   workspace: boolean;
   id: string;
   title: string;
