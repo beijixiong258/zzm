@@ -1,15 +1,17 @@
-# 部署服务复用现有数据库数据卷。
+# 首次启动时自动准备数据库，已有数据卷直接复用。
 name: app
 services:
   mysql:
     image: mysql:8.4
     restart: unless-stopped
-    ports:
-      - "127.0.0.1:3307:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: '030206'
+      MYSQL_DATABASE: aicademiya
     volumes:
       - mysql-data:/var/lib/mysql
+      - ./src/main/resources/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "--silent"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "--silent"]
       interval: 10s
       timeout: 5s
       retries: 12
@@ -20,25 +22,9 @@ services:
     depends_on:
       mysql:
         condition: service_healthy
-    ports:
-      - "8001:8001"
-    environment:
-      AICADEMIYA_CONFIG: /config/config.json
-      AICADEMIYA_UPLOAD_DIR: /data/uploads
-      AICADEMIYA_TRASH_DIR: /data/recycle
-      AICADEMIYA_DOCUMENT_MAX_UNITS: ${AICADEMIYA_DOCUMENT_MAX_UNITS:-300}
-      AICADEMIYA_DOCUMENT_MAX_CHARACTERS: ${AICADEMIYA_DOCUMENT_MAX_CHARACTERS:-300000}
-      AICADEMIYA_DOCUMENT_IMAGE_MAX_EDGE: ${AICADEMIYA_DOCUMENT_IMAGE_MAX_EDGE:-2000}
-      AICADEMIYA_DEMO_ENABLED: ${AICADEMIYA_DEMO_ENABLED:-false}
-      AICADEMIYA_COOKIE_SECURE: "false"
-      AICADEMIYA_ALLOWED_ORIGINS: ${AICADEMIYA_ALLOWED_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173}
-      AICADEMIYA_AI_BASE_URL: ${AICADEMIYA_AI_BASE_URL:-}
-      AICADEMIYA_AI_MODEL: ${AICADEMIYA_AI_MODEL:-}
-      AICADEMIYA_AI_API_KEY: ${AICADEMIYA_AI_API_KEY:-}
     volumes:
       - uploads:/data/uploads
       - recycle:/data/recycle
-      - ./config.json:/config/config.json:ro
       - type: bind
         source: ./application.yaml
         target: /app/config/application.yaml
@@ -60,14 +46,12 @@ services:
       backend:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "node", "--input-type=module", "-e", "try { const response = await fetch('http://127.0.0.1:5173/', { method: 'HEAD', signal: AbortSignal.timeout(3000) }); process.exit(response.ok ? 0 : 1); } catch { process.exit(1); }"]
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:5173/"]
       interval: 10s
       timeout: 5s
       retries: 6
       start_period: 15s
 volumes:
   mysql-data:
-    external: true
-    name: app_mysql-data
   uploads:
   recycle:

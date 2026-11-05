@@ -9,7 +9,7 @@ import java.util.List;
 @Component
 @ConfigurationProperties(prefix = "app")
 public class AppProperties {
-    private String configPath;
+    private Ai ai = new Ai();
     private String uploadDir;
     private int documentMaxUnits = 300;
     private int documentMaxCharacters = 300000;
@@ -23,6 +23,21 @@ public class AppProperties {
     private long attachmentMaxBytes = 500L * 1024 * 1024;
     private long uploadWarningBytes = 10L * 1024 * 1024 * 1024;
     private String trashDir;
+
+    @Data
+    public static class Ai {
+        private String provider = "siliconflow";
+        private String baseUrl = "https://api.siliconflow.cn/v1";
+        private String model = "Qwen/Qwen3.8-27B";
+        private String apiKey = "";
+        private int timeoutSeconds = 120;
+        private double temperature = 0.3;
+        private Integer maxTokens;
+        private Integer visionMaxTokens;
+        private Integer generationMaxTokens;
+        private Integer chatMaxTokens;
+        private Integer assistantMaxTokens;
+    }
 
     public java.nio.file.Path recycleRoot() {
         if (trashDir != null && !trashDir.isBlank()) return java.nio.file.Path.of(trashDir).toAbsolutePath().normalize();

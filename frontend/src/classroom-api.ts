@@ -272,10 +272,7 @@ export type Bootstrap = {
 };
 
 const configured = import.meta.env.VITE_API_BASE_URL as string | undefined;
-export const apiBase = (
-  configured ||
-  `${location.protocol}//${location.hostname.includes(":") ? `[${location.hostname}]` : location.hostname}:8001/api`
-).replace(/\/$/, "");
+export const apiBase = (configured || "/api").replace(/\/$/, "");
 export class RequestError extends Error {
   constructor(
     public status: number,

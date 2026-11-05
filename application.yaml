@@ -1,4 +1,11 @@
 spring:
   datasource:
+    url: jdbc:mysql://mysql:3306/aicademiya?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC
     username: 'root'
     password: '030206'
+app:
+  ai:
+    provider: siliconflow
+    base-url: https://api.siliconflow.cn/v1
+    model: Qwen/Qwen3.8-27B
+    api-key: ''

@@ -7,8 +7,17 @@ export default defineConfig({
     host: "127.0.0.1",
     port: 5173,
     strictPort: true,
+    proxy: {
+      "/api": { target: "http://127.0.0.1:8001" },
+    },
     fs: {
-      deny: ["**/config.json", "**/.env*", "**/data-local/**", "**/*.sqlite3"],
+      deny: [
+        "**/application.yaml",
+        "**/config.json",
+        "**/.env*",
+        "**/data-local/**",
+        "**/*.sqlite3",
+      ],
     },
   },
   preview: {
