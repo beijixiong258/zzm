@@ -49,7 +49,7 @@ public class LegacyImportServiceImpl extends ServiceImpl<LegacyRecordMapper, Leg
             } else {
                 material.setErrorMessage("The original file was unavailable during migration; extracted text is retained");
             }
-            material.setStoragePath(target.toString());
+            material.setStoragePath(filename);
         }
         if (!importedUsers.isEmpty()) users.insert(importedUsers);
         List<Course> importedCourses = manifest.getJSONArray("courses").toList(Course.class);

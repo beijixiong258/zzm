@@ -57,7 +57,7 @@ public class MaterialServiceImpl extends ServiceImpl<CourseMaterialMapper, Cours
     private long fileSize(CourseMaterial material) {
         if (material.getFileSize() != null) return material.getFileSize();
         try {
-            long size = Files.size(Path.of(material.getStoragePath()));
+            long size = Files.size(properties.uploadPath(material.getStoragePath()));
             lambdaUpdate().eq(CourseMaterial::getId, material.getId()).isNull(CourseMaterial::getFileSize).set(CourseMaterial::getFileSize, size).update();
             return size;
         } catch (IOException exception) { throw error(409, "An existing attachment is unavailable. Remove it before uploading more files."); }
@@ -73,12 +73,13 @@ public class MaterialServiceImpl extends ServiceImpl<CourseMaterialMapper, Cours
         String sourcePath = relativePath == null || relativePath.isBlank() ? name : relativePath.replace('\\', '/');
         if (sourcePath.length() > 1024 || sourcePath.startsWith("/") || sourcePath.contains(":") || Arrays.asList(sourcePath.split("/")).contains("..")) throw error(422, "Invalid folder path");
         CourseMaterial material = new CourseMaterial(); material.setId(IdUtil.fastSimpleUUID());
-        Path destination = Path.of(properties.getUploadDir()).toAbsolutePath().normalize().resolve(material.getId() + extension);
+        String storedPath = material.getId() + extension;
+        Path destination = properties.uploadPath(storedPath);
         try { Files.createDirectories(destination.getParent()); file.transferTo(destination); }
         catch (IOException exception) { recycleUncommitted(destination); throw error(500, "File could not be saved"); }
         material.setCourseId(courseId); material.setOwnerId(ownerId); material.setRecordId(recordId); material.setQuestionId(questionId); material.setTitle(name); material.setFileName(name); material.setRelativePath(sourcePath);
         material.setMimeType(switch (extension) { case ".epub" -> "application/epub+zip"; case ".pdf" -> "application/pdf"; case ".docx" -> "application/vnd.openxmlformats-officedocument.wordprocessingml.document"; case ".doc" -> "application/msword"; case ".pptx" -> "application/vnd.openxmlformats-officedocument.presentationml.presentation"; case ".ppt" -> "application/vnd.ms-powerpoint"; case ".xlsx" -> "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"; case ".xls" -> "application/vnd.ms-excel"; case ".txt", ".md" -> "text/plain"; case ".png" -> "image/png"; case ".jpg", ".jpeg" -> "image/jpeg"; case ".webp" -> "image/webp"; default -> "application/octet-stream"; });
-        material.setStoragePath(destination.toString()); material.setVisibility(visibility); material.setStatus("queued");
+        material.setStoragePath(storedPath); material.setVisibility(visibility); material.setStatus("queued");
         material.setTextContent(""); material.setErrorMessage(""); material.setArchived(false); material.setCreatedAt(LocalDateTime.now(ZoneOffset.UTC));
         material.setFileSize(file.getSize());
         if (TransactionSynchronizationManager.isSynchronizationActive()) {
@@ -96,7 +97,7 @@ public class MaterialServiceImpl extends ServiceImpl<CourseMaterialMapper, Cours
     }
     @Override public CourseMaterial requireFile(String id, String versionId, AccountUser user) {
         CourseMaterial material = getById(id);
-        if (material == null) throw error(404, "Material not found");
+        if (material == null || material.getCourseId() == null) throw error(404, "Material not found");
         courses.requireAccess(material.getCourseId(), user, !"student".equals(user.getRole()));
         if (material.getFileRemovedAt() != null) throw error(410, "This material has been removed.");
         if (material.getOwnerId() != null) {
@@ -188,7 +189,7 @@ public class MaterialServiceImpl extends ServiceImpl<CourseMaterialMapper, Cours
             .eq(CourseMaterial::getArchived, false).set(CourseMaterial::getStatus, "processing")
             .set(CourseMaterial::getTextContent, "").set(CourseMaterial::getErrorMessage, "").update()) return;
         try {
-            Path source = Path.of(material.getStoragePath()).toAbsolutePath().normalize();
+            Path source = properties.uploadPath(material.getStoragePath());
             if (!Files.isRegularFile(source)) throw new IOException("Original file is unavailable");
             DocumentExtraction result = parser.parse(source, material.getFileName(), report ->
                 lambdaUpdate().eq(CourseMaterial::getId, material.getId()).eq(CourseMaterial::getStatus, "processing")
@@ -206,7 +207,7 @@ public class MaterialServiceImpl extends ServiceImpl<CourseMaterialMapper, Cours
     }
 
     private Path moveToRecycle(Path source, String category) throws IOException {
-        Path uploadRoot = Path.of(properties.getUploadDir()).toAbsolutePath().normalize();
+        Path uploadRoot = properties.uploadRoot();
         Path trashRoot = properties.recycleRoot();
         source = source.toAbsolutePath().normalize();
         if (!source.startsWith(uploadRoot) || source.equals(uploadRoot) || trashRoot.startsWith(uploadRoot))
@@ -238,14 +239,25 @@ public class MaterialServiceImpl extends ServiceImpl<CourseMaterialMapper, Cours
         recycleCursor = removed.size() == 50 ? removed.get(removed.size() - 1).getId() : null;
         for (CourseMaterial attachment : removed) {
             List<CourseMaterial> shared = lambdaQuery().eq(CourseMaterial::getStoragePath, attachment.getStoragePath()).list();
-            if (shared.stream().anyMatch(file -> file.getFileRemovedAt() == null || "processing".equals(file.getStatus()))) continue;
+            if (shared.stream().anyMatch(file -> file.getFileRemovedAt() == null || "processing".equals(file.getStatus()))) {
+                shared.stream().filter(file -> file.getCourseId() == null && "taskDeleted".equals(file.getStatus()))
+                    .forEach(file -> removeById(file.getId()));
+                continue;
+            }
             if (shared.stream().allMatch(file -> file.getTrashPath() != null)) continue;
             try {
-                Path destination = moveToRecycle(Path.of(attachment.getStoragePath()), "removed-materials");
+                Path source = properties.uploadPath(attachment.getStoragePath());
+                Path expected = properties.recycleRoot().resolve("removed-materials").resolve(source.getFileName());
+                if (!Files.exists(source) && !Files.exists(expected)) {
+                    shared.stream().filter(file -> file.getCourseId() == null && "taskDeleted".equals(file.getStatus()))
+                        .forEach(file -> removeById(file.getId()));
+                    continue;
+                }
+                Path destination = moveToRecycle(source, "removed-materials");
                 if (attachment.getFileSize() != null && Files.size(destination) != attachment.getFileSize())
                     throw new IOException("Recycled file size differs from metadata");
                 lambdaUpdate().in(CourseMaterial::getId, shared.stream().map(CourseMaterial::getId).toList()).isNotNull(CourseMaterial::getFileRemovedAt)
-                    .isNull(CourseMaterial::getTrashPath).set(CourseMaterial::getTrashPath, destination.toString()).update();
+                    .isNull(CourseMaterial::getTrashPath).set(CourseMaterial::getTrashPath, properties.recycleRoot().relativize(destination).toString().replace('\\', '/')).update();
             } catch (IOException | RuntimeException exception) {
                 log.warn("Attachment {} could not be recycled ({}); the background job will retry", attachment.getId(), exception.getClass().getSimpleName());
             }
@@ -254,8 +266,8 @@ public class MaterialServiceImpl extends ServiceImpl<CourseMaterialMapper, Cours
             .isNotNull(CourseMaterial::getFileRemovedAt).isNotNull(CourseMaterial::getTrashPath)
             .orderByAsc(CourseMaterial::getId).page(new Page<CourseMaterial>(1, 50, false)).getRecords();
         for (CourseMaterial attachment : recycled) {
-            if (attachment.getRecordId() != null && records.selectById(attachment.getRecordId()) == null
-                && Files.isRegularFile(Path.of(attachment.getTrashPath()), LinkOption.NOFOLLOW_LINKS))
+            if ((attachment.getCourseId() == null || attachment.getRecordId() != null && records.selectById(attachment.getRecordId()) == null)
+                && Files.isRegularFile(properties.recycledPath(attachment.getTrashPath()), LinkOption.NOFOLLOW_LINKS))
                 removeById(attachment.getId());
         }
     }

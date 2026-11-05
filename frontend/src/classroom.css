@@ -289,9 +289,45 @@ small {
   padding: 11px 0;
 }
 .course-navigation summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  list-style: none;
   padding: 6px 8px;
   font-weight: 600;
   line-height: 1.5;
+}
+.course-navigation summary::-webkit-details-marker {
+  display: none;
+}
+.course-disclosure {
+  flex: 0 0 auto;
+  color: var(--muted);
+  transition: transform 0.15s;
+}
+.course-navigation details[open] > summary .course-disclosure {
+  transform: rotate(90deg);
+}
+.course-navigation .course-title {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.course-actions {
+  flex: 0 0 auto;
+}
+.course-navigation .course-action-trigger.t-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  min-width: 28px;
+  height: 28px;
+  margin: 0;
+  padding: 0;
+  color: var(--muted);
+  border: 0;
+  border-radius: 6px;
 }
 .course-navigation button {
   display: flex;

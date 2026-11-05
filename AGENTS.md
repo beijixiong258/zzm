@@ -4,22 +4,21 @@
 
 ## 本机环境
 
-- 直接复用已有 JDK 17、Maven、Node.js 和前端依赖，不为本机版本另起 MySQL 或前后端容器。
+- 统一使用根目录的一份 Docker Compose 构建并运行前后端，不保留 IDEA 单独运行后端或其他启动方式。IDEA 用于打开和编辑项目，镜像内继续使用 JDK 17 和现有依赖版本。
 - MySQL 是本机已在运行的服务，地址 `127.0.0.1:3306`，数据库 schema 为 **`zzm`**。它当前由名为 `mysql` 的现有容器提供，不由本项目管理其生命周期。
 - 数据库实际账号密码直接保存在根目录 `application.yaml` 的 `spring.datasource` 下。本机使用 `root` 账号；密码用引号保留前导零，不要求设置数据库凭据环境变量。
-- 根目录 `application.yaml` 是用户配置入口，纳入 Git，由 Spring Boot 在项目根目录运行时自动读取。数据库、AI 接口和本机目录均配置在这里，不要求设置数据库凭据环境变量。
-- 本机连接地址统一指向 `jdbc:mysql://127.0.0.1:3306/zzm`。资源目录的 YAML 只保留程序默认值；同步 schema 引用时不要替换产品名称、Java 包名或浏览器存储键。
+- 根目录 `application.yaml` 是用户配置入口，纳入 Git，并只读挂载到后端配置目录。数据库和 AI 接口配置在这里，不要求设置数据库凭据环境变量。
+- 后端通过现有 `local_default` Docker 网络连接 `mysql:3306/zzm`，宿主机管理地址仍是 `127.0.0.1:3306`。资源目录的 YAML 保留程序默认值；同步 schema 引用时不要替换产品名称、Java 包名或浏览器存储键。
 - 本分支关闭 SQL 初始化，使用已有结构和数据，不自行初始化或清空数据库。部署版由 MySQL 官方镜像仅在空数据卷首次创建数据库并执行现有 `schema.sql`，保留已有数据。
-- AI 参数使用 `app.ai`，模型和接口地址已有默认值，只需填写 `api-key`。程序兼容已有 `AICADEMIYA_AI_API_KEY`、`AICADEMIYA_AI_BASE_URL`、`AICADEMIYA_AI_MODEL` 进程变量；保留本机已有 `.env` 和 `config.json`，不读取旧 JSON 配置，不将其中密钥复制到提交中。
-- 上传文件默认保存在 `${user.home}/AppData/Local/AIcademiya/uploads`；回收目录为 `${user.home}/Desktop/智能体回收站/垃圾桶/AIcademiya`。
+- AI 参数使用 `app.ai`，模型和接口地址已有默认值，只需填写 `api-key`。程序兼容已有 `AICADEMIYA_AI_API_KEY`、`AICADEMIYA_AI_BASE_URL`、`AICADEMIYA_AI_MODEL` 进程变量；保留本机已有 `.env` 和 `config.json`，不读取旧 JSON 配置。
+- 上传文件使用项目内的 `./data-local/uploads`，回收目录通过 `../智能体回收站/垃圾桶/AIcademiya` 挂载。容器内配置使用相对目录 `data/uploads`、`data/recycle`，数据库只保存相对于对应目录的文件路径，不保存宿主机绝对路径。
 
-## 在 IDEA 中手动运行
+## 在 IDEA 中打开和运行
 
-1. 用 Maven 工程方式打开项目根目录，Project SDK 和后端运行 JRE 选择已有 JDK 17。
-2. 确认本机 MySQL 已运行，且根目录 `application.yaml` 中的账号可访问 `zzm`。
-3. 为 `zzm.Application` 使用 IDEA 的 Application 运行配置，工作目录设为项目根目录。根目录 YAML 自动加载；本机已使用的 AI 进程变量可以继续沿用。
-4. 运行 `frontend/package.json` 中的 `dev`。也可在根目录的 PowerShell 7 中执行 `npm.cmd --prefix .\frontend run dev`，不增加启动脚本。
-5. 打开 `http://127.0.0.1:5173`。前端请求同一来源的 `/api`，由 Vite 转发到本机 `8001`；专用演示入口由根目录的 `app.demo-enabled` 控制。
+1. 用 Maven 工程方式在 IDEA 中打开项目根目录，停留在 `bendi`。项目 SDK 使用 JDK 17，运行环境由 Docker 镜像提供。
+2. 确认 Docker Desktop 和现有 `mysql` 容器已运行，根目录 `application.yaml` 中的账号可访问 `zzm`。
+3. 在根目录的 PowerShell 7 终端执行 `docker compose up -d --build --wait`，自动构建并启动前后端。修改源码后重复同一命令。
+4. 打开 `http://127.0.0.1:5173`，网页和 `/api` 共用入口。专用演示入口由根目录的 `app.demo-enabled` 控制。
 
 用户要求手动启动时，保持程序停止，由用户启动和验收。不生成重复的启动、重启或环境准备脚本，不自动运行其他项目的服务管理操作。
 
@@ -51,7 +50,8 @@
 - 材料状态归 `MaterialService`，格式解析归 `DocumentParser`、`PdfInputReader`，AI 提示与结构化输出归 `AiService`，生成和应用归 `GenerationService`，模型协议与响应完整性归 `QwenClient`，后台入口为 `BackgroundJobs`。
 - 任务必须属于课程；讲义流程为上传全部材料（包含提示词）、生成、预览修改，不增加导入已有作业等独立步骤。
 - 已发布版本不可变，学习记录绑定版本；学生和学生视角预览使用公开内容投影，不展示内部指令、参考答案或未审核反馈。
-- 归档须覆盖学生列表、学习历史、旧版本链接和附件访问。彻底删除仅针对已归档且没有排队或运行中生成任务的项目，并保留其他任务与共用材料。
+- 归档须覆盖学生列表、学习历史、旧版本链接和附件访问。单个任务的彻底删除仅针对已归档且没有排队或运行中生成任务的项目，并保留其他任务与共用材料。
+- 课程创建者可在课程标题旁的操作菜单中删除课程；确认后通过外键级联删除该课程下全部任务、版本、学习记录和成员关系，账号和其他课程保留。材料进入已有回收流程，文件移走后清理内部回收标记。正在生成或处理材料时先完成处理。
 
 ## 文件与交付
 

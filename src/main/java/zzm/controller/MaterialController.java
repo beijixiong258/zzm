@@ -1,6 +1,7 @@
 package zzm.controller;
 
 import zzm.dto.Requests;
+import zzm.config.AppProperties;
 import zzm.service.*;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -20,6 +21,7 @@ import static zzm.exception.ApiErrors.error;
 public class MaterialController {
     private final MaterialService materials;
     private final AccountService accounts;
+    private final AppProperties properties;
     @GetMapping("/courses/{courseId}/materials") public Object list(@PathVariable String courseId, HttpServletRequest request) { return materials.library(courseId, accounts.current(request)); }
     @PostMapping("/courses/{courseId}/materials") public Object upload(@PathVariable String courseId, @RequestParam MultipartFile file,
         @RequestParam(defaultValue = "") String relativePath, @RequestParam(defaultValue = "student") String visibility, HttpServletRequest request) {
@@ -29,7 +31,7 @@ public class MaterialController {
         return Map.of("text", materials.requireFile(id, versionId, accounts.current(request)).getTextContent());
     }
     @GetMapping("/materials/{id}/file") public ResponseEntity<Resource> file(@PathVariable String id, @RequestParam(required = false) String versionId, HttpServletRequest request) {
-        var material = materials.requireFile(id, versionId, accounts.current(request)); Path path = Path.of(material.getStoragePath());
+        var material = materials.requireFile(id, versionId, accounts.current(request)); Path path = properties.uploadPath(material.getStoragePath());
         if (!Files.isRegularFile(path)) throw error(404, "Original file is unavailable");
         boolean inline = material.getMimeType().startsWith("image/") || "application/pdf".equals(material.getMimeType());
         return ResponseEntity.ok().contentType(MediaType.parseMediaType(material.getMimeType()))
