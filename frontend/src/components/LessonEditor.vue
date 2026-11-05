@@ -66,6 +66,18 @@ function removeOption(question: Question, index: number) {
     question.referenceAnswer = selected.length ? JSON.stringify(selected) : "";
   else if (question.referenceAnswer === previous) question.referenceAnswer = "";
 }
+function hasUnmatchedChoiceAnswer(question: Question) {
+  const reference = question.referenceAnswer || "";
+  if (!reference.trim()) return false;
+  const selected =
+    question.type === "multipleChoice"
+      ? multipleChoiceAnswers(reference, question.options)
+      : [reference];
+  return (
+    !selected.length ||
+    selected.some((answer) => !question.options.includes(answer))
+  );
+}
 function addQuestion() {
   task.value.content.questions.push({
     id: crypto.randomUUID(),
@@ -251,7 +263,15 @@ function addQuestion() {
                   @click="question.options.push('')"
                   >{{ t("Add option") }}</TButton
                 >
-                <label v-if="question.type !== 'multipleChoice'"
+                <label v-if="hasUnmatchedChoiceAnswer(question)"
+                  >{{ t("Reference answer") }}
+                  <TTextarea
+                    v-model="question.referenceAnswer"
+                    :autosize="{ minRows: 2, maxRows: 8 }"
+                    :disabled="disabled"
+                  />
+                </label>
+                <label v-else-if="question.type !== 'multipleChoice'"
                   >{{ t("Reference answer") }}
                   <TSelect
                     v-model="question.referenceAnswer"
