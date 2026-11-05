@@ -7,19 +7,19 @@
 - 直接复用已有 JDK 17、Maven、Node.js 和前端依赖，不为本机版本另起 MySQL 或前后端容器。
 - MySQL 是本机已在运行的服务，地址 `127.0.0.1:3306`，数据库 schema 为 **`zzm`**。它当前由名为 `mysql` 的现有容器提供，不由本项目管理其生命周期。
 - 数据库实际账号密码直接保存在根目录 `application.yaml` 的 `spring.datasource` 下。本机使用 `root` 账号；密码用引号保留前导零，不要求设置数据库凭据环境变量。
-- 根目录 `application.yaml` 纳入 Git，由 Spring Boot 在项目根目录运行时自动读取，覆盖资源目录中的数据库账号密码。保留实际可用的完整配置，不使用数据库凭据环境变量。
-- 连接地址配置在 `src/main/resources/application.yaml`，统一指向 `jdbc:mysql://127.0.0.1:3306/zzm`。同步 schema 引用时不要替换产品名称、Java 包名或浏览器存储键。
-- SQL 初始化脚本保持关闭，使用已有结构和数据，不自行初始化或清空数据库。
-- 模型参数使用现有 `config.json`，AI 接口配置沿用根目录 `.env`。这两个文件也不提交。
+- 根目录 `application.yaml` 是用户配置入口，纳入 Git，由 Spring Boot 在项目根目录运行时自动读取。数据库、AI 接口和本机目录均配置在这里，不要求设置数据库凭据环境变量。
+- 本机连接地址统一指向 `jdbc:mysql://127.0.0.1:3306/zzm`。资源目录的 YAML 只保留程序默认值；同步 schema 引用时不要替换产品名称、Java 包名或浏览器存储键。
+- 本分支关闭 SQL 初始化，使用已有结构和数据，不自行初始化或清空数据库。部署版由 MySQL 官方镜像仅在空数据卷首次创建数据库并执行现有 `schema.sql`，保留已有数据。
+- AI 参数使用 `app.ai`，模型和接口地址已有默认值，只需填写 `api-key`。程序兼容已有 `AICADEMIYA_AI_API_KEY`、`AICADEMIYA_AI_BASE_URL`、`AICADEMIYA_AI_MODEL` 进程变量；保留本机已有 `.env` 和 `config.json`，不读取旧 JSON 配置，不将其中密钥复制到提交中。
 - 上传文件默认保存在 `${user.home}/AppData/Local/AIcademiya/uploads`；回收目录为 `${user.home}/Desktop/智能体回收站/垃圾桶/AIcademiya`。
 
 ## 在 IDEA 中手动运行
 
 1. 用 Maven 工程方式打开项目根目录，Project SDK 和后端运行 JRE 选择已有 JDK 17。
 2. 确认本机 MySQL 已运行，且根目录 `application.yaml` 中的账号可访问 `zzm`。
-3. 为 `zzm.Application` 使用 IDEA 的 Application 运行配置，工作目录设为项目根目录，加载已有 `.env` 中的 AI 配置。数据库账号密码由根目录 YAML 自动加载。
+3. 为 `zzm.Application` 使用 IDEA 的 Application 运行配置，工作目录设为项目根目录。根目录 YAML 自动加载；本机已使用的 AI 进程变量可以继续沿用。
 4. 运行 `frontend/package.json` 中的 `dev`。也可在根目录的 PowerShell 7 中执行 `npm.cmd --prefix .\frontend run dev`，不增加启动脚本。
-5. 打开 `http://127.0.0.1:5173`。前端直接访问本机 `8001/api`；需要专用演示入口时保持 `AICADEMIYA_DEMO_ENABLED=true`。
+5. 打开 `http://127.0.0.1:5173`。前端请求同一来源的 `/api`，由 Vite 转发到本机 `8001`；专用演示入口由根目录的 `app.demo-enabled` 控制。
 
 用户要求手动启动时，保持程序停止，由用户启动和验收。不生成重复的启动、重启或环境准备脚本，不自动运行其他项目的服务管理操作。
 

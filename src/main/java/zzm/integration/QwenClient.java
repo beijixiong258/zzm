@@ -23,8 +23,6 @@ import org.springframework.web.client.*;
 import org.springframework.web.server.ResponseStatusException;
 import java.io.IOException;
 import java.net.URI;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.*;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.Semaphore;
@@ -70,7 +68,7 @@ public class QwenClient {
                 StringBuilder content = new StringBuilder();
                 ChatResponse[] last = new ChatResponse[1];
                 String[] reason = new String[1];
-                int idleTimeout = Math.max(30, configuration().getInt("timeout_seconds", 180));
+                int idleTimeout = Math.max(30, configuration().getTimeoutSeconds());
                 reactor.core.publisher.Flux.defer(() -> {
                         streamAttempts.incrementAndGet();
                         content.setLength(0); last[0] = null; reason[0] = null; progress.accept(0);
@@ -160,43 +158,44 @@ public class QwenClient {
             reason = detail instanceof JSONObject problem ? problem.getStr("message", problem.toString())
                 : response.getStr("message", Objects.toString(detail, reason));
         } catch (RuntimeException ignored) { /* 保留服务提供方返回的非结构化诊断信息。 */ }
-        String key = environment("AICADEMIYA_AI_API_KEY", configuration().getStr("api_key", ""));
+        String key = environment("AICADEMIYA_AI_API_KEY", configuration().getApiKey());
         if (!key.isBlank()) reason = reason.replace(key, "[redacted]");
         if (reason.length() > 2000) reason = reason.substring(0, 2000) + "…";
         if (reason.isBlank()) reason = status == 429 ? "Provider rate limit or quota exceeded." : "The provider rejected this request.";
         return "Upstream AI request failed (HTTP " + status + "): " + reason;
     }
     public int outputTokens(String operation, int fallback) {
-        JSONObject ai = configuration();
-        int output = ai.getInt(operation + "_max_tokens", ai.getInt("max_tokens", fallback));
+        AppProperties.Ai ai = configuration();
+        Integer configured = switch (operation) {
+            case "vision" -> ai.getVisionMaxTokens();
+            case "generation" -> ai.getGenerationMaxTokens();
+            case "chat" -> ai.getChatMaxTokens();
+            case "assistant" -> ai.getAssistantMaxTokens();
+            default -> null;
+        };
+        int output = configured != null ? configured : ai.getMaxTokens() != null ? ai.getMaxTokens() : fallback;
         if (output < 1) throw error(422, "The configured AI output token limit must be positive.");
         return output;
     }
-    public JSONObject configuration() {
-        try {
-            Path path = Path.of(properties.getConfigPath());
-            JSONObject config = Files.isRegularFile(path) ? JSONUtil.parseObj(Files.readString(path, StandardCharsets.UTF_8).replace("\uFEFF", "")).getJSONObject("ai") : null;
-            return config == null ? new JSONObject() : config;
-        } catch (IOException | JSONException exception) { throw error(503, "AI configuration could not be read"); }
-    }
+    private AppProperties.Ai configuration() { return properties.getAi(); }
     public Map<String, Object> status() {
-        JSONObject ai = configuration();
-        return Map.of("model", environment("AICADEMIYA_AI_MODEL", ai.getStr("model", "Qwen/Qwen3.8-27B")),
-            "configured", !environment("AICADEMIYA_AI_API_KEY", ai.getStr("api_key", "")).isBlank(),
+        AppProperties.Ai ai = configuration();
+        return Map.of("model", environment("AICADEMIYA_AI_MODEL", ai.getModel()),
+            "configured", !environment("AICADEMIYA_AI_API_KEY", ai.getApiKey()).isBlank(),
             "contextWindow", ContextBudget.WINDOW, "inputLimit", ContextBudget.INPUT_LIMIT, "safetyReserve", ContextBudget.SAFETY,
             "tokenEstimateOnly", true);
     }
     private ChatClient client(int output, boolean json) {
-        JSONObject ai = configuration();
-        String key = environment("AICADEMIYA_AI_API_KEY", ai.getStr("api_key", ""));
-        String base = environment("AICADEMIYA_AI_BASE_URL", ai.getStr("base_url", "https://api.siliconflow.cn/v1")).replaceAll("/+$", "");
-        String model = environment("AICADEMIYA_AI_MODEL", ai.getStr("model", "Qwen/Qwen3.8-27B"));
+        AppProperties.Ai ai = configuration();
+        String key = environment("AICADEMIYA_AI_API_KEY", ai.getApiKey());
+        String base = environment("AICADEMIYA_AI_BASE_URL", ai.getBaseUrl()).replaceAll("/+$", "");
+        String model = environment("AICADEMIYA_AI_MODEL", ai.getModel());
         if (key.isBlank() || model.isBlank()) throw error(503, "Configure the AI API key and model before generating content");
         if (base.endsWith("/v1")) base = base.substring(0, base.length() - 3);
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
         factory.setProxy(java.net.Proxy.NO_PROXY);
         factory.setConnectTimeout(Duration.ofSeconds(15));
-        factory.setReadTimeout(Duration.ofSeconds(Math.max(10, ai.getInt("timeout_seconds", 180))));
+        factory.setReadTimeout(Duration.ofSeconds(Math.max(10, ai.getTimeoutSeconds())));
         java.net.ProxySelector direct = new java.net.ProxySelector() {
             @Override public List<java.net.Proxy> select(URI uri) { return List.of(java.net.Proxy.NO_PROXY); }
             @Override public void connectFailed(URI uri, java.net.SocketAddress address, IOException exception) {}
@@ -217,9 +216,9 @@ public class QwenClient {
                 }
             }).build();
         OpenAiChatOptions.Builder options = OpenAiChatOptions.builder().model(model)
-            .temperature(ai.getDouble("temperature", 0.3)).maxTokens(output).streamUsage(true);
+            .temperature(ai.getTemperature()).maxTokens(output).streamUsage(true);
         Map<String, Object> extra = new LinkedHashMap<>();
-        if ("siliconflow".equals(ai.getStr("provider", "siliconflow"))) extra.put("enable_thinking", false);
+        if ("siliconflow".equals(ai.getProvider())) extra.put("enable_thinking", false);
         if (json) extra.put("response_format", Map.of("type", "json_object"));
         options.extraBody(extra);
         RetryTemplate retry = RetryTemplate.builder().maxAttempts(2)
