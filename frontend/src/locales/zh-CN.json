@@ -1158,7 +1158,7 @@
   "The connection check timed out after 15 seconds. Try again shortly.": "连接检测超过 15 秒，已结束本次检测。请稍后重试。",
   "The connection check did not finish in time. Try again shortly.": "连接检测未及时完成，已停止等待。请稍后重试。",
   "AI requests are busy. Try the connection check again shortly.": "当前 AI 请求繁忙，请稍后再检测连接。",
-  "The connection check returned no complete reply. Try again shortly.": "连接检测未收到完整回复，请稍后重试。",
+  "The connection check returned no complete reply. Try again shortly.": "连接检测失败，请稍后重试。",
   "The connection check could not reach the AI service. Check the network and try again.": "连接检测无法访问 AI 服务，请检查网络后重试。",
   "Incomplete extraction": "提取不完整",
   "Username or invitation code is incorrect": "用户名或邀请码不正确。",

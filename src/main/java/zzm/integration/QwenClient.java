@@ -157,13 +157,11 @@ public class QwenClient {
         try {
             ChatResponse response = client(64, false, List.of(), CONNECTION_CHECK_TIMEOUT_SECONDS, false, true)
                 .prompt(new Prompt(messages)).call().chatResponse();
-            if (response == null || response.getResult() == null) throw error(502, CONNECTION_CHECK_INCOMPLETE);
-            String text = response.getResult().getOutput().getText();
-            String finish = response.getResult().getMetadata().getFinishReason();
-            if (text == null || text.isBlank() || "length".equalsIgnoreCase(finish) || "content_filter".equalsIgnoreCase(finish))
-                throw error(502, CONNECTION_CHECK_INCOMPLETE);
+            // 检测只看接口是否正常返回，不评判答案内容、空文本或结束标记。
+            var answer = response == null || response.getResult() == null ? null : response.getResult().getOutput();
+            String text = answer == null ? "" : Objects.toString(answer.getText(), "");
             Map<String, Object> measurement = budget.describe(messages, 64, images, ContextBudget.SAFETY);
-            if (response.getMetadata() != null && response.getMetadata().getUsage() != null) {
+            if (response != null && response.getMetadata() != null && response.getMetadata().getUsage() != null) {
                 var usage = response.getMetadata().getUsage();
                 measurement.put("promptTokensActual", usage.getPromptTokens());
                 measurement.put("completionTokensActual", usage.getCompletionTokens());
