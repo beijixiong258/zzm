@@ -27,8 +27,6 @@ public class CourseController {
     @PostMapping("/courses/{id}/students") public void addStudent(@PathVariable String id, @Valid @RequestBody Requests.CourseStudent input, HttpServletRequest request) {
         courses.addStudent(id, input, accounts.current(request));
     }
-    @PostMapping("/courses/{id}/members") public void add(@PathVariable String id, @Valid @RequestBody Requests.Account input, HttpServletRequest request) { courses.addMember(id, input, accounts.current(request)); }
-    @PostMapping("/courses/{id}/members/batch") public void addBatch(@PathVariable String id, @Valid @RequestBody Requests.AccountBatch input, HttpServletRequest request) { courses.addMembers(id, input.getMembers(), accounts.current(request)); }
     @PostMapping("/courses/{id}/members/{userId}/archive") public void archiveMember(@PathVariable String id, @PathVariable String userId, @RequestParam boolean archived, HttpServletRequest request) {
         courses.archiveMember(id, userId, archived, accounts.current(request));
     }

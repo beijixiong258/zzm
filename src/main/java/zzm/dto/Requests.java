@@ -46,9 +46,6 @@ public final class Requests {
         @NotBlank private String currentPassword;
         @NotBlank @Size(min = 8, max = 128) private String newPassword;
     }
-    @Data public static class AccountBatch {
-        @NotNull @Size(min = 1, max = 1000) private List<@NotNull @Valid Account> members;
-    }
     @Data public static class CourseInput {
         @NotBlank @Size(max = 300) private String title;
         @NotBlank @Size(max = 100) private String code;

@@ -138,33 +138,6 @@ public class CourseServiceImpl extends ServiceImpl<CourseMapper, Course> impleme
                 .set(CourseMember::getRole, "student").set(CourseMember::getArchived, false));
         }
     }
-    @Override @Transactional public void addMember(String id, Requests.Account input, AccountUser user) {
-        addMembers(id, List.of(input), user);
-    }
-    @Override @Transactional public void addMembers(String id, List<Requests.Account> input, AccountUser user) {
-        requireAccess(id, user, true);
-        List<String> emails = input.stream().map(a -> a.getEmail().trim().toLowerCase(Locale.ROOT)).toList();
-        if (new HashSet<>(emails).size() != emails.size()) throw error(422, "The member list contains duplicate email addresses");
-        Map<String, AccountUser> known = new HashMap<>();
-        accounts.lambdaQuery().in(AccountUser::getEmail, emails).list().forEach(a -> known.put(a.getEmail(), a));
-        for (Requests.Account account : input) {
-            AccountUser person = known.get(account.getEmail().trim().toLowerCase(Locale.ROOT));
-            if (person == null) throw error(404, "Account not found. Only existing accounts can be added to a course.");
-            if (Boolean.TRUE.equals(person.getArchived())) throw error(422, "Account is archived");
-            if ("student".equals(account.getRole()) != "student".equals(person.getRole())) throw error(422, "The account role does not match the requested course membership");
-        }
-        Set<String> existingIds = new HashSet<>();
-        members.selectList(Wrappers.<CourseMember>lambdaQuery().eq(CourseMember::getCourseId, id)).forEach(m -> existingIds.add(m.getUserId()));
-        List<CourseMember> additions = new ArrayList<>();
-        for (AccountUser person : known.values()) {
-            if (existingIds.contains(person.getId())) continue;
-            CourseMember member = new CourseMember(); member.setCourseId(id); member.setUserId(person.getId());
-            member.setRole("student".equals(person.getRole()) ? "student" : "teacher"); member.setArchived(false); additions.add(member);
-        }
-        if (!additions.isEmpty()) members.insert(additions);
-        members.update(Wrappers.<CourseMember>lambdaUpdate().eq(CourseMember::getCourseId, id)
-            .in(CourseMember::getUserId, known.values().stream().map(AccountUser::getId).toList()).set(CourseMember::getArchived, false));
-    }
     @Override @Transactional public void archiveMember(String id, String userId, boolean archived, AccountUser user) {
         requireAccess(id, user, true);
         CourseMember member = members.selectOne(Wrappers.<CourseMember>lambdaQuery()
