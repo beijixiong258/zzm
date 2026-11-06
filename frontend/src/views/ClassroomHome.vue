@@ -1,6 +1,10 @@
 <script setup lang="ts">
-import { Input as TInput, Button as TButton } from "tdesign-vue-next";
-import { computed, ref } from "vue";
+import {
+  Input as TInput,
+  Button as TButton,
+  MessagePlugin,
+} from "tdesign-vue-next";
+import { computed, onBeforeUnmount, ref } from "vue";
 import { systemText, t } from "../i18n";
 import { call, key } from "../classroom-api";
 import { courses, navigate, refreshCourses, tasks } from "../classroom-state";
@@ -24,18 +28,27 @@ const totalTasks = computed(
 const error = ref(""),
   busy = ref(false),
   joinCode = ref("");
+let disposed = false;
+onBeforeUnmount(() => (disposed = true));
 
 async function join() {
+  if (disposed || busy.value || !joinCode.value.trim()) return;
   busy.value = true;
   error.value = "";
   try {
-    await call("/courses/join?code=" + key(joinCode.value), "POST");
-    joinCode.value = "";
+    await call("/courses/join?code=" + key(joinCode.value.trim()), "POST");
     await refreshCourses();
+    if (disposed) return;
+    joinCode.value = "";
+    void MessagePlugin.success({
+      content: t("Course joined. Open it from My courses."),
+      duration: 4000,
+      closeBtn: true,
+    });
   } catch (e) {
-    error.value = (e as Error).message;
+    if (!disposed) error.value = systemText((e as Error).message);
   } finally {
-    busy.value = false;
+    if (!disposed) busy.value = false;
   }
 }
 </script>
@@ -64,14 +77,38 @@ async function join() {
       ><strong>{{ totalTasks }}</strong>
     </div>
   </div>
-  <form v-if="!course" class="panel row" @submit.prevent="join">
-    <label class="grow"
-      >{{ t("Course invitation code")
-      }}<TInput v-control-attrs="{ required: true }" v-model="joinCode"
-    /></label>
-    <TButton theme="default" variant="outline" type="submit" :disabled="busy">{{
-      t("Join course")
-    }}</TButton>
+  <form v-if="!course" class="panel row wrap" @submit.prevent="join">
+    <label class="grow">
+      {{ t("Course invitation code") }}
+      <TInput
+        v-control-attrs="{
+          required: true,
+          'aria-label': t('Course invitation code'),
+        }"
+        v-model="joinCode"
+        maxlength="32"
+        :disabled="busy"
+        :placeholder="
+          t('Enter the course invitation code provided by your teacher.')
+        "
+      />
+      <small class="muted">
+        {{
+          t(
+            "Use the course invitation code to join. Course codes and personal sign-in codes do not work here.",
+          )
+        }}
+      </small>
+    </label>
+    <TButton
+      theme="default"
+      variant="outline"
+      type="submit"
+      :loading="busy"
+      :disabled="busy || !joinCode.trim()"
+    >
+      {{ t(busy ? "Joining…" : "Join course") }}
+    </TButton>
   </form>
   <h2>{{ t(course ? "Learning tasks" : "My courses") }}</h2>
   <div v-if="!course" class="course-grid">

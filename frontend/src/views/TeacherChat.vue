@@ -10,7 +10,7 @@ import {
   call,
   key,
   type Course,
-  type Member,
+  type StudentInvitation,
   type TeacherReply,
 } from "../classroom-api";
 import { systemText, t } from "../i18n";
@@ -23,9 +23,13 @@ import {
   user,
 } from "../classroom-state";
 import TeacherConversation from "../components/TeacherConversation.vue";
+import CourseStudents from "../components/CourseStudents.vue";
 const props = defineProps<{ courseId?: string }>();
 const currentId = ref(props.courseId || "");
 const existing = courses.value.find((course) => course.id === currentId.value);
+const currentCourse = computed(() =>
+  courses.value.find((course) => course.id === currentId.value),
+);
 const form = ref({
   title: existing?.title || "",
   code: existing?.code || "",
@@ -34,7 +38,7 @@ const form = ref({
   studentProfile: existing?.studentProfile || "",
   systemInstructions: existing?.systemInstructions || "",
 });
-const members = ref<Member[] | null>(null),
+const showStudents = ref(false),
   chatting = ref(false),
   saving = ref(false),
   saved = ref(false),
@@ -116,9 +120,7 @@ async function configure(reply: TeacherReply) {
   )
     return outcome + "\n" + t("Save a course name and code before continuing.");
   if (reply.action === "members") {
-    members.value = await call<Member[]>(
-      `/courses/${key(currentId.value)}/members`,
-    );
+    showStudents.value = true;
     outcome += "\n" + t("The current class members are shown below.");
   } else if (reply.action === "inviteStudent") {
     if (
@@ -130,7 +132,7 @@ async function configure(reply: TeacherReply) {
         "\n" +
         t("Provide the student's name and a username for the invitation.")
       );
-    const result = await call<{ invitationCode: string }>(
+    const result = await call<StudentInvitation>(
       `/courses/${key(currentId.value)}/student-invitations`,
       "POST",
       {
@@ -142,11 +144,8 @@ async function configure(reply: TeacherReply) {
       "\n" +
       t(
         "Student invitation created. Username: {0}; personal invitation code: {1}.",
-        [reply.fields.studentUsername, result.invitationCode],
+        [result.username, result.invitationCode],
       );
-    members.value = await call<Member[]>(
-      `/courses/${key(currentId.value)}/members`,
-    );
   } else if (reply.action === "newTask")
     outcome +=
       "\n" +
@@ -175,6 +174,16 @@ async function configure(reply: TeacherReply) {
           <h1>{{ form.title || t("Course basics") }}</h1>
         </div>
         <div class="row wrap course-editor-actions">
+          <TButton
+            v-if="currentCourse"
+            theme="default"
+            variant="outline"
+            type="button"
+            :disabled="chatting || saving"
+            @click="showStudents = true"
+          >
+            {{ t("Student management") }}
+          </TButton>
           <TButton
             v-if="currentId"
             theme="primary"
@@ -296,18 +305,13 @@ async function configure(reply: TeacherReply) {
               </p>
             </form>
           </section>
-          <section v-if="members" class="conversation-result">
-            <strong>{{ t("Class members") }}</strong>
-            <p v-for="member in members" :key="member.id">
-              {{ member.name }} · {{ member.username || member.email }} ·
-              {{ t(member.role === "student" ? "Student" : "Teacher") }}
-            </p>
-            <p v-if="!members.length" class="muted">
-              {{ t("No students have joined this course yet.") }}
-            </p>
-          </section>
         </template>
       </TeacherConversation>
+      <CourseStudents
+        v-if="showStudents && currentCourse"
+        :course="currentCourse"
+        @close="showStudents = false"
+      />
     </section>
   </div>
 </template>

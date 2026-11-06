@@ -117,6 +117,26 @@ public class CourseServiceImpl extends ServiceImpl<CourseMapper, Course> impleme
             .eq(CourseMember::getRole, "student").eq(CourseMember::getArchived, false)).stream().map(CourseMember::getUserId).toList();
         return ids.isEmpty() ? List.of() : accounts.lambdaQuery().in(AccountUser::getId, ids).eq(AccountUser::getArchived, false).orderByAsc(AccountUser::getName).list();
     }
+    @Override @Transactional public void addStudent(String id, Requests.CourseStudent input, AccountUser user) {
+        requireAccess(id, user, true);
+        String account = input.getAccount().trim().toLowerCase(Locale.ROOT);
+        boolean email = account.contains("@");
+        AccountUser student = accounts.lambdaQuery().eq(email, AccountUser::getEmail, account)
+            .eq(!email, AccountUser::getUsername, account).one();
+        if (student == null) throw error(404, "Student account not found. Check the username or email address.");
+        if (!"student".equals(student.getRole())) throw error(422, "This account is not a student account.");
+        if (Boolean.TRUE.equals(student.getArchived())) throw error(422, "Account is archived");
+        CourseMember member = members.selectOne(Wrappers.<CourseMember>lambdaQuery()
+            .eq(CourseMember::getCourseId, id).eq(CourseMember::getUserId, student.getId()));
+        if (member == null) {
+            member = new CourseMember(); member.setCourseId(id); member.setUserId(student.getId());
+            member.setRole("student"); member.setArchived(false); members.insert(member);
+        } else {
+            // 教师重新添加时恢复原有成员关系，保留该学生的学习记录。
+            members.update(Wrappers.<CourseMember>lambdaUpdate().eq(CourseMember::getId, member.getId())
+                .set(CourseMember::getRole, "student").set(CourseMember::getArchived, false));
+        }
+    }
     @Override @Transactional public void addMember(String id, Requests.Account input, AccountUser user) {
         addMembers(id, List.of(input), user);
     }

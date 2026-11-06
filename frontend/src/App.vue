@@ -436,7 +436,7 @@ void boot();
                 />
               </label>
               <label>
-                {{ t("Invitation code") }}
+                {{ t("Personal sign-in code") }}
                 <TInput
                   v-control-attrs="{ required: true }"
                   v-model="studentCredentials.invitationCode"

@@ -24,6 +24,9 @@ public class CourseController {
     @DeleteMapping("/courses/{id}") public void delete(@PathVariable String id, HttpServletRequest request) { courses.deleteCourse(id, accounts.current(request)); }
     @PostMapping("/courses/join") public void join(@RequestParam String code, HttpServletRequest request) { courses.join(code, accounts.current(request)); }
     @GetMapping("/courses/{id}/members") public Object members(@PathVariable String id, HttpServletRequest request) { return courses.members(id, accounts.current(request)); }
+    @PostMapping("/courses/{id}/students") public void addStudent(@PathVariable String id, @Valid @RequestBody Requests.CourseStudent input, HttpServletRequest request) {
+        courses.addStudent(id, input, accounts.current(request));
+    }
     @PostMapping("/courses/{id}/members") public void add(@PathVariable String id, @Valid @RequestBody Requests.Account input, HttpServletRequest request) { courses.addMember(id, input, accounts.current(request)); }
     @PostMapping("/courses/{id}/student-invitations") public Object invite(@PathVariable String id, @Valid @RequestBody Requests.StudentInvitation input, HttpServletRequest request) {
         return courses.inviteStudent(id, input, accounts.current(request));

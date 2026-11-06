@@ -32,6 +32,9 @@ public final class Requests {
         @NotBlank @Size(max = 100) private String name;
         @NotBlank @Pattern(regexp = "[A-Za-z0-9_.-]{3,64}") private String username;
     }
+    @Data public static class CourseStudent {
+        @NotBlank @Size(max = 254) private String account;
+    }
     @Data public static class Login {
         @NotBlank @Email private String email;
         @NotBlank @Size(max = 128) private String password;
