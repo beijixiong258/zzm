@@ -12,7 +12,7 @@
 - 根目录 `application.yaml` 是用户配置入口，纳入 Git，并只读挂载到后端配置目录。数据库和 AI 接口配置在这里，不要求设置数据库凭据环境变量。
 - 后端通过现有 `local_default` Docker 网络连接 `mysql:3306/zzm`，宿主机管理地址仍是 `127.0.0.1:3306`。资源目录的 YAML 保留程序默认值；同步 schema 引用时不要替换产品名称、Java 包名或浏览器存储键。
 - 本分支关闭 SQL 初始化，使用已有结构和数据，不自行初始化或清空数据库。部署版由 MySQL 官方镜像仅在空数据卷首次创建数据库并执行现有 `schema.sql`，保留已有数据。
-- AI 参数使用 `app.ai`，模型和接口地址已有默认值，只需填写 `api-key`。程序兼容已有 `AICADEMIYA_AI_API_KEY`、`AICADEMIYA_AI_BASE_URL`、`AICADEMIYA_AI_MODEL` 进程变量；保留本机已有 `.env` 和 `config.json`，不读取旧 JSON 配置。
+- 硅基流动密钥直接填写在根目录 `application.yaml` 的顶层 `GJLD_API_KEY`。模型和接口地址在 `app.ai` 下已有默认值。程序兼容已有 `AICADEMIYA_AI_API_KEY`、`AICADEMIYA_AI_BASE_URL`、`AICADEMIYA_AI_MODEL` 进程变量；保留本机已有 `.env` 和 `config.json`，不读取旧 JSON 配置。
 - 上传文件使用项目内的 `./data-local/uploads`，本地版的程序回收目录通过 `../智能体回收站/垃圾桶/AIcademiya` 挂载到用户指定的回收站。容器内配置使用相对目录 `data/uploads`、`data/recycle`，数据库只保存相对于对应目录的文件路径，不保存宿主机绝对路径。
 
 ## 在 IDEA 中打开和运行
