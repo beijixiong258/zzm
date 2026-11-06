@@ -8,4 +8,4 @@ app:
     provider: siliconflow
     base-url: https://api.siliconflow.cn/v1
     model: Qwen/Qwen3.8-27B
-GJLD_API_KEY: ''
+GJLD_API_KEY: 'sk-gsohsguiinxlgxfderwwtjdmnjgiegxmjsgyguvveejqqwhu'
