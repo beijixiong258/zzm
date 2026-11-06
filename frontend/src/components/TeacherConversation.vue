@@ -5,6 +5,7 @@ import { call, type ChatMessage, type TeacherReply } from "../classroom-api";
 import { locale, systemText, t } from "../i18n";
 import RichText from "./RichText.vue";
 import ContextMeter from "./ContextMeter.vue";
+import ProgressStatus from "./ProgressStatus.vue";
 const props = defineProps<{
   conversationKey: string;
   context: Record<string, unknown>;
@@ -17,10 +18,37 @@ const messages = ref<ChatMessage[]>([]),
   prompt = ref(""),
   busy = ref(false),
   error = ref("");
+const replyProgress = ref<number | null>(null);
 const transcript = ref<HTMLElement | null>(null);
 let storageKey = "";
 let disposed = false;
 let request: AbortController | undefined;
+let progressTimer: ReturnType<typeof setInterval> | undefined;
+let progressDismissal: ReturnType<typeof setTimeout> | undefined;
+function finishReplyProgress(completed = false) {
+  clearInterval(progressTimer);
+  clearTimeout(progressDismissal);
+  progressTimer = undefined;
+  progressDismissal = undefined;
+  replyProgress.value = completed ? 100 : null;
+  if (completed) {
+    progressDismissal = setTimeout(() => {
+      replyProgress.value = null;
+      progressDismissal = undefined;
+    }, 450);
+  }
+}
+function startReplyProgress() {
+  finishReplyProgress();
+  replyProgress.value = 8;
+  const startedAt = performance.now();
+  progressTimer = setInterval(() => {
+    // 等待进度仅作视觉反馈，真实回复应用完成后才显示 100%。
+    replyProgress.value =
+      8 + 87 * (1 - Math.exp(-(performance.now() - startedAt) / 45000));
+  }, 1000);
+  void nextTick(() => scrollToLatest("smooth"));
+}
 function scrollToLatest(behavior: ScrollBehavior = "auto") {
   transcript.value?.scrollTo({
     top: transcript.value.scrollHeight,
@@ -76,6 +104,7 @@ onMounted(() => scrollToLatest());
 onBeforeUnmount(() => {
   disposed = true;
   request?.abort();
+  finishReplyProgress();
   persist();
 });
 async function send() {
@@ -90,6 +119,7 @@ async function send() {
   busy.value = true;
   emit("pending", true);
   error.value = "";
+  startReplyProgress();
   request = new AbortController();
   try {
     const response = await call<TeacherReply>(
@@ -115,9 +145,11 @@ async function send() {
       },
     );
     prompt.value = "";
+    finishReplyProgress(true);
     await nextTick();
     scrollToLatest("smooth");
   } catch (e) {
+    finishReplyProgress();
     if (!disposed) error.value = systemText((e as Error).message);
   } finally {
     request = undefined;
@@ -161,7 +193,14 @@ function enter(event: KeyboardEvent) {
             <ContextMeter :usage="message.usage" />
           </details>
         </article>
-        <p v-if="busy" role="status" class="muted">{{ t("Thinking…") }}</p>
+        <ProgressStatus
+          v-if="replyProgress != null"
+          class="conversation-progress"
+          :class="{ 'is-complete': replyProgress === 100 }"
+          :label="t(replyProgress === 100 ? 'Completed' : 'Thinking…')"
+          :value="replyProgress"
+          :active="busy && replyProgress < 100"
+        />
       </div>
       <p v-if="error" class="error" role="alert">{{ systemText(error) }}</p>
       <div class="conversation-composer">
@@ -204,3 +243,22 @@ function enter(event: KeyboardEvent) {
     }}</small>
   </section>
 </template>
+<style scoped>
+.conversation-progress {
+  margin: 16px 0 4px;
+}
+.conversation-progress :deep(.t-progress) {
+  margin-top: 8px;
+}
+.conversation-progress :deep(.t-progress__inner) {
+  transition: width 1s linear;
+}
+.conversation-progress.is-complete :deep(.t-progress__inner) {
+  transition-duration: 0.2s;
+}
+@media (prefers-reduced-motion: reduce) {
+  .conversation-progress :deep(.t-progress__inner::before) {
+    animation: none;
+  }
+}
+</style>

@@ -38,6 +38,9 @@ import static zzm.exception.ApiErrors.error;
 @Component
 @RequiredArgsConstructor
 public class QwenClient {
+    private static final int CONNECTION_CHECK_TIMEOUT_SECONDS = 15;
+    private static final String CONNECTION_CHECK_TIMEOUT = "The connection check timed out after 15 seconds. Try again shortly.";
+    private static final String CONNECTION_CHECK_INCOMPLETE = "The connection check returned no complete reply. Try again shortly.";
     private final AppProperties properties;
     private final ContextBudget budget;
     private final Semaphore slots = new Semaphore(4, true);
@@ -145,6 +148,58 @@ public class QwenClient {
             throw error(502, "The tutor request failed. No incomplete result was saved. Try again shortly.");
         }
         finally { if (acquired) slots.release(); }
+    }
+    /** 连接检测单次执行且不排队，以请求总时限约束连接、响应头和响应体的等待。 */
+    public Completion checkConnection(List<Message> messages, int images) {
+        if (!slots.tryAcquire()) throw error(429, "AI requests are busy. Try the connection check again shortly.");
+        long started = System.nanoTime();
+        boolean completed = false;
+        try {
+            ChatResponse response = client(64, false, List.of(), CONNECTION_CHECK_TIMEOUT_SECONDS, false, true)
+                .prompt(new Prompt(messages)).call().chatResponse();
+            if (response == null || response.getResult() == null) throw error(502, CONNECTION_CHECK_INCOMPLETE);
+            String text = response.getResult().getOutput().getText();
+            String finish = response.getResult().getMetadata().getFinishReason();
+            if (text == null || text.isBlank() || "length".equalsIgnoreCase(finish) || "content_filter".equalsIgnoreCase(finish))
+                throw error(502, CONNECTION_CHECK_INCOMPLETE);
+            Map<String, Object> measurement = budget.describe(messages, 64, images, ContextBudget.SAFETY);
+            if (response.getMetadata() != null && response.getMetadata().getUsage() != null) {
+                var usage = response.getMetadata().getUsage();
+                measurement.put("promptTokensActual", usage.getPromptTokens());
+                measurement.put("completionTokensActual", usage.getCompletionTokens());
+                measurement.put("totalTokensActual", usage.getTotalTokens());
+            }
+            measurement.put("charactersReceived", text.length());
+            measurement.put("requestTiming", Map.of("queueWaitMs", 0L,
+                "requestMs", TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started), "streamRetries", 0));
+            completed = true;
+            return new Completion(text, measurement);
+        } catch (ResponseStatusException exception) { throw exception;
+        } catch (NonTransientAiException | TransientAiException exception) { throw error(502, exception.getMessage());
+        } catch (RuntimeException exception) {
+            boolean timedOut = TimeUnit.NANOSECONDS.toSeconds(System.nanoTime() - started) >= CONNECTION_CHECK_TIMEOUT_SECONDS;
+            boolean networkFailure = false;
+            Throwable root = exception;
+            for (Throwable cause = exception; cause != null; cause = cause.getCause()) {
+                root = cause;
+                timedOut |= cause instanceof java.util.concurrent.TimeoutException
+                    || cause instanceof java.net.SocketTimeoutException || cause instanceof java.net.http.HttpTimeoutException;
+                networkFailure |= cause instanceof ResourceAccessException || cause instanceof IOException;
+            }
+            log.warn("AI connection check failed: {} (root cause: {})", exception.getClass().getSimpleName(), root.getClass().getSimpleName());
+            if (timedOut) throw error(504, CONNECTION_CHECK_TIMEOUT);
+            for (Throwable cause = exception; cause != null; cause = cause.getCause()) {
+                if (cause instanceof NonTransientAiException || cause instanceof TransientAiException)
+                    throw error(502, cause.getMessage());
+            }
+            throw error(502, networkFailure
+                ? "The connection check could not reach the AI service. Check the network and try again."
+                : CONNECTION_CHECK_INCOMPLETE);
+        } finally {
+            slots.release();
+            log.info("AI connection check completed={}, requestMs={}", completed,
+                TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started));
+        }
     }
     public String complete(List<Message> messages) { return complete(messages, 4096, false, 0).text(); }
     public Completion complete(List<Message> messages, int output, boolean json, int images) {
@@ -296,22 +351,33 @@ public class QwenClient {
         return client(output, json, List.of(), configuration().getTimeoutSeconds(), false);
     }
     private ChatClient client(int output, boolean json, List<ToolCallback> callbacks, int timeoutSeconds, boolean tutor) {
+        return client(output, json, callbacks, timeoutSeconds, tutor, false);
+    }
+    private ChatClient client(int output, boolean json, List<ToolCallback> callbacks, int timeoutSeconds, boolean tutor, boolean connectionCheck) {
         AppProperties.Ai ai = configuration();
         String key = environment("AICADEMIYA_AI_API_KEY", ai.getApiKey());
         String base = environment("AICADEMIYA_AI_BASE_URL", ai.getBaseUrl()).replaceAll("/+$", "");
         String model = environment("AICADEMIYA_AI_MODEL", ai.getModel());
         if (key.isBlank() || model.isBlank()) throw error(503, "Configure the AI API key and model before generating content");
         if (base.endsWith("/v1")) base = base.substring(0, base.length() - 3);
-        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
-        factory.setProxy(java.net.Proxy.NO_PROXY);
-        factory.setConnectTimeout(Duration.ofSeconds(Math.min(15, Math.max(1, timeoutSeconds))));
-        factory.setReadTimeout(Duration.ofSeconds(Math.max(1, timeoutSeconds)));
         java.net.ProxySelector direct = new java.net.ProxySelector() {
             @Override public List<java.net.Proxy> select(URI uri) { return List.of(java.net.Proxy.NO_PROXY); }
             @Override public void connectFailed(URI uri, java.net.SocketAddress address, IOException exception) {}
         };
         var httpClient = java.net.http.HttpClient.newBuilder().proxy(direct)
             .connectTimeout(Duration.ofSeconds(15)).build();
+        ClientHttpRequestFactory factory;
+        if (connectionCheck) {
+            JdkClientHttpRequestFactory bounded = new JdkClientHttpRequestFactory(httpClient);
+            bounded.setReadTimeout(Duration.ofSeconds(CONNECTION_CHECK_TIMEOUT_SECONDS));
+            factory = bounded;
+        } else {
+            SimpleClientHttpRequestFactory standard = new SimpleClientHttpRequestFactory();
+            standard.setProxy(java.net.Proxy.NO_PROXY);
+            standard.setConnectTimeout(Duration.ofSeconds(Math.min(15, Math.max(1, timeoutSeconds))));
+            standard.setReadTimeout(Duration.ofSeconds(Math.max(1, timeoutSeconds)));
+            factory = standard;
+        }
         OpenAiApi api = OpenAiApi.builder().baseUrl(base).apiKey(key)
             .webClientBuilder(WebClient.builder().clientConnector(new JdkClientHttpConnector(httpClient))
                 .codecs(codecs -> codecs.defaultCodecs().maxInMemorySize(4 * 1024 * 1024)))
@@ -326,14 +392,15 @@ public class QwenClient {
                 }
             }).build();
         OpenAiChatOptions.Builder options = OpenAiChatOptions.builder().model(model)
-            .temperature(ai.getTemperature()).maxTokens(output).streamUsage(true);
+            .temperature(ai.getTemperature()).maxTokens(output);
+        if (!connectionCheck) options.streamUsage(true);
         if (tutor) options.internalToolExecutionEnabled(false);
         if (!callbacks.isEmpty()) options.toolCallbacks(callbacks);
         Map<String, Object> extra = new LinkedHashMap<>();
         if ("siliconflow".equals(ai.getProvider())) extra.put("enable_thinking", false);
         if (json) extra.put("response_format", Map.of("type", "json_object"));
         options.extraBody(extra);
-        RetryTemplate retry = RetryTemplate.builder().maxAttempts(tutor ? 1 : 2)
+        RetryTemplate retry = RetryTemplate.builder().maxAttempts(tutor || connectionCheck ? 1 : 2)
             .retryOn(TransientAiException.class).retryOn(ResourceAccessException.class)
             .exponentialBackoff(Duration.ofSeconds(1), 2, Duration.ofSeconds(3)).build();
         return ChatClient.create(OpenAiChatModel.builder().openAiApi(api).defaultOptions(options.build()).retryTemplate(retry).build());

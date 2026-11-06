@@ -586,13 +586,6 @@ void load();
       <p v-if="success" role="status" class="success">
         {{ systemText(success) }}
       </p>
-      <details class="conversation-result">
-        <summary>{{ t("Local token estimate") }}</summary>
-        <ContextMeter
-          :usage="usage"
-          :loading="checkingContext"
-        /><AiConnection />
-      </details>
       <section
         v-if="showGenerationState && job"
         class="conversation-result generation-state"
@@ -723,6 +716,18 @@ void load();
           }}
         </p>
       </section>
+      <details class="conversation-result">
+        <summary>{{ t("Local token estimate") }}</summary>
+        <p>
+          <small class="muted">{{
+            t(
+              "Local estimates are advisory only. The provider determines capacity, actual usage and request acceptance.",
+            )
+          }}</small>
+        </p>
+        <ContextMeter :usage="usage" :loading="checkingContext" embedded />
+        <AiConnection />
+      </details>
       <section v-if="hasContent" class="conversation-result lesson-result">
         <h2>{{ draft.title }}</h2>
         <p>{{ draft.description }}</p>

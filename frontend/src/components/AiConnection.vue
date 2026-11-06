@@ -1,28 +1,50 @@
 <script setup lang="ts">
 import { Button as TButton } from "tdesign-vue-next";
-import { ref } from "vue";
+import { onBeforeUnmount, ref } from "vue";
 import { t, systemText } from "../i18n";
 import { call } from "../classroom-api";
-const busy = ref(""),
-  error = ref("");
-const result = ref<{
+type ConnectionResult = {
   connected: boolean;
   model: string;
   elapsedMs: number;
   capability: string;
   detail?: string;
   response?: string;
-} | null>(null);
+};
+const busy = ref(""),
+  error = ref("");
+const result = ref<ConnectionResult | null>(null);
+let request: AbortController | undefined;
+let disposed = false;
+onBeforeUnmount(() => {
+  disposed = true;
+  request?.abort();
+});
 async function check(vision: boolean) {
+  if (disposed || busy.value) return;
   busy.value = vision ? "vision" : "text";
   error.value = "";
   result.value = null;
+  const controller = new AbortController();
+  request = controller;
+  const timeout = setTimeout(() => controller.abort(), 18000);
   try {
-    result.value = await call(`/ai/connection?vision=${vision}`, "POST");
+    const response = await call<ConnectionResult>(
+      `/ai/connection?vision=${vision}`,
+      "POST",
+      undefined,
+      controller.signal,
+    );
+    if (!disposed) result.value = response;
   } catch (e) {
-    error.value = (e as Error).message;
+    if (!disposed)
+      error.value = controller.signal.aborted
+        ? t("The connection check did not finish in time. Try again shortly.")
+        : systemText((e as Error).message);
   } finally {
-    busy.value = "";
+    clearTimeout(timeout);
+    request = undefined;
+    if (!disposed) busy.value = "";
   }
 }
 </script>

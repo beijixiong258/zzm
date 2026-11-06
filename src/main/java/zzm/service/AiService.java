@@ -545,7 +545,7 @@ public class AiService {
                     .media(new Media(MimeType.valueOf("image/png"), new ByteArrayResource(bytes.toByteArray()))).build();
                 images = budget.imageTokens(112, 112);
             } else message = new UserMessage("Reply with OK to confirm this connection.");
-            var response = client.complete(List.of(message), 64, false, images);
+            var response = client.checkConnection(List.of(message), images);
             result.put("connected", true); result.put("response", response.text()); result.put("usage", response.usage());
         } catch (org.springframework.web.server.ResponseStatusException exception) {
             result.put("connected", false); result.put("detail", Objects.toString(exception.getReason(), "AI connection failed"));

@@ -1,6 +1,11 @@
 <script setup lang="ts">
 import { Loading as TLoading, Progress as TProgress } from "tdesign-vue-next";
-defineProps<{ label: string; detail?: string; value?: number | null }>();
+defineProps<{
+  label: string;
+  detail?: string;
+  value?: number | null;
+  active?: boolean;
+}>();
 </script>
 <template>
   <div class="progress-status" role="status">
@@ -13,6 +18,7 @@ defineProps<{ label: string; detail?: string; value?: number | null }>();
       :aria-label="label"
       :percentage="value"
       :label="false"
+      :status="active ? 'active' : undefined"
     />
     <small v-if="detail" class="muted">{{ detail }}</small>
   </div>

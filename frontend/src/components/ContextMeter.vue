@@ -1,19 +1,29 @@
 <script setup lang="ts">
 import { t } from "../i18n";
 import type { ContextUsage } from "../classroom-api";
-defineProps<{ usage: ContextUsage | null; loading?: boolean }>();
+defineProps<{
+  usage: ContextUsage | null;
+  loading?: boolean;
+  embedded?: boolean;
+}>();
 const number = (value: number) => value.toLocaleString();
 </script>
 <template>
-  <section class="context-meter" aria-live="polite">
-    <strong>{{ t("Local token estimate") }}</strong>
-    <p class="muted">
-      {{
-        t(
-          "Local estimates are advisory only. The provider determines capacity, actual usage and request acceptance.",
-        )
-      }}
-    </p>
+  <section
+    class="context-meter"
+    :class="{ 'is-embedded': embedded }"
+    aria-live="polite"
+  >
+    <template v-if="!embedded">
+      <strong>{{ t("Local token estimate") }}</strong>
+      <p class="muted">
+        {{
+          t(
+            "Local estimates are advisory only. The provider determines capacity, actual usage and request acceptance.",
+          )
+        }}
+      </p>
+    </template>
     <p v-if="loading" class="muted">{{ t("Estimating context…") }}</p>
     <template v-if="usage">
       <p>
@@ -83,7 +93,11 @@ const number = (value: number) => value.toLocaleString();
           }}
         </p>
         <p v-if="usage.contextStrategy === 'retrieval'">
-          {{ t("The tutor selects relevant questions, recent conversation and source excerpts. Earlier records remain available. The estimate before sending excludes any additional reading.") }}
+          {{
+            t(
+              "The tutor selects relevant questions, recent conversation and source excerpts. Earlier records remain available. The estimate before sending excludes any additional reading.",
+            )
+          }}
         </p>
         <p v-else>
           {{
@@ -96,3 +110,10 @@ const number = (value: number) => value.toLocaleString();
     </template>
   </section>
 </template>
+<style scoped>
+.context-meter.is-embedded {
+  padding: 0;
+  border: 0;
+  background: none;
+}
+</style>

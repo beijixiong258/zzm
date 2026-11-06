@@ -8,6 +8,7 @@ import {
   RadioGroup as TRadioGroup,
   Table as TTable,
   Dropdown as TDropdown,
+  type DropdownOption,
   type GlobalConfigProvider,
 } from "tdesign-vue-next";
 import { computed, defineAsyncComponent, nextTick, ref, watch } from "vue";
@@ -105,6 +106,29 @@ const activeCourses = computed(() =>
   courses.value.filter((item) => !item.archived && !item.workspace),
 );
 const deletingCourse = ref("");
+function getCourseActions(item: Course): DropdownOption[] {
+  const actions: DropdownOption[] = [
+    {
+      content: t("Edit course"),
+      value: "edit",
+      onClick: () => {
+        void navigate({ page: "course", courseId: item.id });
+        menuOpen.value = false;
+      },
+    },
+  ];
+  if (item.canDelete) {
+    actions.push({
+      content: t("Delete course"),
+      value: "delete",
+      theme: "error",
+      onClick: () => {
+        void deleteCourse(item);
+      },
+    });
+  }
+  return actions;
+}
 async function deleteCourse(item: Course) {
   if (deletingCourse.value) return;
   deletingCourse.value = item.id;
@@ -304,7 +328,7 @@ void boot();
           @change="setLocale(String($event))"
         >
           <TOption value="zh-CN" label="中文" />
-          <TOption value="en" label="English (UK)" />
+          <TOption value="en" label="English" />
         </TSelect>
       </div>
       <div class="login-layout">
@@ -563,7 +587,7 @@ void boot();
               />
               <span class="course-title">{{ item.title }}</span>
               <span
-                v-if="staff && item.canDelete"
+                v-if="staff"
                 class="course-actions"
                 @click.stop
                 @keydown.stop
@@ -572,14 +596,7 @@ void boot();
                   trigger="click"
                   placement="bottom-right"
                   :disabled="!!deletingCourse"
-                  :options="[
-                    {
-                      content: t('Delete course'),
-                      value: 'delete',
-                      theme: 'error',
-                    },
-                  ]"
-                  @click="deleteCourse(item)"
+                  :options="getCourseActions(item)"
                 >
                   <TButton
                     theme="default"
@@ -596,6 +613,7 @@ void boot();
               </span>
             </summary>
             <TButton
+              v-if="!staff"
               theme="default"
               variant="outline"
               type="button"
@@ -604,7 +622,7 @@ void boot();
                 menuOpen = false;
               "
             >
-              {{ t(staff ? "Course information" : "Course overview") }}</TButton
+              {{ t("Course overview") }}</TButton
             ><template v-if="staff"
               ><TButton
                 theme="primary"
@@ -724,7 +742,7 @@ void boot();
             @change="setLocale(String($event))"
           >
             <TOption value="zh-CN" label="中文" />
-            <TOption value="en" label="English (UK)" />
+            <TOption value="en" label="English" />
           </TSelect>
         </header>
         <main class="page-body">
