@@ -95,8 +95,8 @@ async function removeStudent(member: Member) {
     );
     if (!confirmed || disposed || props.course.id !== courseId) return;
     await call(
-      `/courses/${key(courseId)}/members/${key(member.id)}/archive?archived=true`,
-      "POST",
+      `/courses/${key(courseId)}/students/${key(member.id)}`,
+      "DELETE",
     );
     if (disposed || props.course.id !== courseId) return;
     members.value = members.value.filter((value) => value.id !== member.id);

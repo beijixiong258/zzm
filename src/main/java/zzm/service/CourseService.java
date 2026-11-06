@@ -18,6 +18,6 @@ public interface CourseService extends IService<Course> {
     List<Map<String, Object>> members(String id, AccountUser user);
     List<AccountUser> students(String courseId);
     void addStudent(String id, Requests.CourseStudent input, AccountUser user);
-    void archiveMember(String id, String userId, boolean archived, AccountUser user);
+    void removeStudent(String id, String studentId, AccountUser user);
     void join(String code, AccountUser user);
 }

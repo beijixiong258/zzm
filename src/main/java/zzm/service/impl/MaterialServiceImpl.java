@@ -31,7 +31,8 @@ import static zzm.exception.ApiErrors.error;
 @Service
 @RequiredArgsConstructor
 public class MaterialServiceImpl extends ServiceImpl<CourseMaterialMapper, CourseMaterial> implements MaterialService {
-    private final CourseService courses;
+    private final CourseMapper courses;
+    private final CourseAccess courseAccess;
     private final AppProperties properties;
     private final DocumentParser parser;
     private final PdfInputReader pdf;
@@ -54,7 +55,7 @@ public class MaterialServiceImpl extends ServiceImpl<CourseMaterialMapper, Cours
         if (batch.isEmpty()) { retrievalCursor = null; return; }
         for (CourseMaterial material : batch) {
             retrievalCursor = material.getId();
-            Course course = courses.getById(material.getCourseId());
+            Course course = courses.selectById(material.getCourseId());
             if (course == null || Boolean.TRUE.equals(course.getArchived())) continue;
             RetrievalContent content = RetrievalContent.read(material);
             if (content.isComplete()) continue;
@@ -99,7 +100,7 @@ public class MaterialServiceImpl extends ServiceImpl<CourseMaterialMapper, Cours
             List<TeachingSession> tasks = sessions.selectList(Wrappers.<TeachingSession>lambdaQuery().eq(TeachingSession::getArchived, false));
             Set<String> activeTasks = new HashSet<>();
             for (TeachingSession task : tasks) {
-                Course course = courses.getById(task.getCourseId());
+                Course course = courses.selectById(task.getCourseId());
                 if (course == null || Boolean.TRUE.equals(course.getArchived())) continue;
                 activeTasks.add(task.getId());
                 if (task.getPublishedVersionId() == null) continue;
@@ -113,7 +114,7 @@ public class MaterialServiceImpl extends ServiceImpl<CourseMaterialMapper, Cours
             }
             for (CourseMaterial material : lambdaQuery().eq(CourseMaterial::getArchived, false).isNull(CourseMaterial::getFileRemovedAt)
                 .isNotNull(CourseMaterial::getCourseId).in(CourseMaterial::getStatus, "ready", "needsReview").list()) {
-                Course course = courses.getById(material.getCourseId());
+                Course course = courses.selectById(material.getCourseId());
                 if (course == null || Boolean.TRUE.equals(course.getArchived()) || material.getOwnerId() != null && !activeRecords.contains(material.getRecordId())) continue;
                 RetrievalContent content = RetrievalContent.read(material);
                 if (content.isComplete()) syncDocument(new RetrievalDocument("m-" + material.getId(), content.getRevision(), material.getTitle(), content.getParts()), desired, remote);
@@ -130,11 +131,11 @@ public class MaterialServiceImpl extends ServiceImpl<CourseMaterialMapper, Cours
             qmd.saveDocument(document);
     }
     @Override public List<Map<String, Object>> library(String courseId, AccountUser user) {
-        courses.requireAccess(courseId, user, true);
+        courseAccess.requireAccess(courseId, user, true);
         return lambdaQuery().eq(CourseMaterial::getCourseId, courseId).isNull(CourseMaterial::getOwnerId).isNull(CourseMaterial::getFileRemovedAt).orderByAsc(CourseMaterial::getRelativePath).list().stream().map(this::view).toList();
     }
     @Override public CourseMaterial upload(String courseId, MultipartFile file, String relativePath, String visibility, AccountUser user) {
-        courses.requireAccess(courseId, user, true);
+        courseAccess.requireAccess(courseId, user, true);
         return store(courseId, file, relativePath, visibility, null, null, null);
     }
     @Override public CourseMaterial uploadForRecord(String courseId, String recordId, String questionId, MultipartFile file, AccountUser user) {
@@ -191,7 +192,7 @@ public class MaterialServiceImpl extends ServiceImpl<CourseMaterialMapper, Cours
     @Override public CourseMaterial requireFile(String id, String versionId, AccountUser user) {
         CourseMaterial material = getById(id);
         if (material == null || material.getCourseId() == null) throw error(404, "Material not found");
-        courses.requireAccess(material.getCourseId(), user, !"student".equals(user.getRole()));
+        courseAccess.requireAccess(material.getCourseId(), user, !"student".equals(user.getRole()));
         if (material.getFileRemovedAt() != null) throw error(410, "This material has been removed.");
         if (material.getOwnerId() != null) {
             if (!material.getOwnerId().equals(user.getId()) && "student".equals(user.getRole())) throw error(403, "Attachment access denied");
@@ -218,17 +219,17 @@ public class MaterialServiceImpl extends ServiceImpl<CourseMaterialMapper, Cours
         return material;
     }
     @Override public void edit(String id, Requests.MaterialInput input, AccountUser user) {
-        CourseMaterial material = requireFile(id, null, user); courses.requireAccess(material.getCourseId(), user, true);
+        CourseMaterial material = requireFile(id, null, user); courseAccess.requireAccess(material.getCourseId(), user, true);
         lambdaUpdate().eq(CourseMaterial::getId, id).set(CourseMaterial::getTitle, input.getTitle().trim()).set(CourseMaterial::getVisibility, input.getVisibility()).update();
     }
     @Override public void archive(String id, boolean archived, AccountUser user) {
-        CourseMaterial material = requireFile(id, null, user); courses.requireAccess(material.getCourseId(), user, true);
+        CourseMaterial material = requireFile(id, null, user); courseAccess.requireAccess(material.getCourseId(), user, true);
         lambdaUpdate().eq(CourseMaterial::getId, id).set(CourseMaterial::getArchived, archived).update();
     }
     @Override @Transactional public void removeMaterial(String id, AccountUser user) {
         CourseMaterial material = lambdaQuery().eq(CourseMaterial::getId, id).last("FOR UPDATE").one();
         if (material == null) throw error(404, "Material not found");
-        courses.requireAccess(material.getCourseId(), user, true);
+        courseAccess.requireAccess(material.getCourseId(), user, true);
         if (material.getOwnerId() != null) throw error(422, "Student attachments must be removed from their learning record.");
         if (material.getFileRemovedAt() != null) return;
         List<TeachingSession> drafts = sessions.selectList(Wrappers.<TeachingSession>lambdaQuery()
@@ -246,12 +247,25 @@ public class MaterialServiceImpl extends ServiceImpl<CourseMaterialMapper, Cours
         lambdaUpdate().eq(CourseMaterial::getId, id).set(CourseMaterial::getArchived, true)
             .set(CourseMaterial::getFileRemovedAt, LocalDateTime.now(ZoneOffset.UTC)).set(CourseMaterial::getRemovedBy, user.getId()).update();
     }
+    @Override @Transactional public void removeCourseMaterials(String courseId, AccountUser user) {
+        courseAccess.requireAccess(courseId, user, true);
+        markMaterialsForRemoval(lambdaQuery().select(CourseMaterial::getId, CourseMaterial::getStatus)
+            .eq(CourseMaterial::getCourseId, courseId).orderByAsc(CourseMaterial::getId).last("FOR UPDATE").list(), user);
+    }
     @Override @Transactional public void removeTaskAttachments(List<String> recordIds, AccountUser user) {
         if (recordIds.isEmpty()) return;
-        lambdaUpdate().in(CourseMaterial::getRecordId, recordIds).isNull(CourseMaterial::getFileRemovedAt)
+        markMaterialsForRemoval(lambdaQuery().select(CourseMaterial::getId, CourseMaterial::getStatus)
+            .in(CourseMaterial::getRecordId, recordIds).orderByAsc(CourseMaterial::getId).last("FOR UPDATE").list(), user);
+    }
+    private void markMaterialsForRemoval(List<CourseMaterial> selected, AccountUser user) {
+        if (selected.isEmpty()) return;
+        if (selected.stream().anyMatch(file -> "processing".equals(file.getStatus())))
+            throw error(409, "Some materials are still being processed. Wait for them to finish before continuing.");
+        List<String> ids = selected.stream().map(CourseMaterial::getId).toList();
+        lambdaUpdate().in(CourseMaterial::getId, ids).isNull(CourseMaterial::getFileRemovedAt)
             .set(CourseMaterial::getFileRemovedAt, LocalDateTime.now(ZoneOffset.UTC)).set(CourseMaterial::getRemovedBy, user.getId()).update();
         // 在现有回收任务安全移走原文件前，保留文件位置。
-        lambdaUpdate().in(CourseMaterial::getRecordId, recordIds).set(CourseMaterial::getArchived, true)
+        lambdaUpdate().in(CourseMaterial::getId, ids).set(CourseMaterial::getArchived, true)
             .set(CourseMaterial::getStatus, "taskDeleted").set(CourseMaterial::getTextContent, "")
             .set(CourseMaterial::getExtractionReportJson, null).set(CourseMaterial::getErrorMessage, "").update();
     }
@@ -260,7 +274,7 @@ public class MaterialServiceImpl extends ServiceImpl<CourseMaterialMapper, Cours
         if ("student".equals(user.getRole())) {
             LearningRecord record = material.getRecordId() == null ? null : records.selectById(material.getRecordId());
             if (record == null || !user.getId().equals(record.getUserId()) || Set.of("submitted","confirmed").contains(record.getStatus())) throw error(403,"This attachment cannot be changed");
-        } else courses.requireAccess(material.getCourseId(), user, true);
+        } else courseAccess.requireAccess(material.getCourseId(), user, true);
         if ("processing".equals(material.getStatus())) throw error(409, "Material is processing");
         if (!lambdaUpdate().eq(CourseMaterial::getId, id).ne(CourseMaterial::getStatus, "processing")
             .set(CourseMaterial::getStatus, "queued").set(CourseMaterial::getErrorMessage, "")

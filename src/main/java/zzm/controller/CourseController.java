@@ -5,6 +5,7 @@ import zzm.service.*;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -27,7 +28,8 @@ public class CourseController {
     @PostMapping("/courses/{id}/students") public void addStudent(@PathVariable String id, @Valid @RequestBody Requests.CourseStudent input, HttpServletRequest request) {
         courses.addStudent(id, input, accounts.current(request));
     }
-    @PostMapping("/courses/{id}/members/{userId}/archive") public void archiveMember(@PathVariable String id, @PathVariable String userId, @RequestParam boolean archived, HttpServletRequest request) {
-        courses.archiveMember(id, userId, archived, accounts.current(request));
+    @DeleteMapping("/courses/{id}/students/{studentId}") @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void removeStudent(@PathVariable String id, @PathVariable String studentId, HttpServletRequest request) {
+        courses.removeStudent(id, studentId, accounts.current(request));
     }
 }

@@ -169,7 +169,8 @@ public class SessionServiceImpl extends ServiceImpl<TeachingSessionMapper, Teach
         if (!Boolean.TRUE.equals(session.getArchived())) throw error(409, "Archive the task before deleting it permanently.");
         requireIdleTask(id);
         List<String> recordIds = records.selectList(Wrappers.<LearningRecord>lambdaQuery()
-            .eq(LearningRecord::getSessionId, id).last("FOR UPDATE")).stream().map(LearningRecord::getId).toList();
+            .select(LearningRecord::getId).eq(LearningRecord::getSessionId, id)
+            .orderByAsc(LearningRecord::getId).last("FOR UPDATE")).stream().map(LearningRecord::getId).toList();
         if (!recordIds.isEmpty()) {
             materials.removeTaskAttachments(recordIds, user);
             histories.delete(Wrappers.<LearningRecordHistory>lambdaQuery().in(LearningRecordHistory::getRecordId, recordIds));

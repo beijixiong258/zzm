@@ -11,8 +11,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.util.*;
-import java.time.LocalDateTime;
-import java.time.ZoneOffset;
 import static zzm.exception.ApiErrors.error;
 
 @Service
@@ -20,20 +18,13 @@ import static zzm.exception.ApiErrors.error;
 public class CourseServiceImpl extends ServiceImpl<CourseMapper, Course> implements CourseService {
     private final CourseMemberMapper members;
     private final AccountService accounts;
+    private final CourseAccess courseAccess;
     private final TeachingSessionMapper tasks;
     private final GenerationJobMapper jobs;
-    private final CourseMaterialMapper materials;
+    private final MaterialService materials;
     private final LearningRecordMapper records;
     @Override public Course requireAccess(String id, AccountUser user, boolean teacher) {
-        if (Boolean.TRUE.equals(user.getMustChangePassword())) throw error(403, "Password change required");
-        if (teacher) accounts.requireStaff(user);
-        Course course = getById(id);
-        if (course == null) throw error(404, "Course not found");
-        CourseMember membership = members.selectOne(Wrappers.<CourseMember>lambdaQuery().eq(CourseMember::getCourseId, id)
-            .eq(CourseMember::getUserId, user.getId()).eq(CourseMember::getArchived, false));
-        if (membership == null || teacher && !"teacher".equals(membership.getRole())) throw error(403, "Course access denied");
-        if (!teacher && Boolean.TRUE.equals(course.getArchived())) throw error(404, "Course is archived");
-        return course;
+        return courseAccess.requireAccess(id, user, teacher);
     }
     @Override public List<Map<String, Object>> mine(AccountUser user) {
         List<String> ids = members.selectList(Wrappers.<CourseMember>lambdaQuery().eq(CourseMember::getUserId, user.getId())
@@ -68,8 +59,7 @@ public class CourseServiceImpl extends ServiceImpl<CourseMapper, Course> impleme
     }
     @Override @Transactional public void deleteCourse(String id, AccountUser user) {
         requireAccess(id, user, true);
-        Course course = lambdaQuery().eq(Course::getId, id).last("FOR UPDATE").one();
-        if (course == null) throw error(404, "Course not found");
+        Course course = lockCourse(id);
         if (!course.getOwnerId().equals(user.getId())) throw error(403, "Only the course owner can delete this course.");
         if (Boolean.TRUE.equals(course.getWorkspace())) throw error(409, "The teaching workspace cannot be deleted.");
         List<String> taskIds = tasks.selectList(Wrappers.<TeachingSession>lambdaQuery()
@@ -78,16 +68,7 @@ public class CourseServiceImpl extends ServiceImpl<CourseMapper, Course> impleme
         if (!taskIds.isEmpty() && !jobs.selectList(Wrappers.<GenerationJob>lambdaQuery().in(GenerationJob::getSessionId, taskIds)
             .in(GenerationJob::getStatus, "queued", "running").last("FOR UPDATE")).isEmpty())
             throw error(409, "Wait for course generation to finish before deleting the course.");
-        List<CourseMaterial> files = materials.selectList(Wrappers.<CourseMaterial>lambdaQuery()
-            .eq(CourseMaterial::getCourseId, id).orderByAsc(CourseMaterial::getId).last("FOR UPDATE"));
-        if (files.stream().anyMatch(file -> "processing".equals(file.getStatus())))
-            throw error(409, "Wait for course materials to finish processing before deleting the course.");
-        materials.update(Wrappers.<CourseMaterial>lambdaUpdate().eq(CourseMaterial::getCourseId, id)
-            .isNull(CourseMaterial::getFileRemovedAt).set(CourseMaterial::getFileRemovedAt, LocalDateTime.now(ZoneOffset.UTC))
-            .set(CourseMaterial::getRemovedBy, user.getId()));
-        materials.update(Wrappers.<CourseMaterial>lambdaUpdate().eq(CourseMaterial::getCourseId, id)
-            .set(CourseMaterial::getArchived, true).set(CourseMaterial::getStatus, "taskDeleted")
-            .set(CourseMaterial::getTextContent, "").set(CourseMaterial::getExtractionReportJson, null).set(CourseMaterial::getErrorMessage, ""));
+        materials.removeCourseMaterials(id, user);
         // 任务、版本、学习记录和成员由外键级联删除，材料暂存于原有文件回收队列。
         if (baseMapper.deleteById(id) != 1) throw error(409, "Course changed. Reload before deleting.");
     }
@@ -127,26 +108,35 @@ public class CourseServiceImpl extends ServiceImpl<CourseMapper, Course> impleme
         if (student == null) throw error(404, "Student account not found. Check the username or email address.");
         if (!"student".equals(student.getRole())) throw error(422, "This account is not a student account.");
         if (Boolean.TRUE.equals(student.getArchived())) throw error(422, "Account is archived");
+        addStudentMembership(id, student.getId(), true);
+    }
+    private void addStudentMembership(String courseId, String studentId, boolean allowRestore) {
+        // 同一课程的成员写入串行，重复添加或同时入课均读取最新成员状态。
+        Course course = lockCourse(courseId);
+        if (!allowRestore && (Boolean.TRUE.equals(course.getArchived()) || Boolean.TRUE.equals(course.getWorkspace())))
+            throw error(404, "Course join code is invalid");
         CourseMember member = members.selectOne(Wrappers.<CourseMember>lambdaQuery()
-            .eq(CourseMember::getCourseId, id).eq(CourseMember::getUserId, student.getId()));
+            .eq(CourseMember::getCourseId, courseId).eq(CourseMember::getUserId, studentId).last("FOR UPDATE"));
         if (member == null) {
-            member = new CourseMember(); member.setCourseId(id); member.setUserId(student.getId());
+            member = new CourseMember(); member.setCourseId(courseId); member.setUserId(studentId);
             member.setRole("student"); member.setArchived(false); members.insert(member);
-        } else {
+        } else if (Boolean.TRUE.equals(member.getArchived())) {
+            if (!allowRestore) throw error(403, "Ask your teacher to restore your course membership");
             // 教师重新添加时恢复入课资格，已删除的学习记录不会恢复。
             members.update(Wrappers.<CourseMember>lambdaUpdate().eq(CourseMember::getId, member.getId())
                 .set(CourseMember::getRole, "student").set(CourseMember::getArchived, false));
         }
     }
-    @Override @Transactional public void archiveMember(String id, String userId, boolean archived, AccountUser user) {
+    @Override @Transactional public void removeStudent(String id, String studentId, AccountUser user) {
         requireAccess(id, user, true);
+        lockCourse(id);
         CourseMember member = members.selectOne(Wrappers.<CourseMember>lambdaQuery()
-            .eq(CourseMember::getCourseId, id).eq(CourseMember::getUserId, userId));
+            .eq(CourseMember::getCourseId, id).eq(CourseMember::getUserId, studentId).last("FOR UPDATE"));
         if (member == null) throw error(404, "Course member not found");
-        if (!"student".equals(member.getRole())) throw error(403, "Only student memberships can be changed here.");
-        if (archived) deleteStudentRecords(id, userId, user);
+        if (!"student".equals(member.getRole())) throw error(403, "Only students can be removed from a course.");
+        deleteStudentRecords(id, studentId, user);
         members.update(Wrappers.<CourseMember>lambdaUpdate().eq(CourseMember::getId, member.getId())
-            .set(CourseMember::getArchived, archived));
+            .set(CourseMember::getArchived, true));
     }
     private void deleteStudentRecords(String courseId, String studentId, AccountUser user) {
         // 与开始任务共用任务行锁，防止移出课程时并发创建新的学习记录。
@@ -159,17 +149,7 @@ public class CourseServiceImpl extends ServiceImpl<CourseMapper, Course> impleme
             .orderByAsc(LearningRecord::getId).last("FOR UPDATE"))
             .stream().map(LearningRecord::getId).toList();
         if (recordIds.isEmpty()) return;
-        List<CourseMaterial> attachments = materials.selectList(Wrappers.<CourseMaterial>lambdaQuery()
-            .select(CourseMaterial::getId, CourseMaterial::getStatus).in(CourseMaterial::getRecordId, recordIds)
-            .orderByAsc(CourseMaterial::getId).last("FOR UPDATE"));
-        if (attachments.stream().anyMatch(file -> "processing".equals(file.getStatus())))
-            throw error(409, "Wait for the student's attachments to finish processing before removing them from the course.");
-        materials.update(Wrappers.<CourseMaterial>lambdaUpdate().in(CourseMaterial::getRecordId, recordIds)
-            .isNull(CourseMaterial::getFileRemovedAt).set(CourseMaterial::getFileRemovedAt, LocalDateTime.now(ZoneOffset.UTC))
-            .set(CourseMaterial::getRemovedBy, user.getId()));
-        materials.update(Wrappers.<CourseMaterial>lambdaUpdate().in(CourseMaterial::getRecordId, recordIds)
-            .set(CourseMaterial::getArchived, true).set(CourseMaterial::getStatus, "taskDeleted")
-            .set(CourseMaterial::getTextContent, "").set(CourseMaterial::getExtractionReportJson, null).set(CourseMaterial::getErrorMessage, ""));
+        materials.removeTaskAttachments(recordIds, user);
         // 作答、对话和辅导状态随主记录删除，历史表由外键级联删除；附件进入现有回收流程。
         records.delete(Wrappers.<LearningRecord>lambdaQuery().in(LearningRecord::getId, recordIds));
     }
@@ -177,11 +157,11 @@ public class CourseServiceImpl extends ServiceImpl<CourseMapper, Course> impleme
         if (!"student".equals(user.getRole()) || Boolean.TRUE.equals(user.getMustChangePassword())) throw error(403, "Student access required");
         Course course = lambdaQuery().eq(Course::getJoinCode, code.trim()).eq(Course::getArchived, false).one();
         if (course == null || Boolean.TRUE.equals(course.getWorkspace())) throw error(404, "Course join code is invalid");
-        CourseMember member = members.selectOne(Wrappers.<CourseMember>lambdaQuery().eq(CourseMember::getCourseId, course.getId()).eq(CourseMember::getUserId, user.getId()));
-        if (member != null) {
-            if (Boolean.TRUE.equals(member.getArchived())) throw error(403, "Ask your teacher to restore your course membership");
-            return;
-        }
-        member = new CourseMember(); member.setCourseId(course.getId()); member.setUserId(user.getId()); member.setRole("student"); member.setArchived(false); members.insert(member);
+        addStudentMembership(course.getId(), user.getId(), false);
+    }
+    private Course lockCourse(String id) {
+        Course course = lambdaQuery().eq(Course::getId, id).last("FOR UPDATE").one();
+        if (course == null) throw error(404, "Course not found");
+        return course;
     }
 }
