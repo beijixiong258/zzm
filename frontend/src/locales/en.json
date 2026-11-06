@@ -1,4 +1,5 @@
 {
+  "The tutor selects relevant questions, recent conversation and source excerpts. Earlier records remain available. The estimate before sending excludes any additional reading.": "The tutor selects relevant questions, recent conversation and source excerpts. Earlier records remain available. The estimate before sending excludes any additional reading.",
   "Processing complete": "Processing complete",
   "Processing complete · AI input limit exceeded": "Processing complete · AI input limit exceeded",
   "Estimated use: {0} tokens / limit: {1}": "Estimated use: {0} tokens; limit: {1}",
@@ -1455,5 +1456,20 @@
   "AI connection or response processing failed ({0}). No incomplete result was applied.": "The AI connection or response could not be processed ({0}). The incomplete result has not been applied.",
   "Generation processing failed ({0})": "Content generation failed ({0}).",
   "Update task": "Update task",
-  "Task updated.": "Task updated."
+  "Task updated.": "Task updated.",
+  "The required context exceeds the configured tutor limit. Narrow the question before sending.": "The required context exceeds the configured tutor limit. Narrow your question before sending.",
+  "All AI request slots are busy. Try again shortly.": "All AI request slots are busy. Please try again shortly.",
+  "The tutor reached its time limit. Narrow the question and try again.": "The AI tutor reached its time limit. Narrow your question and try again.",
+  "The required tutor context exceeds the configured model limit. Narrow the question or shorten the required instructions.": "The required context exceeds the model limit. Narrow your question or ask your teacher to shorten the task instructions.",
+  "The tutor reached its reading budget. Ask about a smaller part of the task.": "The AI tutor reached its reading limit for this turn. Ask about a smaller part of the task.",
+  "The tutor response was not completed. No partial reply was saved.": "The AI tutor's reply was incomplete and has not been saved.",
+  "The model did not finish within the tutor tool budget. Try a more specific question.": "The AI tutor could not finish within this turn's reading limit. Try a more specific question.",
+  "The tutor did not produce a completed response": "The AI tutor did not produce a complete response.",
+  "AI request was interrupted": "The AI request was interrupted.",
+  "The tutor request failed. No incomplete result was saved. Try again shortly.": "The AI tutor request failed. No incomplete result was saved. Please try again shortly.",
+  "Page not found": "The requested page was not found.",
+  "The PDF page could not be read": "The requested PDF page could not be read.",
+  "This task or learning record changed during the reply. Reload before sending again.": "The task or learning record changed while the reply was being generated. Refresh before sending again.",
+  "The source materials changed during the reply. Reload before sending again.": "The source materials changed while the reply was being generated. Refresh before sending again.",
+  "The selected question no longer belongs to this task. Reload before sending.": "The selected question no longer belongs to this task. Refresh before sending."
 }

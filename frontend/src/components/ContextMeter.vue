@@ -45,7 +45,9 @@ const number = (value: number) => value.toLocaleString();
       <p v-if="usage.estimatedOverReference" class="notice">
         {{
           t(
-            "The local estimate exceeds a reference line. You can still send; the provider may accept or reject the request.",
+            usage.contextStrategy === "retrieval"
+              ? "The required context exceeds the configured tutor limit. Narrow the question before sending."
+              : "The local estimate exceeds a reference line. You can still send; the provider may accept or reject the request.",
           )
         }}
       </p>
@@ -80,7 +82,10 @@ const number = (value: number) => value.toLocaleString();
             )
           }}
         </p>
-        <p>
+        <p v-if="usage.contextStrategy === 'retrieval'">
+          {{ t("The tutor selects relevant questions, recent conversation and source excerpts. Earlier records remain available. The estimate before sending excludes any additional reading.") }}
+        </p>
+        <p v-else>
           {{
             t(
               "All selected PDF pages are sent in order. Local estimates never remove pages, materials or conversation history.",

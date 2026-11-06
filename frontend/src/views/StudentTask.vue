@@ -47,9 +47,14 @@ const pendingUploads = ref(0),
 const attachments = ref<Material[]>([]),
   attachmentIds = ref<string[]>([]),
   questionId = ref("");
+const focusQuestionId = ref("");
 const usage = ref<ContextUsage | null>(null),
   checking = ref(false);
 const record = computed(() => workspace.value?.record);
+watch(() => workspace.value?.task.content.questions, (questions) => {
+  if (!questions?.some((question) => question.id === focusQuestionId.value)) focusQuestionId.value = "";
+});
+watch(() => props.taskId, () => { focusQuestionId.value = ""; });
 const previewPane = ref<"lesson" | "chat">("lesson");
 const readonly = computed(
   () =>
@@ -278,6 +283,7 @@ async function checkContext() {
         requestId: crypto.randomUUID(),
         revision: record.value.revision,
         answers: answers.value,
+        focusQuestionId: focusQuestionId.value || undefined,
       },
     );
     if (sequence === contextSequence) usage.value = value;
@@ -288,7 +294,7 @@ async function checkContext() {
   }
 }
 watch(
-  [prompt, attachmentIds, answers],
+  [prompt, attachmentIds, answers, focusQuestionId],
   () => {
     clearTimeout(contextTimer);
     contextSequence++;
@@ -312,6 +318,7 @@ async function chat() {
           requestId: crypto.randomUUID(),
           revision: record.value.revision,
           attachmentIds: attachmentIds.value,
+          focusQuestionId: focusQuestionId.value || undefined,
         },
       ),
     );
@@ -446,6 +453,7 @@ void load();
           :answers="answers"
           :readonly="readonly || busy"
           @answer="(id, value) => (answers[id] = value)"
+          @focus-question="(id) => (focusQuestionId = id)"
         />
         <div v-if="record || !preview" class="row wrap task-actions">
           <TButton

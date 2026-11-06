@@ -18,6 +18,8 @@ public interface MaterialService extends IService<CourseMaterial> {
     void retry(String id, AccountUser user);
     void recoverProcessing();
     void processNext();
+    void processRetrieval();
+    void syncRetrieval();
     void recycleRemovedAttachments();
     void reportStorageUsage();
     void requireProcessed(List<CourseMaterial> materials);

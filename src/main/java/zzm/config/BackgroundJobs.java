@@ -35,6 +35,12 @@ public class BackgroundJobs {
         if (acceptingJobs) materials.processNext();
     }
 
+    @Scheduled(fixedDelay = 1500, initialDelay = 3000)
+    public void prepareRetrieval() { if (acceptingJobs) materials.processRetrieval(); }
+
+    @Scheduled(fixedDelay = 30000, initialDelay = 5000)
+    public void syncRetrieval() { if (acceptingJobs) materials.syncRetrieval(); }
+
     @Scheduled(fixedDelay = 30000, initialDelay = 5000)
     public void recycleAttachments() {
         if (acceptingJobs) materials.recycleRemovedAttachments();

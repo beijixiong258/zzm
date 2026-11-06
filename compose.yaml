@@ -1,7 +1,10 @@
 name: zzm-local
 services:
   backend:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: backend
     restart: unless-stopped
     volumes:
       - ./application.yaml:/app/config/application.yaml:ro
@@ -10,14 +13,31 @@ services:
     networks:
       - default
       - existing-mysql
+      - retrieval
+  retrieval:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: retrieval
+    restart: unless-stopped
+    volumes:
+      - retrieval-data:/data
+    networks:
+      - retrieval
   frontend:
-    build: ./frontend
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: frontend
     restart: unless-stopped
     ports:
       - "5173:5173"
     depends_on:
       - backend
 networks:
+  retrieval:
   existing-mysql:
     external: true
     name: local_default
+volumes:
+  retrieval-data:

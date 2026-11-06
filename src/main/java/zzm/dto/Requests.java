@@ -86,6 +86,7 @@ public final class Requests {
         @NotNull @Size(max = 100) private Map<String, String> answers;
     }
     @Data public static class Chat {
+        @Size(max = 100) private String focusQuestionId;
         @Size(max = 100) private Map<@Size(max = 100) String, @Size(max = 20000) String> answers;
         @NotBlank @Size(max = 10000) private String message;
         @NotBlank @Size(max = 100) private String requestId;

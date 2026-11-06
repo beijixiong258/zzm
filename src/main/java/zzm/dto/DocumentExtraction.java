@@ -16,6 +16,8 @@ public class DocumentExtraction {
         private boolean readable;
         private String text = "";
         private List<String> issues = new ArrayList<>();
+        // PDF 检索专用；每项将一个图或公式与它的简短说明、图题放在一起。
+        private List<String> visualPassages;
         private int inputTokens;
         private int estimatedImageTokens;
     }

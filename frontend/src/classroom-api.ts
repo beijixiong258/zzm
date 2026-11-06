@@ -90,6 +90,10 @@ export type Diagram = {
   edges: { from: string; to: string; label: string }[];
 };
 export type ContextUsage = {
+  contextStrategy?: string;
+  estimateBeforeRetrieval?: boolean;
+  allModelInputTokens?: number;
+  allModelOutputTokens?: number;
   window: number;
   inputLimit?: number;
   inputRemaining?: number;

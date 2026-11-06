@@ -9,6 +9,8 @@ import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.http.client.reactive.JdkClientHttpConnector;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.messages.Message;
+import org.springframework.ai.chat.messages.ToolResponseMessage;
+import org.springframework.ai.tool.ToolCallback;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.openai.*;
@@ -40,6 +42,110 @@ public class QwenClient {
     private final ContextBudget budget;
     private final Semaphore slots = new Semaphore(4, true);
     public record Completion(String text, Map<String, Object> usage) {}
+    /** 显式执行只读工具循环，每次模型往返重新核对权限、预算和累计用量。 */
+    public Completion completeTutor(List<Message> initial, List<ToolCallback> callbacks,
+            java.util.function.Supplier<List<Message>> pendingImages, java.util.function.IntSupplier imageTokens, Runnable validate) {
+        return completeTutor(initial, callbacks, pendingImages, imageTokens, validate, properties.getTutor().getTimeoutSeconds(), 0);
+    }
+    public Completion completeTutor(List<Message> initial, List<ToolCallback> callbacks,
+            java.util.function.Supplier<List<Message>> pendingImages, java.util.function.IntSupplier imageTokens, Runnable validate,
+            int seconds, long earlierInput) {
+        return completeTutor(initial, callbacks, pendingImages, imageTokens, validate, seconds, earlierInput, outputTokens("chat", 4096), false);
+    }
+    public Completion completeSummary(List<Message> messages, int output, int seconds) {
+        return completeTutor(messages, List.of(), List::of, () -> 0, () -> {}, Math.min(25, seconds), 0, output, true);
+    }
+    private Completion completeTutor(List<Message> initial, List<ToolCallback> callbacks,
+            java.util.function.Supplier<List<Message>> pendingImages, java.util.function.IntSupplier imageTokens, Runnable validate,
+            int seconds, long earlierInput, int output, boolean json) {
+        var limits = properties.getTutor();
+        int calls = 0;
+        long started = System.nanoTime(), actualInput = 0, actualOutput = 0, estimatedTotal = earlierInput;
+        boolean acquired = false;
+        List<Message> messages = new ArrayList<>(initial);
+        List<Map<String, Object>> rounds = new ArrayList<>();
+        Set<String> performed = new HashSet<>();
+        Map<String, ToolCallback> tools = new LinkedHashMap<>(); callbacks.forEach(c -> tools.put(c.getToolDefinition().name(), c));
+        int schemaTokens = callbacks.stream().mapToInt(c -> budget.upperBound(c.getToolDefinition().inputSchema()) + budget.upperBound(c.getToolDefinition().description()) + 64).sum();
+        int maximumCalls = Math.max(1, Math.min(16, limits.getToolCalls()));
+        int maximumRounds = Math.max(0, Math.min(4, limits.getToolRounds()));
+        long cumulativeLimit = limits.getTurnInputLimit();
+        try {
+            acquired = slots.tryAcquire(10, TimeUnit.SECONDS);
+            if (!acquired) throw error(429, "All AI request slots are busy. Try again shortly.");
+            for (int round = 0; round <= maximumRounds; round++) {
+                validate.run();
+                int remainingSeconds = seconds - (int) TimeUnit.NANOSECONDS.toSeconds(System.nanoTime() - started);
+                if (remainingSeconds <= 0) throw error(504, "The tutor reached its time limit. Narrow the question and try again.");
+                boolean useTools = !callbacks.isEmpty() && round < maximumRounds && calls < maximumCalls
+                    && estimatedTotal + 2L * (budget.tokens(messages) + schemaTokens + imageTokens.getAsInt()) <= cumulativeLimit;
+                var measurement = budget.studentDescribe(messages, limits, output, imageTokens.getAsInt(), useTools ? schemaTokens : 0);
+                long estimated = ((Number) measurement.get("inputEstimate")).longValue();
+                if (Boolean.TRUE.equals(measurement.get("estimatedOverReference")))
+                    throw error(422, "The required tutor context exceeds the configured model limit. Narrow the question or shorten the required instructions.");
+                if (estimatedTotal + estimated > cumulativeLimit) throw error(422, "The tutor reached its reading budget. Ask about a smaller part of the task.");
+                estimatedTotal += estimated;
+                long requestStart = System.nanoTime();
+                ChatResponse response = client(output, json, useTools ? callbacks : List.of(), Math.max(1, remainingSeconds), true)
+                    .prompt(new Prompt(messages)).call().chatResponse();
+                if (TimeUnit.NANOSECONDS.toSeconds(System.nanoTime() - started) >= seconds)
+                    throw error(504, "The tutor reached its time limit. Narrow the question and try again.");
+                if (response == null || response.getResult() == null) throw error(502, "AI returned an empty response");
+                String finish = response.getResult().getMetadata().getFinishReason();
+                if ("length".equalsIgnoreCase(finish) || "content_filter".equalsIgnoreCase(finish))
+                    throw error(502, "The tutor response was not completed. No partial reply was saved.");
+                var usage = response.getMetadata() == null ? null : response.getMetadata().getUsage();
+                long input = usage == null ? 0 : usage.getPromptTokens(), completion = usage == null ? 0 : usage.getCompletionTokens();
+                actualInput += input; actualOutput += completion;
+                estimatedTotal = Math.max(estimatedTotal, earlierInput + actualInput);
+                rounds.add(Map.of("input", input, "output", completion, "inputEstimate", estimated,
+                    "requestMs", TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - requestStart)));
+                var answer = response.getResult().getOutput();
+                if (answer.getToolCalls().isEmpty()) {
+                    if (answer.getText() == null || answer.getText().isBlank()) throw error(502, "AI returned an empty response");
+                    validate.run();
+                    measurement.put("promptTokensActual", actualInput); measurement.put("completionTokensActual", actualOutput);
+                    measurement.put("totalTokensActual", actualInput + actualOutput); measurement.put("turnInputEstimate", estimatedTotal);
+                    measurement.put("toolCalls", calls); measurement.put("modelRounds", rounds);
+                    measurement.put("requestTiming", Map.of("requestMs", TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started)));
+                    return new Completion(answer.getText(), measurement);
+                }
+                if (!useTools) throw error(502, "The model did not finish within the tutor tool budget. Try a more specific question.");
+                messages.add(answer);
+                List<ToolResponseMessage.ToolResponse> responses = new ArrayList<>();
+                for (var call : answer.getToolCalls()) {
+                    if (TimeUnit.NANOSECONDS.toSeconds(System.nanoTime() - started) >= seconds)
+                        throw error(504, "The tutor reached its time limit. Narrow the question and try again.");
+                    validate.run();
+                    ToolCallback callback = tools.get(call.name());
+                    String key = call.name() + ":" + call.arguments(), value;
+                    if (callback == null) value = "{\"error\":\"Unknown read-only tool\"}";
+                    else if (calls >= maximumCalls) value = "{\"error\":\"Reading budget reached; answer using available evidence\"}";
+                    else if (!performed.add(key)) value = "{\"error\":\"This exact read was already returned in this turn\"}";
+                    else {
+                        calls++;
+                        try { value = callback.call(call.arguments()); }
+                        catch (ResponseStatusException exception) { throw exception; }
+                        catch (RuntimeException exception) { value = "{\"error\":\"Invalid tool arguments or unavailable source; correct the request or state the limitation\"}"; }
+                    }
+                    responses.add(new ToolResponseMessage.ToolResponse(call.id(), call.name(), value));
+                }
+                messages.add(ToolResponseMessage.builder().responses(responses).build());
+                messages.addAll(pendingImages.get());
+            }
+            throw error(502, "The tutor did not produce a completed response");
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt(); throw error(503, "AI request was interrupted");
+        } catch (ResponseStatusException exception) { throw exception; }
+        catch (NonTransientAiException | TransientAiException exception) {
+            log.warn("Tutor provider request failed: {}", exception.getMessage());
+            throw error(502, exception.getMessage());
+        } catch (RuntimeException exception) {
+            log.warn("Tutor request failed", exception);
+            throw error(502, "The tutor request failed. No incomplete result was saved. Try again shortly.");
+        }
+        finally { if (acquired) slots.release(); }
+    }
     public String complete(List<Message> messages) { return complete(messages, 4096, false, 0).text(); }
     public Completion complete(List<Message> messages, int output, boolean json, int images) {
         return complete(messages, output, json, images, ignored -> {});
@@ -187,6 +293,9 @@ public class QwenClient {
             "tokenEstimateOnly", true);
     }
     private ChatClient client(int output, boolean json) {
+        return client(output, json, List.of(), configuration().getTimeoutSeconds(), false);
+    }
+    private ChatClient client(int output, boolean json, List<ToolCallback> callbacks, int timeoutSeconds, boolean tutor) {
         AppProperties.Ai ai = configuration();
         String key = environment("AICADEMIYA_AI_API_KEY", ai.getApiKey());
         String base = environment("AICADEMIYA_AI_BASE_URL", ai.getBaseUrl()).replaceAll("/+$", "");
@@ -195,8 +304,8 @@ public class QwenClient {
         if (base.endsWith("/v1")) base = base.substring(0, base.length() - 3);
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
         factory.setProxy(java.net.Proxy.NO_PROXY);
-        factory.setConnectTimeout(Duration.ofSeconds(15));
-        factory.setReadTimeout(Duration.ofSeconds(Math.max(10, ai.getTimeoutSeconds())));
+        factory.setConnectTimeout(Duration.ofSeconds(Math.min(15, Math.max(1, timeoutSeconds))));
+        factory.setReadTimeout(Duration.ofSeconds(Math.max(1, timeoutSeconds)));
         java.net.ProxySelector direct = new java.net.ProxySelector() {
             @Override public List<java.net.Proxy> select(URI uri) { return List.of(java.net.Proxy.NO_PROXY); }
             @Override public void connectFailed(URI uri, java.net.SocketAddress address, IOException exception) {}
@@ -218,11 +327,13 @@ public class QwenClient {
             }).build();
         OpenAiChatOptions.Builder options = OpenAiChatOptions.builder().model(model)
             .temperature(ai.getTemperature()).maxTokens(output).streamUsage(true);
+        if (tutor) options.internalToolExecutionEnabled(false);
+        if (!callbacks.isEmpty()) options.toolCallbacks(callbacks);
         Map<String, Object> extra = new LinkedHashMap<>();
         if ("siliconflow".equals(ai.getProvider())) extra.put("enable_thinking", false);
         if (json) extra.put("response_format", Map.of("type", "json_object"));
         options.extraBody(extra);
-        RetryTemplate retry = RetryTemplate.builder().maxAttempts(2)
+        RetryTemplate retry = RetryTemplate.builder().maxAttempts(tutor ? 1 : 2)
             .retryOn(TransientAiException.class).retryOn(ResourceAccessException.class)
             .exponentialBackoff(Duration.ofSeconds(1), 2, Duration.ofSeconds(3)).build();
         return ChatClient.create(OpenAiChatModel.builder().openAiApi(api).defaultOptions(options.build()).retryTemplate(retry).build());

@@ -10,6 +10,8 @@ import java.util.List;
 @ConfigurationProperties(prefix = "app")
 public class AppProperties {
     private Ai ai = new Ai();
+    private Tutor tutor = new Tutor();
+    private Retrieval retrieval = new Retrieval();
     private String uploadDir;
     private int documentMaxUnits = 300;
     private int documentMaxCharacters = 300000;
@@ -23,6 +25,29 @@ public class AppProperties {
     private long attachmentMaxBytes = 500L * 1024 * 1024;
     private long uploadWarningBytes = 10L * 1024 * 1024 * 1024;
     private String trashDir;
+
+    @Data
+    public static class Tutor {
+        private int inputTarget = 12000;
+        private int materialTokens = 4000;
+        private int recentTokens = 3000;
+        private int recentMessages = 16;
+        private int summaryTokens = 1000;
+        private int inputLimit = 200000;
+        private int contextWindow = 256000;
+        private int turnInputLimit = 60000;
+        private int toolRounds = 3;
+        private int toolCalls = 8;
+        private int timeoutSeconds = 120;
+    }
+
+    @Data
+    public static class Retrieval {
+        private boolean enabled = true;
+        private String baseUrl = "http://retrieval:8181";
+        private int timeoutSeconds = 12;
+        private boolean rerank = false;
+    }
 
     @Data
     public static class Ai {
