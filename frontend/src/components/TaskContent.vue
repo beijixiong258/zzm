@@ -20,7 +20,7 @@ defineProps<{
   readonly?: boolean;
   preview?: boolean;
 }>();
-const emit = defineEmits<{ answer: [id: string, value: string] }>();
+const emit = defineEmits<{ answer: [id: string, value: string]; focusQuestion: [id: string] }>();
 function multiple(
   question: Question,
   option: string,
@@ -115,6 +115,8 @@ function multiple(
       v-for="(question, index) in task.content.questions"
       :key="question.id"
       class="student-question"
+      @focusin="emit('focusQuestion', question.id)"
+      @pointerdown="emit('focusQuestion', question.id)"
     >
       <div class="row spread">
         <strong>{{ t("Question {0}", [index + 1]) }}</strong

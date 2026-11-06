@@ -17,6 +17,8 @@ public class LearningRecord {
     private String answerHistoryJson;
     private String conversationHistoryJson;
     private String messagesJson;
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    private String tutorStateJson;
     private String legacyJson;
     @Version
     private Long revision;

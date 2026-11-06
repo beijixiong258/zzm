@@ -1,5 +1,11 @@
 frontend/node_modules
+retrieval/node_modules
+retrieval/server.test.mjs
 frontend/dist
+frontend/tests
+frontend/artifacts
+frontend/**/*.log
+retrieval/**/*.log
 target
 config.json
 config.*.json
@@ -7,7 +13,6 @@ data-local
 local-materials
 local-demo
 *.tsbuildinfo
-frontend/tests/artifacts
 artifacts
 data
 data-production
@@ -15,6 +20,7 @@ data-v2
 logs
 .env
 .env.*
+frontend/.env*
 /.idea/
 /cys的测试材料/
 local-settings*.json

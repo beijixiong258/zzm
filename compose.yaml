@@ -17,8 +17,14 @@ services:
       retries: 12
       start_period: 30s
   backend:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: backend
     restart: unless-stopped
+    networks:
+      - default
+      - retrieval
     depends_on:
       mysql:
         condition: service_healthy
@@ -37,8 +43,21 @@ services:
       timeout: 5s
       retries: 12
       start_period: 60s
+  retrieval:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: retrieval
+    restart: unless-stopped
+    volumes:
+      - retrieval-data:/data
+    networks:
+      - retrieval
   frontend:
-    build: ./frontend
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: frontend
     restart: unless-stopped
     ports:
       - "5173:5173"
@@ -51,7 +70,10 @@ services:
       timeout: 5s
       retries: 6
       start_period: 15s
+networks:
+  retrieval:
 volumes:
+  retrieval-data:
   mysql-data:
   uploads:
   recycle:

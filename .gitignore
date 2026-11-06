@@ -1,6 +1,7 @@
 /releases/
 
 frontend/node_modules/
+retrieval/node_modules/
 target/
 *.tsbuildinfo
 .env

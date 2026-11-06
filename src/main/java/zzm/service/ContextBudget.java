@@ -4,6 +4,10 @@ import org.springframework.ai.chat.messages.Message;
 import org.springframework.stereotype.Service;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
+import zzm.config.AppProperties;
+import zzm.dto.RetrievalContent;
+import org.springframework.ai.chat.messages.AssistantMessage;
+import org.springframework.ai.chat.messages.ToolResponseMessage;
 
 /** 本地估算仅供参考，请求容量由服务提供方决定。 */
 @Service
@@ -20,6 +24,25 @@ public class ContextBudget {
         long ascii = text.codePoints().filter(c -> c < 128).count();
         long other = text.codePointCount(0, text.length()) - ascii;
         return (int) Math.ceil(ascii / 3.5 + other * 1.5);
+    }
+    public int messageTokens(Message message, boolean conservative) {
+        String text = Objects.toString(message.getText(), "");
+        if (message instanceof AssistantMessage assistant && !assistant.getToolCalls().isEmpty()) text += RetrievalContent.json(assistant.getToolCalls());
+        if (message instanceof ToolResponseMessage response) text += RetrievalContent.json(response.getResponses());
+        return 32 + (conservative ? upperBound(text) : estimate(text));
+    }
+    public int tokens(List<Message> messages) { return messages.stream().mapToInt(m -> messageTokens(m, false)).sum(); }
+    public Map<String, Object> studentDescribe(List<Message> messages, AppProperties.Tutor limits, int output, int images, int toolTokens) {
+        long estimated = images + toolTokens + tokens(messages);
+        long upper = images + toolTokens + messages.stream().mapToLong(m -> messageTokens(m, true)).sum();
+        int hard = Math.min(limits.getInputLimit(), limits.getContextWindow() - output - CHAT_SAFETY);
+        Map<String, Object> result = new LinkedHashMap<>(describe(List.of(), output, images, CHAT_SAFETY));
+        result.put("window", limits.getContextWindow()); result.put("inputLimit", limits.getInputLimit());
+        result.put("inputEstimate", estimated); result.put("inputUpperBound", upper);
+        result.put("inputRemaining", limits.getInputLimit() - upper); result.put("contextRemaining", hard - upper);
+        result.put("remaining", hard - upper); result.put("estimatedOverReference", upper > hard);
+        result.put("contextStrategy", "retrieval"); result.put("softTarget", limits.getInputTarget());
+        return result;
     }
     public int imageTokens(int width, int height) {
         // 硅基流动通义千问的高清图像估算：28 像素网格，像素总数范围为 3136 至 12845056。

@@ -2,6 +2,8 @@ package zzm.entity;
 
 import com.baomidou.mybatisplus.annotation.*;
 import lombok.Data;
+import java.util.Locale;
+import java.util.Objects;
 
 @Data
 public class CourseMaterial {
@@ -18,6 +20,9 @@ public class CourseMaterial {
     private String storagePath;
     private String textContent;
     private String extractionReportJson;
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    private String retrievalJson;
+    private java.time.LocalDateTime retrievalRetryAt;
     private String status;
     private String visibility;
     private String errorMessage;
@@ -27,4 +32,9 @@ public class CourseMaterial {
     private String removedBy;
     private String trashPath;
     private java.time.LocalDateTime createdAt;
+
+    public boolean hasPdfFormat() {
+        return "application/pdf".equalsIgnoreCase(mimeType)
+            || Objects.toString(fileName, "").toLowerCase(Locale.ROOT).endsWith(".pdf");
+    }
 }

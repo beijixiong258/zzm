@@ -29,9 +29,12 @@ public class SchemaEvolution implements ApplicationRunner {
         add("learning_record", "conversation_history_json", "JSON NULL");
         add("learning_record", "preview", "BOOLEAN NOT NULL DEFAULT FALSE");
         add("learning_record", "snapshot_json", "JSON NULL");
+        add("learning_record", "tutor_state_json", "JSON NULL");
         Long versionRequired = jdbc.queryForObject("SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='learning_record' AND column_name='version_id' AND is_nullable='NO'", Long.class);
         if (versionRequired != null && versionRequired > 0) jdbc.execute("ALTER TABLE learning_record MODIFY version_id VARCHAR(64) NULL");
         add("course_material", "extraction_report_json", "JSON NULL");
+        add("course_material", "retrieval_json", "JSON NULL");
+        add("course_material", "retrieval_retry_at", "DATETIME(3) NULL");
         add("course_material", "owner_id", "VARCHAR(64) NULL");
         add("course_material", "record_id", "VARCHAR(64) NULL");
         add("course_material", "question_id", "VARCHAR(100) NULL");

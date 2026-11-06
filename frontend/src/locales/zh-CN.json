@@ -1,4 +1,5 @@
 {
+  "The tutor selects relevant questions, recent conversation and source excerpts. Earlier records remain available. The estimate before sending excludes any additional reading.": "AI 助教会选取相关题目、近期对话和材料片段，较早的记录仍会保留。发送前的估算不包含后续可能补充读取的内容。",
   "Processing complete": "处理完成",
   "Processing complete · AI input limit exceeded": "处理完成 · 超出 AI 输入容量",
   "Estimated use: {0} tokens / limit: {1}": "预计使用 {0} 个 token，上限为 {1} 个",
@@ -1455,5 +1456,20 @@
   "AI connection or response processing failed ({0}). No incomplete result was applied.": "AI 连接或响应处理失败（{0}）。不完整的结果未应用。",
   "Generation processing failed ({0})": "内容生成失败（{0}）。",
   "Update task": "更新任务",
-  "Task updated.": "任务已更新。"
+  "Task updated.": "任务已更新。",
+  "The required context exceeds the configured tutor limit. Narrow the question before sending.": "必要上下文已超出 AI 助教的配置上限，请缩小提问范围后发送。",
+  "All AI request slots are busy. Try again shortly.": "AI 请求繁忙，请稍后重试。",
+  "The tutor reached its time limit. Narrow the question and try again.": "AI 助教处理超时，请缩小提问范围后重试。",
+  "The required tutor context exceeds the configured model limit. Narrow the question or shorten the required instructions.": "必要上下文已超出模型配置上限，请缩小提问范围，或请教师精简任务指令。",
+  "The tutor reached its reading budget. Ask about a smaller part of the task.": "本轮读取量已达到上限，请围绕任务中较小的部分提问。",
+  "The tutor response was not completed. No partial reply was saved.": "AI 助教的回复未完成，不完整的回复未保存。",
+  "The model did not finish within the tutor tool budget. Try a more specific question.": "AI 助教在本轮读取次数上限内未完成回复，请提出更具体的问题。",
+  "The tutor did not produce a completed response": "AI 助教未生成完整回复。",
+  "AI request was interrupted": "AI 请求已中断。",
+  "The tutor request failed. No incomplete result was saved. Try again shortly.": "AI 助教请求失败，不完整的结果未保存，请稍后重试。",
+  "Page not found": "未找到指定页面。",
+  "The PDF page could not be read": "无法读取指定的 PDF 页面。",
+  "This task or learning record changed during the reply. Reload before sending again.": "生成回复期间，任务或学习记录已更新，请刷新后重新发送。",
+  "The source materials changed during the reply. Reload before sending again.": "生成回复期间，参考材料已更新，请刷新后重新发送。",
+  "The selected question no longer belongs to this task. Reload before sending.": "当前选中的题目已不属于此任务，请刷新后发送。"
 }

@@ -3,6 +3,9 @@ package zzm.service.impl;
 import zzm.config.AppProperties;
 import zzm.dto.Requests;
 import zzm.dto.DocumentExtraction;
+import zzm.dto.RetrievalContent;
+import zzm.dto.RetrievalContent.*;
+import zzm.integration.QmdClient;
 import zzm.entity.*;
 import zzm.mapper.*;
 import zzm.service.*;
@@ -35,7 +38,96 @@ public class MaterialServiceImpl extends ServiceImpl<CourseMaterialMapper, Cours
     private final SessionVersionMapper versions;
     private final TeachingSessionMapper sessions;
     private final LearningRecordMapper records;
+    private final AiService ai;
+    private final QmdClient qmd;
     private String recycleCursor;
+    private String retrievalCursor;
+
+    /** 每次只处理一份文本或一个 PDF 页面，保存进度后可从中断处恢复。 */
+    @Override public synchronized void processRetrieval() {
+        if (!properties.getRetrieval().isEnabled()) return;
+        var query = lambdaQuery().eq(CourseMaterial::getArchived, false).isNull(CourseMaterial::getFileRemovedAt)
+            .isNotNull(CourseMaterial::getCourseId).in(CourseMaterial::getStatus, "ready", "needsReview")
+            .and(q -> q.isNull(CourseMaterial::getRetrievalRetryAt).or().le(CourseMaterial::getRetrievalRetryAt, LocalDateTime.now(ZoneOffset.UTC)));
+        if (retrievalCursor != null) query.gt(CourseMaterial::getId, retrievalCursor);
+        List<CourseMaterial> batch = query.orderByAsc(CourseMaterial::getId).last("LIMIT 20").list();
+        if (batch.isEmpty()) { retrievalCursor = null; return; }
+        for (CourseMaterial material : batch) {
+            retrievalCursor = material.getId();
+            Course course = courses.getById(material.getCourseId());
+            if (course == null || Boolean.TRUE.equals(course.getArchived())) continue;
+            RetrievalContent content = RetrievalContent.read(material);
+            if (content.isComplete()) continue;
+            try {
+                requireProcessed(List.of(material));
+                if (PdfInputReader.isPdf(material)) {
+                    int page = content.getNextPage();
+                    var source = pdf.searchPage(material, page);
+                    var reading = source.image() == null ? null : ai.readPdfForSearch("Material " + material.getId() + ", page " + page, source);
+                    content.appendPdfPage(page, source.text(), reading);
+                    content.setNextPage(page + 1);
+                    if (page >= pdf.report(material).getUnitsTotal()) content.finish();
+                } else {
+                    content.append(material.getTextContent(), 0, "extracted", !"needsReview".equals(material.getStatus()));
+                    content.finish();
+                }
+                // 重处理或删除已开始时，旧解析结果不得覆盖当前材料。
+                var update = lambdaUpdate().eq(CourseMaterial::getId, material.getId()).eq(CourseMaterial::getStatus, material.getStatus())
+                    .eq(CourseMaterial::getArchived, false).isNull(CourseMaterial::getFileRemovedAt)
+                    .eq(CourseMaterial::getTextContent, material.getTextContent());
+                if (material.getExtractionReportJson() == null) update.isNull(CourseMaterial::getExtractionReportJson);
+                else update.apply("CAST(extraction_report_json AS CHAR) = CAST(CAST({0} AS JSON) AS CHAR)", material.getExtractionReportJson());
+                // 慢返回的视觉识别只能续写自己读到的进度，防止并发任务覆盖已完成的页面。
+                if (material.getRetrievalJson() == null) update.isNull(CourseMaterial::getRetrievalJson);
+                else update.apply("retrieval_json = CAST({0} AS JSON)", material.getRetrievalJson());
+                update.set(CourseMaterial::getRetrievalJson, RetrievalContent.json(content)).set(CourseMaterial::getRetrievalRetryAt, null).update();
+            } catch (RuntimeException exception) {
+                lambdaUpdate().eq(CourseMaterial::getId, material.getId()).set(CourseMaterial::getRetrievalRetryAt, LocalDateTime.now(ZoneOffset.UTC).plusMinutes(1)).update();
+                log.warn("Material retrieval preparation failed: material={}, cause={}", material.getId(), exception.getClass().getSimpleName());
+            }
+            return;
+        }
+    }
+
+    /** 对账以数据库当前状态为准；即使主体已级联删除，也可清除检索服务中的孤立内容。 */
+    @Override public synchronized void syncRetrieval() {
+        if (!properties.getRetrieval().isEnabled()) return;
+        try {
+            JSONObject manifest = qmd.request("GET", "/corpora", null);
+            Map<String, JSONObject> remote = new HashMap<>();
+            manifest.getJSONArray("corpora").forEach(value -> { var item = JSONUtil.parseObj(value); remote.put(item.getStr("id"), item); });
+            Set<String> desired = new HashSet<>();
+            List<TeachingSession> tasks = sessions.selectList(Wrappers.<TeachingSession>lambdaQuery().eq(TeachingSession::getArchived, false));
+            Set<String> activeTasks = new HashSet<>();
+            for (TeachingSession task : tasks) {
+                Course course = courses.getById(task.getCourseId());
+                if (course == null || Boolean.TRUE.equals(course.getArchived())) continue;
+                activeTasks.add(task.getId());
+                if (task.getPublishedVersionId() == null) continue;
+                SessionVersion version = versions.selectById(task.getPublishedVersionId());
+                if (version != null) syncCorpus(RetrievalContent.lesson("t-" + task.getId(), RetrievalContent.lessonText(JSONUtil.parseObj(version.getContentJson()))), desired, remote);
+            }
+            Set<String> activeRecords = new HashSet<>();
+            if (!activeTasks.isEmpty()) for (LearningRecord record : records.selectList(Wrappers.<LearningRecord>lambdaQuery().in(LearningRecord::getSessionId, activeTasks))) {
+                activeRecords.add(record.getId());
+                if (Boolean.TRUE.equals(record.getPreview())) syncCorpus(RetrievalContent.lesson("p-" + record.getId(), RetrievalContent.lessonText(JSONUtil.parseObj(record.getSnapshotJson()))), desired, remote);
+            }
+            for (CourseMaterial material : lambdaQuery().eq(CourseMaterial::getArchived, false).isNull(CourseMaterial::getFileRemovedAt)
+                .isNotNull(CourseMaterial::getCourseId).in(CourseMaterial::getStatus, "ready", "needsReview").list()) {
+                Course course = courses.getById(material.getCourseId());
+                if (course == null || Boolean.TRUE.equals(course.getArchived()) || material.getOwnerId() != null && !activeRecords.contains(material.getRecordId())) continue;
+                RetrievalContent content = RetrievalContent.read(material);
+                if (content.isComplete()) syncCorpus(new Corpus("m-" + material.getId(), content.getRevision(), material.getTitle(), content.getParts()), desired, remote);
+            }
+            for (String id : remote.keySet()) if (!desired.contains(id)) qmd.remove(id);
+        } catch (RuntimeException exception) {
+            log.debug("Retrieval synchronisation deferred: {}", exception.getClass().getSimpleName());
+        }
+    }
+    private void syncCorpus(Corpus corpus, Set<String> desired, Map<String, JSONObject> remote) {
+        desired.add(corpus.id()); JSONObject existing = remote.get(corpus.id());
+        if (existing == null || !corpus.revision().equals(existing.getStr("revision")) || "deleted".equals(existing.getStr("status"))) qmd.put(corpus);
+    }
     @Override public List<Map<String, Object>> library(String courseId, AccountUser user) {
         courses.requireAccess(courseId, user, true);
         return lambdaQuery().eq(CourseMaterial::getCourseId, courseId).isNull(CourseMaterial::getOwnerId).isNull(CourseMaterial::getFileRemovedAt).orderByAsc(CourseMaterial::getRelativePath).list().stream().map(this::view).toList();

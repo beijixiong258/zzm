@@ -11,10 +11,14 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.contentstream.PDContentStream;
 import org.apache.pdfbox.contentstream.operator.Operator;
+import org.apache.pdfbox.cos.COSName;
+import org.apache.pdfbox.cos.COSNumber;
 import org.apache.pdfbox.pdfparser.PDFStreamParser;
 import org.apache.pdfbox.pdmodel.*;
 import org.apache.pdfbox.pdmodel.graphics.form.PDFormXObject;
 import org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject;
+import org.apache.pdfbox.pdmodel.interactive.annotation.PDAnnotationLink;
+import org.apache.pdfbox.pdmodel.interactive.annotation.PDAnnotationPopup;
 import org.apache.pdfbox.rendering.PDFRenderer;
 import org.apache.pdfbox.text.PDFTextStripper;
 import org.springframework.stereotype.Component;
@@ -22,6 +26,8 @@ import javax.imageio.*;
 import javax.imageio.stream.MemoryCacheImageOutputStream;
 import java.awt.Color;
 import java.awt.Rectangle;
+import java.awt.geom.Path2D;
+import java.awt.geom.Rectangle2D;
 import java.awt.image.BufferedImage;
 import java.io.*;
 import java.nio.file.Path;
@@ -38,9 +44,42 @@ public class PdfInputReader {
     private final AppProperties properties;
     private final ContextBudget budget;
 
+    public record SearchPage(String text, byte[] image) {}
+
+    /** 检索表示单独读取原生文字和必要原图，不改变教师生成所用的整份 PDF 输入模式。 */
+    public SearchPage searchPage(CourseMaterial material, int pageNumber) {
+        try (PDDocument document = Loader.loadPDF(properties.uploadPath(material.getStoragePath()).toFile())) {
+            if (pageNumber < 1 || pageNumber > document.getNumberOfPages()) throw error(422, "Page not found");
+            String text = "";
+            if (document.getCurrentAccessPermission().canExtractContent()) {
+                PDFTextStripper stripper = new PDFTextStripper(); stripper.setSortByPosition(true);
+                stripper.setStartPage(pageNumber); stripper.setEndPage(pageNumber); text = stripper.getText(document).strip();
+            }
+            PDPage page = document.getPage(pageNumber - 1);
+            // 混排页保留文字层，同时为图中独有的公式、标签和关系准备页面图像。
+            String nativeText = usableText(text) ? text : "";
+            boolean visual = nativeText.isBlank() || hasGraphics(page, page.getResources(), 0, true)
+                || page.getAnnotations().stream().anyMatch(a -> !a.isInvisible() && !a.isHidden() && !a.isNoView()
+                    && !(a instanceof PDAnnotationLink) && !(a instanceof PDAnnotationPopup));
+            return new SearchPage(nativeText, visual ? renderPage(document, pageNumber) : null);
+        } catch (IOException exception) { throw error(422, "The PDF page could not be read"); }
+    }
+    /** 学生对话只渲染指定页；不调用遍历全部页面的生成入口。 */
+    public byte[] image(CourseMaterial material, int pageNumber) {
+        try (PDDocument document = Loader.loadPDF(properties.uploadPath(material.getStoragePath()).toFile())) {
+            if (pageNumber < 1 || pageNumber > document.getNumberOfPages()) throw error(422, "Page not found");
+            return renderPage(document, pageNumber);
+        } catch (IOException exception) { throw error(422, "The PDF page could not be read"); }
+    }
+    private byte[] renderPage(PDDocument document, int pageNumber) throws IOException {
+        PDFRenderer renderer = new PDFRenderer(document); renderer.setSubsamplingAllowed(true);
+        BufferedImage picture = renderer.renderImageWithDPI(pageNumber - 1, dpi(document.getPage(pageNumber - 1)));
+        try { return jpeg(picture, cropBounds(picture)); }
+        finally { picture.flush(); }
+    }
+
     public static boolean isPdf(CourseMaterial material) {
-        return "application/pdf".equalsIgnoreCase(material.getMimeType())
-            || Objects.toString(material.getFileName(), "").toLowerCase(Locale.ROOT).endsWith(".pdf");
+        return material.hasPdfFormat();
     }
     public Report report(CourseMaterial material) {
         return material.getExtractionReportJson() == null ? new Report()
@@ -96,7 +135,7 @@ public class PdfInputReader {
                     stripper.setStartPage(i + 1); stripper.setEndPage(i + 1);
                     text = stripper.getText(document).strip();
                     // 纯文本提取无法完整保留图形和批注。
-                    if (!usableText(text) || hasGraphics(document.getPage(i), document.getPage(i).getResources(), 0)
+                    if (!usableText(text) || hasGraphics(document.getPage(i), document.getPage(i).getResources(), 0, false)
                         || !document.getPage(i).getAnnotations().isEmpty()) images = true;
                     if (!images && text.isBlank()) {
                         BufferedImage page = renderer.renderImageWithDPI(i, dpi(document.getPage(i)));
@@ -207,22 +246,78 @@ public class PdfInputReader {
         int edge = Math.max(1000, Math.min(3000, properties.getDocumentImageMaxEdge()));
         return (float) Math.min(144, edge * 72.0 / Math.max(width, height));
     }
-    private boolean hasGraphics(PDContentStream stream, PDResources resources, int depth) throws IOException {
+    private boolean hasGraphics(PDContentStream stream, PDResources resources, int depth, boolean skipRules) throws IOException {
         if (depth > 12) return true;
-        Object previous = null;
-        for (Object token : new PDFStreamParser(stream).parse()) {
-            if (token instanceof Operator operator) {
-                if (Set.of("BI", "sh", "S", "s", "f", "F", "f*", "B", "B*", "b", "b*").contains(operator.getName())) return true;
-                if ("Do".equals(operator.getName()) && previous instanceof org.apache.pdfbox.cos.COSName resource) {
-                    if (resources == null) return true;
-                    var object = resources.getXObject(resource);
+        List<Object> tokens = new PDFStreamParser(stream).parse();
+        int pathStart = 0;
+        int boxes = 0;
+        int horizontalRules = 0, verticalRules = 0;
+        for (int i = 0; i < tokens.size(); i++) {
+            if (!(tokens.get(i) instanceof Operator operator)) continue;
+            switch (operator.getName()) {
+                case "BI", "sh" -> { return true; }
+                case "Do" -> {
+                    if (resources == null || i == 0 || !(tokens.get(i - 1) instanceof COSName name)) return true;
+                    var object = resources.getXObject(name);
                     if (object instanceof PDImageXObject) return true;
-                    if (object instanceof PDFormXObject form && hasGraphics(form, form.getResources() == null ? resources : form.getResources(), depth + 1)) return true;
+                    if (object instanceof PDFormXObject form && hasGraphics(form,
+                        form.getResources() == null ? resources : form.getResources(), depth + 1, skipRules)) return true;
                 }
+                case "S", "s", "f", "F", "f*", "B", "B*", "b", "b*" -> {
+                    if (!skipRules) return true;
+                    var shape = simplePath(tokens, pathStart, i);
+                    if (shape == null) return true;
+                    Rectangle2D bounds = shape.getBounds2D();
+                    double width = bounds.getWidth(), height = bounds.getHeight();
+                    if (width > 0 && height > 0 && !shape.contains(bounds)) return true;
+                    double thickness = Math.min(width, height);
+                    if (thickness <= 2 && Math.max(width, height) >= 8 * thickness) {
+                        if (width > height) horizontalRules++;
+                        if (height > width) verticalRules++;
+                        // 同时出现横纵边界和内部划线，可能是需要保留行列关系的表格。
+                        if (horizontalRules >= 3 && verticalRules >= 3) return true;
+                    } else {
+                        boolean outline = "S".equals(operator.getName()) || "s".equals(operator.getName());
+                        boolean pageBackground = stream instanceof PDPage p && bounds.contains(p.getCropBox().getLowerLeftX(),
+                            p.getCropBox().getLowerLeftY(), p.getCropBox().getWidth(), p.getCropBox().getHeight());
+                        if (!outline && !pageBackground) return true;
+                        if (outline && ++boxes > 1) return true;
+                    }
+                    pathStart = i + 1;
+                }
+                case "n" -> pathStart = i + 1;
             }
-            previous = token;
         }
         return false;
+    }
+    /** 只把一条轴对齐线或一个独立矩形视为装饰；曲线、组合路径和无法判读的路径保守地保留。 */
+    private Path2D simplePath(List<Object> tokens, int start, int end) {
+        Path2D.Double path = new Path2D.Double();
+        int points = 0;
+        for (int i = start; i < end; i++) {
+            if (!(tokens.get(i) instanceof Operator operator)) continue;
+            switch (operator.getName()) {
+                case "re" -> {
+                    if (points != 0 || i < 4) return null;
+                    if (!(tokens.get(i - 4) instanceof COSNumber x) || !(tokens.get(i - 3) instanceof COSNumber y)
+                        || !(tokens.get(i - 2) instanceof COSNumber w) || !(tokens.get(i - 1) instanceof COSNumber h)) return null;
+                    double x0 = x.floatValue(), y0 = y.floatValue(), x1 = x0 + w.floatValue(), y1 = y0 + h.floatValue();
+                    path.append(new Rectangle2D.Double(Math.min(x0, x1), Math.min(y0, y1), Math.abs(x1 - x0), Math.abs(y1 - y0)), false);
+                    points = 5;
+                }
+                case "m", "l" -> {
+                    if (++points > 5 || i < 2 || !(tokens.get(i - 2) instanceof COSNumber x)
+                        || !(tokens.get(i - 1) instanceof COSNumber y)) return null;
+                    if ("m".equals(operator.getName()) && points == 1) path.moveTo(x.floatValue(), y.floatValue());
+                    else if ("l".equals(operator.getName()) && points > 1) path.lineTo(x.floatValue(), y.floatValue());
+                    else return null;
+                }
+                case "h" -> { if (points > 0) path.closePath(); }
+                case "c", "v", "y" -> { return null; }
+                case "cm" -> { if (points > 0) return null; }
+            }
+        }
+        return path;
     }
     private Rectangle inkBounds(BufferedImage image) {
         int left = image.getWidth(), right = -1, top = image.getHeight(), bottom = -1;
