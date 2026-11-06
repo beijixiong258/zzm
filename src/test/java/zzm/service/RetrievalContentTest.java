@@ -15,13 +15,13 @@ class RetrievalContentTest {
         material.setRetrievalJson(RetrievalContent.json(content));
         var restored = RetrievalContent.read(material);
         assertTrue(restored.isComplete()); assertEquals(content.getRevision(), restored.getRevision());
-        assertEquals(source, restored.getParts().stream().map(RetrievalContent.Part::text).collect(java.util.stream.Collectors.joining()));
+        assertEquals(source, restored.getParts().stream().map(RetrievalContent.DocumentPart::text).collect(java.util.stream.Collectors.joining()));
         assertTrue(restored.getParts().stream().allMatch(p -> p.page() == 7 && p.text().length() <= 2400));
         material.setTextContent("changed"); assertFalse(RetrievalContent.read(material).isComplete());
     }
     @Test void lessonEditsChangeTheRevisionWithoutChangingTheBusinessId() {
-        var first = RetrievalContent.lesson("t-task", "First teacher text");
-        var second = RetrievalContent.lesson("t-task", "Corrected teacher text");
+        var first = RetrievalContent.createLessonDocument("t-task", "First teacher text");
+        var second = RetrievalContent.createLessonDocument("t-task", "Corrected teacher text");
         assertEquals(first.id(), second.id()); assertNotEquals(first.revision(), second.revision());
     }
 
@@ -49,8 +49,8 @@ class RetrievalContentTest {
         index.appendPdfPage(5, "", reading);
         var parts = index.getParts();
         assertEquals(List.of("Original caption", formula, "Printed words on the scan", formula),
-            parts.stream().map(RetrievalContent.Part::text).toList());
-        assertEquals(List.of(4, 4, 5, 5), parts.stream().map(RetrievalContent.Part::page).toList());
+            parts.stream().map(RetrievalContent.DocumentPart::text).toList());
+        assertEquals(List.of(4, 4, 5, 5), parts.stream().map(RetrievalContent.DocumentPart::page).toList());
         assertTrue(parts.get(0).reliable()); assertFalse(parts.get(1).reliable());
         assertEquals(3000L, index.getVisionInputTokens());
     }

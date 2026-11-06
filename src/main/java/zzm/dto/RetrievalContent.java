@@ -16,12 +16,12 @@ public class RetrievalContent {
     private int nextPage = 1;
     private boolean complete;
     private long visionInputTokens;
-    private List<Part> parts = new ArrayList<>();
+    private List<DocumentPart> parts = new ArrayList<>();
 
-    public record Part(String id, String text, int page, String method, boolean reliable) {}
-    public record Scope(String id, String revision) {}
-    public record Corpus(String id, String revision, String title, List<Part> parts) {}
-    public record Hit(String corpusId, String revision, String partId, int page, String snippet, double score) {}
+    public record DocumentPart(String id, String text, int page, String method, boolean reliable) {}
+    public record SearchScope(String id, String revision) {}
+    public record RetrievalDocument(String id, String revision, String title, List<DocumentPart> parts) {}
+    public record SearchResult(String documentId, String revision, String partId, int page, String snippet, double score) {}
 
     public static String json(Object value) {
         try { return JSON.writeValueAsString(value); }
@@ -82,12 +82,12 @@ public class RetrievalContent {
         part(current.toString(), page, method, reliable);
     }
     private void part(String text, int page, String method, boolean reliable) {
-        if (!text.isBlank()) parts.add(new Part("s" + parts.size(), text, page, method, reliable));
+        if (!text.isBlank()) parts.add(new DocumentPart("s" + parts.size(), text, page, method, reliable));
     }
-    public static Corpus lesson(String id, String text) {
+    public static RetrievalDocument createLessonDocument(String id, String text) {
         RetrievalContent content = new RetrievalContent(); content.sourceKey = hash(text);
         content.append(text, 0, "published", true); content.finish();
-        return new Corpus(id, content.revision, "Current lesson", content.parts);
+        return new RetrievalDocument(id, content.revision, "Current lesson", content.parts);
     }
     public static String lessonText(cn.hutool.json.JSONObject snapshot) {
         var content = snapshot.getJSONObject("content");

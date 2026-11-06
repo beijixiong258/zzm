@@ -1,6 +1,5 @@
 frontend/node_modules
 retrieval/node_modules
-retrieval/server.test.mjs
 frontend/dist
 frontend/tests
 frontend/artifacts

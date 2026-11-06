@@ -1,6 +1,7 @@
 name: zzm-local
 services:
   backend:
+    pull_policy: build
     build:
       context: .
       dockerfile: Dockerfile
@@ -13,18 +14,8 @@ services:
     networks:
       - default
       - existing-mysql
-      - retrieval
-  retrieval:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: retrieval
-    restart: unless-stopped
-    volumes:
-      - retrieval-data:/data
-    networks:
-      - retrieval
   frontend:
+    pull_policy: build
     build:
       context: .
       dockerfile: Dockerfile
@@ -35,9 +26,6 @@ services:
     depends_on:
       - backend
 networks:
-  retrieval:
   existing-mysql:
     external: true
     name: local_default
-volumes:
-  retrieval-data:
