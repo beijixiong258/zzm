@@ -1399,7 +1399,7 @@
   "Teaching task": "教学任务",
   "New lesson": "新建任务",
   "Upload your teaching materials": "上传教学材料",
-  "Upload all lesson materials, worksheets, answer keys and teaching instructions together. AI will organize them into a lesson for you to review and edit.": "请将课件、练习单、参考答案和提示词一并上传。AI 会据此生成讲义，供你预览和修改。",
+  "Upload all lesson materials, worksheets, answer keys and teaching instructions together. AI will organize them into a lesson for you to review and edit.": "请将课件（含题目和答案）以及提示词一并上传。AI 会据此生成讲义，供你预览和修改",
   "The lesson can be generated when all uploaded materials are ready.": "全部上传材料处理完成后，即可生成讲义。",
   "Preview and edit lesson": "预览与修改讲义",
   "Edit lesson": "编辑讲义",
