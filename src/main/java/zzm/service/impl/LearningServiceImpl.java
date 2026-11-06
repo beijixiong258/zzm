@@ -356,7 +356,7 @@ public class LearningServiceImpl extends ServiceImpl<LearningRecordMapper, Learn
         final TutorState state;
         final List<TaskContent.Question> focus;
         final Map<String, CourseMaterial> allowed = new LinkedHashMap<>();
-        final Map<String, Corpus> corpora = new LinkedHashMap<>();
+        final Map<String, RetrievalDocument> documents = new LinkedHashMap<>();
         final Set<String> publicSources = new HashSet<>(), supplied = new HashSet<>();
         final List<Message> images = new ArrayList<>();
         final String taskFingerprint, materialFingerprint;
@@ -387,8 +387,8 @@ public class LearningServiceImpl extends ServiceImpl<LearningRecordMapper, Learn
             materialFingerprint = fingerprint(allowed.values());
             state = tutor.state(record.getTutorStateJson(), RetrievalContent.hash(taskFingerprint + materialFingerprint), history);
             focus = tutor.focus(content, input, state);
-            Corpus lesson = RetrievalContent.lesson((Boolean.TRUE.equals(record.getPreview()) ? "p-" + record.getId() : "t-" + record.getSessionId()), RetrievalContent.lessonText(snapshot));
-            corpora.put("lesson", lesson);
+            RetrievalDocument lesson = RetrievalContent.createLessonDocument((Boolean.TRUE.equals(record.getPreview()) ? "p-" + record.getId() : "t-" + record.getSessionId()), RetrievalContent.lessonText(snapshot));
+            documents.put("lesson", lesson);
             for (CourseMaterial material : allowed.values()) {
                 RetrievalContent prepared = RetrievalContent.read(material);
                 if (!prepared.isComplete()) {
@@ -397,12 +397,12 @@ public class LearningServiceImpl extends ServiceImpl<LearningRecordMapper, Learn
                     prepared = new RetrievalContent(); prepared.setSourceKey(RetrievalContent.sourceKey(material));
                     prepared.append(material.getTextContent(), 0, "extracted", !"needsReview".equals(material.getStatus())); prepared.finish();
                 }
-                corpora.put(material.getId(), new Corpus("m-" + material.getId(), prepared.getRevision(), material.getTitle(), prepared.getParts()));
+                documents.put(material.getId(), new RetrievalDocument("m-" + material.getId(), prepared.getRevision(), material.getTitle(), prepared.getParts()));
             }
             state.getSources().removeIf(ref -> {
                 String source = Objects.toString(ref.get("sourceId"), "");
-                Corpus corpus = corpora.get(source);
-                return corpus == null || !Objects.equals(ref.get("revision"), corpus.revision());
+                RetrievalDocument document = documents.get(source);
+                return document == null || !Objects.equals(ref.get("revision"), document.revision());
             });
         }
         private boolean active(CourseMaterial material) {
@@ -520,16 +520,16 @@ public class LearningServiceImpl extends ServiceImpl<LearningRecordMapper, Learn
             searchCalls++;
             long started = System.nanoTime();
             try {
-                List<Scope> scopes = corpora.entrySet().stream().filter(e -> !excludedSources.contains(e.getKey()))
-                    .map(Map.Entry::getValue).filter(c -> !c.parts().isEmpty()).map(c -> new Scope(c.id(), c.revision())).toList();
+                List<SearchScope> scopes = documents.entrySet().stream().filter(e -> !excludedSources.contains(e.getKey()))
+                    .map(Map.Entry::getValue).filter(c -> !c.parts().isEmpty()).map(c -> new SearchScope(c.id(), c.revision())).toList();
                 List<Map<String, Object>> hits = new ArrayList<>();
-                for (Hit hit : qmd.search(scopes, query, 5)) {
-                    var match = corpora.entrySet().stream().filter(e -> e.getValue().id().equals(hit.corpusId()) && e.getValue().revision().equals(hit.revision())).findFirst();
+                for (SearchResult hit : qmd.searchDocuments(scopes, query, 5)) {
+                    var match = documents.entrySet().stream().filter(e -> e.getValue().id().equals(hit.documentId()) && e.getValue().revision().equals(hit.revision())).findFirst();
                     if (match.isEmpty() || excludedSources.contains(match.get().getKey())) continue;
-                    Corpus corpus = match.get().getValue();
-                    Part part = corpus.parts().stream().filter(p -> p.id().equals(hit.partId())).findFirst().orElse(null);
+                    RetrievalDocument document = match.get().getValue();
+                    DocumentPart part = document.parts().stream().filter(p -> p.id().equals(hit.partId())).findFirst().orElse(null);
                     if (part == null) continue;
-                    Map<String, Object> item = source(match.get().getKey()); item.put("partId", partLocator(corpus, part)); item.put("page", part.page()); item.put("snippet", hit.snippet()); hits.add(item);
+                    Map<String, Object> item = source(match.get().getKey()); item.put("partId", partLocator(document, part)); item.put("page", part.page()); item.put("snippet", hit.snippet()); hits.add(item);
                 }
                 // 原图可用而检索文本尚未完成时，也须提供材料定位信息，不能把未命中当成没有原文件。
                 return bounded(Map.of("matches", hits, "sources", sourceDirectory(), "notice", "Snippets locate evidence. Read the exact part before quoting details. Sources remain readable even when not indexed; use read_page for a requested PDF page."));
@@ -544,39 +544,39 @@ public class LearningServiceImpl extends ServiceImpl<LearningRecordMapper, Learn
         }
         private Map<String, Object> source(String id) {
             Map<String, Object> result = new LinkedHashMap<>(); result.put("sourceId", id);
-            Corpus corpus = corpora.get(id);
-            result.put("firstPart", corpus == null || corpus.parts().isEmpty() ? "" : partLocator(corpus, corpus.parts().get(0)));
+            RetrievalDocument document = documents.get(id);
+            result.put("firstPart", document == null || document.parts().isEmpty() ? "" : partLocator(document, document.parts().get(0)));
             result.put("public", "lesson".equals(id) || publicSources.contains(id));
             CourseMaterial material = allowed.get(id);
             result.put("title", "lesson".equals(id) ? snapshot.getStr("title") : publicSources.contains(id) && material != null ? material.getTitle() : "Private teaching reference");
             if (material != null && PdfInputReader.isPdf(material)) result.put("pages", pdf.report(material).getUnitsTotal());
             return result;
         }
-        private String partLocator(Corpus corpus, Part part) {
+        private String partLocator(RetrievalDocument document, DocumentPart part) {
             // 对模型隐藏顺序编号，避免将 s52 等片段编号误读为 PDF 第 52 页；不改变现有索引。
-            return "part-" + RetrievalContent.hash(corpus.id() + ":" + corpus.revision() + ":" + part.id()).substring(0, 16);
+            return "part-" + RetrievalContent.hash(document.id() + ":" + document.revision() + ":" + part.id()).substring(0, 16);
         }
-        private boolean matchesPart(Corpus corpus, Part part, String locator) {
-            return partLocator(corpus, part).equals(locator) || part.id().equals(locator);
+        private boolean matchesPart(RetrievalDocument document, DocumentPart part, String locator) {
+            return partLocator(document, part).equals(locator) || part.id().equals(locator);
         }
         Object readPart(String id, String partId) {
             if (!"lesson".equals(id) && !allowed.containsKey(id)) return Map.of("error", "Source is not available in this task");
-            Corpus corpus = corpora.get(id);
-            if (corpus == null) return Map.of("source", source(id), "notice", "Search text is not prepared. Read a specific original page if needed.");
-            int index = -1; for (int i = 0; i < corpus.parts().size(); i++) if (matchesPart(corpus, corpus.parts().get(i), partId)) { index = i; break; }
+            RetrievalDocument document = documents.get(id);
+            if (document == null) return Map.of("source", source(id), "notice", "Search text is not prepared. Read a specific original page if needed.");
+            int index = -1; for (int i = 0; i < document.parts().size(); i++) if (matchesPart(document, document.parts().get(i), partId)) { index = i; break; }
             if (index < 0) return Map.of("error", "Part not found", "source", source(id));
-            Part part = corpus.parts().get(index); String hash = RetrievalContent.hash(part.text());
-            String locator = partLocator(corpus, part);
+            DocumentPart part = document.parts().get(index); String hash = RetrievalContent.hash(part.text());
+            String locator = partLocator(document, part);
             if (supplied.contains(hash)) return Map.of("sourceId", id, "partId", locator, "notice", "The identical text was already supplied in this turn");
             Map<String, Object> result = source(id); result.put("partId", locator); result.put("text", part.text()); result.put("page", part.page());
-            result.put("revision", corpus.revision()); result.put("method", part.method()); result.put("reliable", part.reliable());
-            result.put("previousPart", index > 0 ? partLocator(corpus, corpus.parts().get(index - 1)) : "");
-            result.put("nextPart", index + 1 < corpus.parts().size() ? partLocator(corpus, corpus.parts().get(index + 1)) : "");
+            result.put("revision", document.revision()); result.put("method", part.method()); result.put("reliable", part.reliable());
+            result.put("previousPart", index > 0 ? partLocator(document, document.parts().get(index - 1)) : "");
+            result.put("nextPart", index + 1 < document.parts().size() ? partLocator(document, document.parts().get(index + 1)) : "");
             Object value = bounded(result);
             if (value == result) {
                 supplied.add(hash);
                 state.getSources().removeIf(ref -> id.equals(ref.get("sourceId")) && (locator.equals(ref.get("partId")) || part.id().equals(ref.get("partId"))));
-                state.getSources().add(Map.of("sourceId", id, "partId", locator, "page", part.page(), "revision", corpus.revision(), "public", "lesson".equals(id) || publicSources.contains(id)));
+                state.getSources().add(Map.of("sourceId", id, "partId", locator, "page", part.page(), "revision", document.revision(), "public", "lesson".equals(id) || publicSources.contains(id)));
                 while (state.getSources().size() > 8) state.getSources().remove(0);
             }
             return value;
@@ -640,9 +640,9 @@ public class LearningServiceImpl extends ServiceImpl<LearningRecordMapper, Learn
         private Object readPage(String id, Integer page, String partId) {
             CourseMaterial material = allowed.get(id);
             if (material == null) return Map.of("error", "Source is not available in this task");
-            Corpus corpus = corpora.get(id);
+            RetrievalDocument document = documents.get(id);
             if (!partId.isBlank()) {
-                Part part = corpus == null ? null : corpus.parts().stream().filter(p -> matchesPart(corpus, p, partId)).findFirst().orElse(null);
+                DocumentPart part = document == null ? null : document.parts().stream().filter(p -> matchesPart(document, p, partId)).findFirst().orElse(null);
                 if (part == null) return Map.of("error", "Part not found in this source");
                 int locatedPage = material.getMimeType().startsWith("image/") ? 1 : part.page();
                 if (locatedPage < 1) return Map.of("error", "This part has no original image page");
@@ -666,7 +666,7 @@ public class LearningServiceImpl extends ServiceImpl<LearningRecordMapper, Learn
                 // 保存实际读取页，避免后续对话把片段编号或书内印刷页码误作 PDF 页码。
                 state.getSources().removeIf(ref -> id.equals(ref.get("sourceId")) && "image".equals(ref.get("kind")) && Objects.equals(actualPage, ref.get("page")));
                 state.getSources().add(Map.of("sourceId", id, "page", actualPage, "partId", partId, "kind", "image",
-                    "revision", corpus == null ? RetrievalContent.sourceKey(material) : corpus.revision(), "public", publicSources.contains(id)));
+                    "revision", document == null ? RetrievalContent.sourceKey(material) : document.revision(), "public", publicSources.contains(id)));
                 while (state.getSources().size() > 8) state.getSources().remove(0);
                 return Map.of("source", source(id), "page", actualPage, "notice", "The original page image follows. Cite this physical page number, not the part identifier or an unverified printed page.");
             } catch (java.io.IOException exception) { return Map.of("error", "The source image is temporarily unavailable"); }

@@ -44,7 +44,10 @@ public class AppProperties {
     @Data
     public static class Retrieval {
         private boolean enabled = true;
-        private String baseUrl = "http://retrieval:8181";
+        private String baseUrl = "http://127.0.0.1:8181";
+        private String command = "qmd";
+        private String dataDir = "/data";
+        private int indexTimeoutSeconds = 600;
         private int timeoutSeconds = 12;
         private boolean rerank = false;
     }

@@ -3,6 +3,7 @@ package zzm.config;
 import zzm.service.GenerationService;
 import zzm.service.MaterialService;
 import zzm.service.AccountService;
+import zzm.integration.QmdClient;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
@@ -15,6 +16,7 @@ public class BackgroundJobs {
     private final MaterialService materials;
     private final GenerationService generations;
     private final AccountService accounts;
+    private final QmdClient qmd;
     private volatile boolean acceptingJobs;
 
     @EventListener(ApplicationReadyEvent.class)
@@ -40,6 +42,9 @@ public class BackgroundJobs {
 
     @Scheduled(fixedDelay = 30000, initialDelay = 5000)
     public void syncRetrieval() { if (acceptingJobs) materials.syncRetrieval(); }
+
+    @Scheduled(fixedDelay = 1000, initialDelay = 5000)
+    public void processRetrievalIndex() { if (acceptingJobs) qmd.processNextIndexTask(); }
 
     @Scheduled(fixedDelay = 30000, initialDelay = 5000)
     public void recycleAttachments() {

@@ -2,7 +2,7 @@ package zzm.service;
 
 import zzm.config.AppProperties;
 import zzm.dto.*;
-import zzm.dto.RetrievalContent.Hit;
+import zzm.dto.RetrievalContent.SearchResult;
 import zzm.entity.*;
 import zzm.integration.*;
 import zzm.mapper.*;
@@ -71,13 +71,13 @@ class LearningTutorTest {
         request.setFocusQuestionId("q1"); request.setMessage("这步怎么算？"); request.setAttachmentIds(List.of("shot"));
         when(ai.studentReply(anyList(), any())).thenReturn(reply());
         service.chat("record", request, user);
-        verify(qmd).search(argThat(scopes -> scopes.stream().anyMatch(s -> s.id().equals("m-teacher-source"))
+        verify(qmd).searchDocuments(argThat(scopes -> scopes.stream().anyMatch(s -> s.id().equals("m-teacher-source"))
                 && scopes.stream().noneMatch(s -> s.id().equals("m-shot"))),
             argThat(query -> query.contains("这步怎么算") && query.contains("\\sqrt{d_k}") && !query.contains("previous example")), eq(5));
     }
 
     @Test void toolsCannotReadOtherStudentsAndDoNotInjectWholeMaterials() {
-        when(qmd.search(anyList(), anyString(), anyInt())).thenReturn(List.of(new Hit("m-another-student", "bad", "s0", 1, "FORBIDDEN", 1)));
+        when(qmd.searchDocuments(anyList(), anyString(), anyInt())).thenReturn(List.of(new SearchResult("m-another-student", "bad", "s0", 1, "FORBIDDEN", 1)));
         when(ai.studentReply(anyList(), any())).thenAnswer(call -> {
             String context = call.getArgument(0).toString(); assertFalse(context.contains("PRIVATE_FULL_HANDOUT"));
             assertFalse(context.contains(material.getTextContent())); assertTrue(context.contains("Option two"));
@@ -123,8 +123,8 @@ class LearningTutorTest {
         material.setMimeType("application/pdf"); material.setTextContent("");
         var report = new DocumentExtraction.Report(); report.setPdfInputMode("images"); report.setUnitsTotal(132);
         when(pdf.report(material)).thenReturn(report);
-        var lesson = RetrievalContent.lesson("t-task", RetrievalContent.lessonText(JSONUtil.parseObj(version.getContentJson())));
-        when(qmd.search(anyList(), anyString(), anyInt())).thenReturn(List.of(new Hit("t-task", lesson.revision(), "s0", 0, "Lesson evidence", 1)));
+        var lesson = RetrievalContent.createLessonDocument("t-task", RetrievalContent.lessonText(JSONUtil.parseObj(version.getContentJson())));
+        when(qmd.searchDocuments(anyList(), anyString(), anyInt())).thenReturn(List.of(new SearchResult("t-task", lesson.revision(), "s0", 0, "Lesson evidence", 1)));
         request.setMessage("第1题，请核对PDF第41页的公式。");
         when(ai.studentReply(anyList(), any())).thenAnswer(call -> {
             String context = call.getArgument(0).toString();

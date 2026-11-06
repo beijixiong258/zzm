@@ -93,9 +93,8 @@ public class MaterialServiceImpl extends ServiceImpl<CourseMaterialMapper, Cours
     @Override public synchronized void syncRetrieval() {
         if (!properties.getRetrieval().isEnabled()) return;
         try {
-            JSONObject manifest = qmd.request("GET", "/corpora", null);
-            Map<String, JSONObject> remote = new HashMap<>();
-            manifest.getJSONArray("corpora").forEach(value -> { var item = JSONUtil.parseObj(value); remote.put(item.getStr("id"), item); });
+            Map<String, QmdClient.DocumentIndexStatus> remote = new HashMap<>();
+            qmd.listDocumentIndexStatus().forEach(document -> remote.put(document.id(), document));
             Set<String> desired = new HashSet<>();
             List<TeachingSession> tasks = sessions.selectList(Wrappers.<TeachingSession>lambdaQuery().eq(TeachingSession::getArchived, false));
             Set<String> activeTasks = new HashSet<>();
@@ -105,28 +104,30 @@ public class MaterialServiceImpl extends ServiceImpl<CourseMaterialMapper, Cours
                 activeTasks.add(task.getId());
                 if (task.getPublishedVersionId() == null) continue;
                 SessionVersion version = versions.selectById(task.getPublishedVersionId());
-                if (version != null) syncCorpus(RetrievalContent.lesson("t-" + task.getId(), RetrievalContent.lessonText(JSONUtil.parseObj(version.getContentJson()))), desired, remote);
+                if (version != null) syncDocument(RetrievalContent.createLessonDocument("t-" + task.getId(), RetrievalContent.lessonText(JSONUtil.parseObj(version.getContentJson()))), desired, remote);
             }
             Set<String> activeRecords = new HashSet<>();
             if (!activeTasks.isEmpty()) for (LearningRecord record : records.selectList(Wrappers.<LearningRecord>lambdaQuery().in(LearningRecord::getSessionId, activeTasks))) {
                 activeRecords.add(record.getId());
-                if (Boolean.TRUE.equals(record.getPreview())) syncCorpus(RetrievalContent.lesson("p-" + record.getId(), RetrievalContent.lessonText(JSONUtil.parseObj(record.getSnapshotJson()))), desired, remote);
+                if (Boolean.TRUE.equals(record.getPreview())) syncDocument(RetrievalContent.createLessonDocument("p-" + record.getId(), RetrievalContent.lessonText(JSONUtil.parseObj(record.getSnapshotJson()))), desired, remote);
             }
             for (CourseMaterial material : lambdaQuery().eq(CourseMaterial::getArchived, false).isNull(CourseMaterial::getFileRemovedAt)
                 .isNotNull(CourseMaterial::getCourseId).in(CourseMaterial::getStatus, "ready", "needsReview").list()) {
                 Course course = courses.getById(material.getCourseId());
                 if (course == null || Boolean.TRUE.equals(course.getArchived()) || material.getOwnerId() != null && !activeRecords.contains(material.getRecordId())) continue;
                 RetrievalContent content = RetrievalContent.read(material);
-                if (content.isComplete()) syncCorpus(new Corpus("m-" + material.getId(), content.getRevision(), material.getTitle(), content.getParts()), desired, remote);
+                if (content.isComplete()) syncDocument(new RetrievalDocument("m-" + material.getId(), content.getRevision(), material.getTitle(), content.getParts()), desired, remote);
             }
-            for (String id : remote.keySet()) if (!desired.contains(id)) qmd.remove(id);
+            for (String id : remote.keySet()) if (!desired.contains(id)) qmd.deleteDocument(id);
         } catch (RuntimeException exception) {
             log.debug("Retrieval synchronisation deferred: {}", exception.getClass().getSimpleName());
         }
     }
-    private void syncCorpus(Corpus corpus, Set<String> desired, Map<String, JSONObject> remote) {
-        desired.add(corpus.id()); JSONObject existing = remote.get(corpus.id());
-        if (existing == null || !corpus.revision().equals(existing.getStr("revision")) || "deleted".equals(existing.getStr("status"))) qmd.put(corpus);
+    private void syncDocument(RetrievalDocument document, Set<String> desired, Map<String, QmdClient.DocumentIndexStatus> remote) {
+        desired.add(document.id());
+        QmdClient.DocumentIndexStatus existing = remote.get(document.id());
+        if (existing == null || !document.revision().equals(existing.revision()) || "deleted".equals(existing.status()))
+            qmd.saveDocument(document);
     }
     @Override public List<Map<String, Object>> library(String courseId, AccountUser user) {
         courses.requireAccess(courseId, user, true);
