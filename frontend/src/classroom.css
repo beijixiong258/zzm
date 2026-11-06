@@ -88,6 +88,7 @@ small {
 }
 .row {
   display: flex;
+  min-width: 0;
   align-items: center;
   gap: 10px;
 }
@@ -393,19 +394,26 @@ small {
   width: calc(100% - 258px);
 }
 .topbar {
-  height: 74px;
-  padding: 0 38px;
+  min-height: 74px;
+  padding: 14px 38px;
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 16px;
   border-bottom: 1px solid var(--line);
   background: #fbfcfa;
   font-size: 12px;
 }
-.topbar .t-select__wrap {
-  width: 160px;
-  padding: 7px 10px;
-  background: transparent;
+.workspace-breadcrumb {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.topbar .interface-language-select {
+  flex: 0 0 132px;
+  width: 132px;
 }
 .page-body {
   padding: 34px 38px 60px;
@@ -414,6 +422,7 @@ small {
 }
 .page-heading {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 20px;
@@ -425,8 +434,13 @@ small {
   margin-bottom: 0;
   max-width: 720px;
 }
+.page-heading > div:first-child {
+  min-width: 0;
+}
 .page-heading > .row {
-  flex-shrink: 0;
+  flex-shrink: 1;
+  flex-wrap: wrap;
+  max-width: 100%;
 }
 footer {
   padding: 18px 38px;
@@ -436,7 +450,7 @@ footer {
 }
 .overview-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 18px;
   margin: 24px 0 32px;
 }
@@ -468,7 +482,7 @@ footer {
 }
 .course-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr));
   gap: 18px;
   margin-top: 18px;
 }
@@ -792,11 +806,45 @@ td button {
   max-width: 260px;
 }
 .app-dialog .t-dialog__body {
-  max-height: calc(90vh - 100px);
+  min-height: 0;
+  max-height: calc(90dvh - 100px);
   overflow: auto;
 }
 .app-dialog-content {
+  min-width: 0;
   outline: 0;
+}
+.app-dialog.t-dialog,
+.app-confirm-dialog.t-dialog {
+  display: flex;
+  flex-direction: column;
+  /* TDesign 的居中容器上下各预留 48px。 */
+  max-height: calc(100dvh - 96px);
+  min-width: 0;
+}
+.app-dialog .t-dialog__header,
+.app-confirm-dialog .t-dialog__header {
+  flex: none;
+  align-items: flex-start;
+}
+.app-dialog .t-dialog__header-content,
+.app-confirm-dialog .t-dialog__header-content {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.app-confirm-dialog .t-dialog__body {
+  min-height: 0;
+  overflow: auto;
+}
+.app-confirm-dialog .t-dialog__footer {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.app-confirm-dialog .t-dialog__footer .t-button + .t-button {
+  margin-left: 0;
 }
 /* 登录页使用独立的响应式布局，保留工作区外层结构。 */
 .login-page {
@@ -1375,14 +1423,13 @@ td button {
     padding: 5px 10px;
   }
   .topbar {
-    height: 66px;
-    padding: 0 16px 0 64px;
+    min-height: 66px;
+    padding: 12px 16px 12px 64px;
+    gap: 10px;
   }
-  .topbar > div {
-    max-width: calc(100% - 120px);
-    overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
+  .topbar .interface-language-select {
+    flex-basis: 112px;
+    width: 112px;
   }
   .sidebar-shade {
     display: block;
@@ -1752,6 +1799,22 @@ td button {
 .preview-navigation .badge {
   margin-left: auto;
 }
+.preview-navigation .t-radio-group {
+  max-width: 100%;
+  align-items: stretch;
+}
+.preview-navigation .t-radio-group .t-radio-button {
+  min-width: 0;
+  height: auto;
+  min-height: var(--td-comp-size-m);
+  white-space: normal;
+}
+.preview-navigation .t-radio-button__label {
+  min-width: 0;
+  white-space: normal;
+  line-height: 1.5;
+  padding-block: 4px;
+}
 
 /* 教师对话工作区的样式仅作用于对应区域，学生界面和文件管理使用各自布局。 */
 .teacher-chat-page {
@@ -1778,7 +1841,8 @@ td button {
   font-size: 24px;
 }
 .course-editor-actions {
-  flex: none;
+  flex: 0 1 auto;
+  max-width: 100%;
   justify-content: flex-end;
 }
 .course-save-button .t-button__text {
@@ -1917,6 +1981,16 @@ td button {
   min-height: 84px;
   padding: 10px 2px;
 }
+.conversation-composer .row {
+  flex-wrap: wrap;
+}
+.conversation-composer .row > small {
+  flex: 1 1 140px;
+  min-width: 0;
+}
+.conversation-composer .row > .t-button {
+  flex: none;
+}
 
 .task-attachment-tools .file-uploader > .muted {
   font-size: 11px;
@@ -1978,7 +2052,7 @@ td button {
 }
 .task-heading-actions .t-button {
   font-size: 13px;
-  white-space: nowrap;
+  white-space: normal;
 }
 .lesson-preview-toolbar {
   position: sticky;
@@ -1988,6 +2062,10 @@ td button {
   padding: 16px 0;
   margin: -16px 0 16px;
   border-bottom: 1px solid var(--line);
+}
+.lesson-preview-toolbar > .row {
+  flex-wrap: wrap;
+  max-width: 100%;
 }
 .lesson-editor {
   display: grid;
@@ -2031,7 +2109,7 @@ td button {
   padding-top: 12px;
   border-top: 1px solid var(--line);
 }
-@media (max-width: 760px) {
+@media (max-width: 1000px) {
   .lesson-editor {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -2137,6 +2215,17 @@ td button {
 /* TDesign 控件沿用现有业务布局和品牌主题。 */
 .t-button__text {
   min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+/* 英文长操作名称按可用宽度换行，按钮高度随文字增长。 */
+:where(.page-body, .app-dialog, .app-confirm-dialog, .login-page) .t-button {
+  max-width: 100%;
+  min-height: var(--td-comp-size-m);
+  height: auto;
+  padding-block: 4px;
+  white-space: normal;
+  line-height: 1.5;
 }
 .classroom-sidebar .t-button {
   justify-content: flex-start;
@@ -2177,4 +2266,26 @@ td button {
 }
 .progress-status .t-loading {
   margin-right: 8px;
+}
+.material-preview > .row:first-child {
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+.material-preview > .row:first-child h3 {
+  flex: 1 1 180px;
+  min-width: 0;
+}
+@media (max-width: 600px) {
+  .app-dialog.t-dialog,
+  .app-confirm-dialog.t-dialog {
+    padding: 20px 16px;
+  }
+  .preview-navigation .t-radio-group {
+    display: flex;
+    width: 100%;
+  }
+  .preview-navigation .t-radio-group .t-radio-button {
+    flex: 1;
+    justify-content: center;
+  }
 }

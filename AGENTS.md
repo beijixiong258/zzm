@@ -51,6 +51,7 @@
 
 - Spring AI、MyBatis-Plus 遵循官方规范，保留 `IService`、`ServiceImpl`、`BaseMapper`，同一实体业务尽量集中到对应 Service，查询更新优先使用 Lambda 条件构造器。
 - 前端使用 TDesign Vue Next 并保留品牌色，业务组件按实际调用关系复用，不引入无关重构、升级或无实际用途的抽象。
+- 界面布局同时适配中文与英文，长按钮名称按可用宽度换行并随内容增高，弹窗、表格和导航不得挤压或遮住操作。长课程名、文件名和账号须限制在所属区域内，窄屏优先换行或在表格内部滚动，不依赖缩短文案或隐藏操作维持布局。
 - `TeacherChat.vue` 共用于新建课程和课程信息，使用同一个信息框与 `TeacherConversation.vue` 对话区，不复制两套字段、保存和对话逻辑。
 - `TaskEditor.vue` 管理上传、生成与任务操作，`LessonEditor.vue` 管理讲义编辑，`CourseLibrary.vue` 只管理当前课程材料，`ArchivedTasks.vue` 管理任务回收站。界面统一使用“回收站”“移入回收站”“恢复”和“彻底删除”，英文对应 recycle bin；保留现有语言键、接口与存储标识。
 - 材料状态归 `MaterialService`，格式解析归 `DocumentParser`、`PdfInputReader`，AI 提示与结构化输出归 `AiService`，生成和应用归 `GenerationService`，模型协议与响应完整性归 `QwenClient`，后台入口为 `BackgroundJobs`。

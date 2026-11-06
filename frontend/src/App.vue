@@ -730,13 +730,24 @@ void boot();
       <div v-if="menuOpen" class="sidebar-shade" @click="menuOpen = false" />
       <div class="classroom-main">
         <header class="topbar">
-          <div>
+          <div
+            class="workspace-breadcrumb"
+            :title="
+              [
+                t(staff ? 'Teaching workspace' : 'Learning workspace'),
+                course?.code,
+              ]
+                .filter(Boolean)
+                .join(' / ')
+            "
+          >
             <span>{{
               t(staff ? "Teaching workspace" : "Learning workspace")
             }}</span
             ><span v-if="course" class="muted"> / {{ course.code }}</span>
           </div>
           <TSelect
+            class="interface-language-select"
             v-control-attrs="{ 'aria-label': t('Interface language') }"
             :value="locale"
             @change="setLocale(String($event))"

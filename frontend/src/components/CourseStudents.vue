@@ -32,9 +32,13 @@ const activeStudents = computed(() =>
   ),
 );
 const columns = computed(() => [
-  { colKey: "name", title: t("Name") },
-  { colKey: "account", title: t("Username") + " / " + t("Email") },
-  { colKey: "actions", title: t("Actions"), width: 120 },
+  { colKey: "name", title: t("Name"), width: "30%" },
+  {
+    colKey: "account",
+    title: t("Username") + " / " + t("Email"),
+    width: "40%",
+  },
+  { colKey: "actions", title: t("Actions"), width: "30%" },
 ]);
 
 async function refreshMembers() {
@@ -247,6 +251,7 @@ onBeforeUnmount(() => {
         <p v-if="membersError" class="error" role="alert">{{ membersError }}</p>
         <TTable
           row-key="id"
+          table-layout="fixed"
           :data="activeStudents"
           :columns="columns"
           :loading="loading"
@@ -277,7 +282,19 @@ onBeforeUnmount(() => {
 <style scoped>
 .course-students {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 24px;
+}
+.course-students > section {
+  min-width: 0;
+}
+.course-students :deep(th),
+.course-students :deep(td) {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.course-students :deep(td .t-button) {
+  padding-inline: 0;
 }
 .course-students h3 {
   margin: 0 0 12px;
