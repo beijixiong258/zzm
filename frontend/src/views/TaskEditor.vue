@@ -5,6 +5,7 @@ import {
   Dropdown as TDropdown,
   Select as TSelect,
   Option as TOption,
+  MessagePlugin,
   type DropdownOption,
 } from "tdesign-vue-next";
 import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
@@ -32,7 +33,6 @@ import {
   retainTaskAddress,
 } from "../classroom-state";
 import FileUploader from "../components/FileUploader.vue";
-import AiConnection from "../components/AiConnection.vue";
 import ContextMeter from "../components/ContextMeter.vue";
 import StudentTask from "./StudentTask.vue";
 import TaskContent from "../components/TaskContent.vue";
@@ -65,6 +65,7 @@ const busy = ref(false),
   selectedMaterial = ref<Material | null>(null);
 const pendingUploads = ref(0);
 const taskActionsVisible = ref(false);
+const checkingConnection = ref(false);
 const choosingFiles = ref(false),
   showPreview = ref(false);
 const previewMode = ref<"edit" | "student">("edit");
@@ -89,6 +90,7 @@ const usage = ref<ContextUsage | null>(null),
 let contextTimer: ReturnType<typeof setTimeout> | undefined,
   contextSequence = 0;
 let timer: ReturnType<typeof setTimeout> | undefined;
+let connectionRequest: AbortController | undefined;
 let disposed = false;
 let polling = false;
 const active = computed(
@@ -146,6 +148,16 @@ const taskActions = computed<DropdownOption[]>(() => [
     disabled: busy.value || !!active.value,
     onClick: () => {
       void openFileSelection();
+    },
+  },
+  {
+    content: t(
+      checkingConnection.value ? "Checking connection…" : "Test AI connection",
+    ),
+    value: "connection",
+    disabled: checkingConnection.value,
+    onClick: () => {
+      void checkAiConnection();
     },
   },
   ...(draft.value.id
@@ -216,6 +228,49 @@ async function checkContext() {
     if (sequence === contextSequence) usage.value = null;
   } finally {
     if (sequence === contextSequence) checkingContext.value = false;
+  }
+}
+function showConnectionMessage(content: string, connected = false) {
+  const showMessage = connected ? MessagePlugin.success : MessagePlugin.error;
+  void showMessage({
+    content,
+    placement: "top",
+    duration: 4000,
+    closeBtn: true,
+    style: { maxWidth: "calc(100vw - 32px)" },
+  });
+}
+async function checkAiConnection() {
+  if (disposed || checkingConnection.value) return;
+  checkingConnection.value = true;
+  taskActionsVisible.value = false;
+  const controller = new AbortController();
+  connectionRequest = controller;
+  const timeout = setTimeout(() => controller.abort(), 18000);
+  try {
+    const result = await call<{
+      connected: boolean;
+      model: string;
+      elapsedMs: number;
+      detail?: string;
+    }>("/ai/connection", "POST", undefined, controller.signal);
+    if (disposed) return;
+    const summary = `${t(result.connected ? "Connection successful" : "Connection failed")} · ${result.model} · ${result.elapsedMs} ms`;
+    showConnectionMessage(
+      summary + (result.detail ? ` — ${systemText(result.detail)}` : ""),
+      result.connected,
+    );
+  } catch (e) {
+    if (!disposed)
+      showConnectionMessage(
+        controller.signal.aborted
+          ? t("The connection check did not finish in time. Try again shortly.")
+          : systemText((e as Error).message),
+      );
+  } finally {
+    clearTimeout(timeout);
+    connectionRequest = undefined;
+    if (!disposed) checkingConnection.value = false;
   }
 }
 watch(
@@ -524,6 +579,7 @@ async function approveObserved(message: ChatMessage) {
 }
 onBeforeUnmount(() => {
   disposed = true;
+  connectionRequest?.abort();
   clearTimeout(timer);
   clearTimeout(contextTimer);
   contextSequence++;
@@ -736,7 +792,6 @@ void load();
           }}</small>
         </p>
         <ContextMeter :usage="usage" :loading="checkingContext" embedded />
-        <AiConnection />
       </details>
       <section v-if="hasContent" class="conversation-result lesson-result">
         <h2>{{ draft.title }}</h2>
