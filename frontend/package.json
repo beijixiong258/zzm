@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc --noEmit && vite build",
-    "build:brand": "node tests/brand-assets.mjs",
+    "build:brand": "node tests/generateBrandAssets.ts",
+    "check:scripts": "tsc --noEmit -p tsconfig.scripts.json",
     "preview": "vite preview",
     "format": "prettier --write src tests vite.config.ts"
   },

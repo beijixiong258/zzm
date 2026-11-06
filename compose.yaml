@@ -22,14 +22,12 @@ services:
       dockerfile: Dockerfile
       target: backend
     restart: unless-stopped
-    networks:
-      - default
-      - retrieval
     depends_on:
       mysql:
         condition: service_healthy
     volumes:
       - uploads:/app/data/uploads
+      - retrieval-data:/data
       - recycle:/app/data/recycle
       - type: bind
         source: ./application.yaml
@@ -43,16 +41,6 @@ services:
       timeout: 5s
       retries: 12
       start_period: 60s
-  retrieval:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: retrieval
-    restart: unless-stopped
-    volumes:
-      - retrieval-data:/data
-    networks:
-      - retrieval
   frontend:
     build:
       context: .
@@ -70,8 +58,6 @@ services:
       timeout: 5s
       retries: 6
       start_period: 15s
-networks:
-  retrieval:
 volumes:
   retrieval-data:
   mysql-data:
