@@ -3,6 +3,8 @@ import { confirmAction } from "../confirmAction";
 import {
   Button as TButton,
   Dropdown as TDropdown,
+  Select as TSelect,
+  Option as TOption,
   type DropdownOption,
 } from "tdesign-vue-next";
 import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
@@ -183,6 +185,13 @@ watch(materials, () => {
       materials.value.find(
         (material) => material.id === selectedMaterial.value?.id,
       ) || null;
+  if (
+    selectionPreviewId.value &&
+    !activeMaterials.value.some(
+      (material) => material.id === selectionPreviewId.value,
+    )
+  )
+    selectionPreviewId.value = "";
   void checkContext();
 });
 async function checkContext() {
@@ -422,6 +431,7 @@ async function publish() {
   });
 }
 async function openFileSelection() {
+  selectedMaterial.value = null;
   selectionIds.value = [...draft.value.materialIds];
   selectionChanges.clear();
   selectionPreviewId.value = "";
@@ -847,30 +857,47 @@ void load();
             }}
           </p>
         </aside>
-        <section class="panel">
-          <template v-if="selectionPreview"
-            ><CourseMaterialPreview :material="selectionPreview" />
+        <section class="panel material-selection-preview">
+          <div class="material-preview-controls">
+            <TSelect
+              v-control-attrs="{
+                'aria-label': t('Select a file to preview'),
+                title: selectionPreview?.fileName || '',
+              }"
+              v-model="selectionPreviewId"
+              class="material-preview-select"
+              filterable
+              clearable
+              :disabled="!activeMaterials.length"
+              :placeholder="t('Select a file to preview')"
+              @keydown.esc.stop
+            >
+              <TOption
+                v-for="material in activeMaterials"
+                :key="material.id"
+                :value="material.id"
+                :label="material.fileName"
+                :title="material.relativePath || material.fileName"
+              />
+            </TSelect>
             <TButton
               theme="default"
               variant="outline"
               type="button"
-              v-if="!['queued', 'processing'].includes(selectionPreview.status)"
-              :disabled="busy"
-              @click="retryMaterial(selectionPreview)"
+              class="material-preview-button"
+              :disabled="!selectionPreview"
+              @click="selectedMaterial = selectionPreview || null"
             >
-              {{ t("Reprocess material") }}
+              {{ t("Preview") }}
             </TButton>
-          </template>
-          <p v-else class="empty">
-            {{ t("Select a material from the folder tree to preview it.") }}
-          </p>
+          </div>
         </section>
       </div>
     </section>
   </template>
   <AppDialog
-    v-if="selectedMaterial && !choosingFiles"
-    :title="t('Material preview')"
+    v-if="selectedMaterial"
+    :title="selectedMaterial.fileName || t('Material preview')"
     wide
     @close="selectedMaterial = null"
   >
