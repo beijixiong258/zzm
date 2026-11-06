@@ -21,8 +21,6 @@ public interface AccountService extends IService<AccountUser> {
     AccountUser setup(Requests.Account input);
     AccountUser login(Requests.Login input, HttpServletResponse response);
     AccountUser studentLogin(Requests.StudentLogin input, HttpServletResponse response);
-    Map<String, Object> createInvitedStudent(Requests.StudentInvitation input);
-    Map<String, Object> invitation(String userId, boolean enabled);
     AccountUser demo(String id, HttpServletResponse response);
     void logout(HttpServletRequest request, HttpServletResponse response);
     void changePassword(AccountUser user, Requests.Password input, HttpServletResponse response);

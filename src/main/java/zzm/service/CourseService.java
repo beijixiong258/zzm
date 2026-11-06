@@ -21,7 +21,5 @@ public interface CourseService extends IService<Course> {
     void addMember(String id, Requests.Account input, AccountUser user);
     void addMembers(String id, List<Requests.Account> input, AccountUser user);
     void archiveMember(String id, String userId, boolean archived, AccountUser user);
-    Map<String, Object> inviteStudent(String courseId, Requests.StudentInvitation input, AccountUser user);
-    Map<String, Object> changeInvitation(String courseId, String studentId, boolean enabled, AccountUser user);
     void join(String code, AccountUser user);
 }

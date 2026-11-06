@@ -2,18 +2,12 @@
 import {
   Button as TButton,
   Input as TInput,
-  RadioGroup as TRadioGroup,
   Table as TTable,
   MessagePlugin,
 } from "tdesign-vue-next";
 import { computed, onBeforeUnmount, ref, watch } from "vue";
-import {
-  call,
-  key,
-  type Course,
-  type Member,
-  type StudentInvitation,
-} from "../classroom-api";
+import { call, key, type Course, type Member } from "../classroom-api";
+import { confirmAction } from "../confirmAction";
 import { systemText, t } from "../i18n";
 import AppDialog from "./AppDialog.vue";
 
@@ -24,26 +18,23 @@ const loading = ref(false),
   adding = ref(false),
   membersError = ref(""),
   formError = ref("");
-const addMode = ref("existing");
 const account = ref("");
-const student = ref({ name: "", username: "" });
-const createdStudent = ref<StudentInvitation | null>(null);
+const removingId = ref("");
+const busy = computed(() => adding.value || !!removingId.value);
 let sequence = 0;
 let disposed = false;
-const activeMembers = computed(() =>
+const activeStudents = computed(() =>
   members.value.filter(
-    (member) => !member.membershipArchived && !member.archived,
+    (member) =>
+      member.membershipRole === "student" &&
+      !member.membershipArchived &&
+      !member.archived,
   ),
-);
-const studentCount = computed(
-  () =>
-    activeMembers.value.filter((member) => member.membershipRole === "student")
-      .length,
 );
 const columns = computed(() => [
   { colKey: "name", title: t("Name") },
   { colKey: "account", title: t("Username") + " / " + t("Email") },
-  { colKey: "membershipRole", title: t("Role"), width: 100 },
+  { colKey: "actions", title: t("Actions"), width: 120 },
 ]);
 
 async function refreshMembers() {
@@ -63,39 +54,69 @@ async function refreshMembers() {
   }
 }
 async function addStudent() {
-  if (disposed || adding.value) return;
+  if (disposed || busy.value || !account.value.trim()) return;
+  const courseId = props.course.id;
   adding.value = true;
   formError.value = "";
   try {
-    if (addMode.value === "existing") {
-      await call("/courses/" + key(props.course.id) + "/students", "POST", {
-        account: account.value.trim(),
-      });
-      if (disposed) return;
-      account.value = "";
-      void MessagePlugin.success({
-        content: t("Student added to this course."),
+    await call("/courses/" + key(courseId) + "/students", "POST", {
+      account: account.value.trim(),
+    });
+    if (disposed || props.course.id !== courseId) return;
+    account.value = "";
+    void MessagePlugin.success({
+      content: t("Student added to this course."),
+      duration: 4000,
+      closeBtn: true,
+    });
+    await refreshMembers();
+  } catch (e) {
+    if (!disposed && props.course.id === courseId)
+      formError.value = systemText((e as Error).message);
+  } finally {
+    if (!disposed) adding.value = false;
+  }
+}
+async function removeStudent(member: Member) {
+  if (disposed || busy.value) return;
+  const courseId = props.course.id;
+  removingId.value = member.id;
+  try {
+    const confirmed = await confirmAction(
+      t(
+        "Remove {0} from this course? Their learning records, answers and conversations in this course will be deleted. Their account and other courses will be kept.",
+        [member.name],
+      ),
+      {
+        header: t("Remove student"),
+        confirmLabel: t("Remove from course"),
+        danger: true,
+      },
+    );
+    if (!confirmed || disposed || props.course.id !== courseId) return;
+    await call(
+      `/courses/${key(courseId)}/members/${key(member.id)}/archive?archived=true`,
+      "POST",
+    );
+    if (disposed || props.course.id !== courseId) return;
+    members.value = members.value.filter((value) => value.id !== member.id);
+    void MessagePlugin.success({
+      content: t(
+        "Student removed. Their learning records in this course have been deleted.",
+      ),
+      duration: 4000,
+      closeBtn: true,
+    });
+    await refreshMembers();
+  } catch (e) {
+    if (!disposed && props.course.id === courseId)
+      void MessagePlugin.error({
+        content: systemText((e as Error).message),
         duration: 4000,
         closeBtn: true,
       });
-    } else {
-      const result = await call<StudentInvitation>(
-        "/courses/" + key(props.course.id) + "/student-invitations",
-        "POST",
-        {
-          name: student.value.name.trim(),
-          username: student.value.username.trim().toLowerCase(),
-        },
-      );
-      if (disposed) return;
-      createdStudent.value = result;
-      student.value = { name: "", username: "" };
-    }
-    await refreshMembers();
-  } catch (e) {
-    if (!disposed) formError.value = systemText((e as Error).message);
   } finally {
-    if (!disposed) adding.value = false;
+    if (!disposed) removingId.value = "";
   }
 }
 async function copyText(text: string) {
@@ -118,27 +139,16 @@ async function copyText(text: string) {
       });
   }
 }
-function copyStudentSignIn() {
-  const result = createdStudent.value;
-  if (!result) return;
-  void copyText(
-    [
-      t("Name") + ": " + result.name,
-      t("Username") + ": " + result.username,
-      t("Personal sign-in code") + ": " + result.invitationCode,
-    ].join("\n"),
-  );
-}
 watch(
   () => props.course.id,
   () => {
     members.value = [];
-    createdStudent.value = null;
+    account.value = "";
+    formError.value = "";
     void refreshMembers();
   },
   { immediate: true },
 );
-watch(addMode, () => (formError.value = ""));
 onBeforeUnmount(() => {
   disposed = true;
   sequence++;
@@ -148,7 +158,7 @@ onBeforeUnmount(() => {
 <template>
   <AppDialog
     :title="course.title + ' · ' + t('Student management')"
-    :busy="adding"
+    :busy="busy"
     wide
     @close="emit('close')"
   >
@@ -183,16 +193,8 @@ onBeforeUnmount(() => {
       </section>
       <section class="course-student-add">
         <h3>{{ t("Add student") }}</h3>
-        <TRadioGroup
-          v-model="addMode"
-          :disabled="adding"
-          :options="[
-            { value: 'existing', label: t('Add an existing student') },
-            { value: 'new', label: t('Create a student account') },
-          ]"
-        />
         <form class="course-student-form" @submit.prevent="addStudent">
-          <label v-if="addMode === 'existing'" class="student-account-field">
+          <label>
             {{ t("Student username or email") }}
             <TInput
               v-control-attrs="{
@@ -200,120 +202,42 @@ onBeforeUnmount(() => {
                 'aria-label': t('Student username or email'),
               }"
               v-model="account"
-              :disabled="adding"
+              :disabled="busy"
               maxlength="254"
               @blur="account = account.trim()"
             />
           </label>
-          <template v-else>
-            <label>
-              {{ t("Name") }}
-              <TInput
-                v-control-attrs="{ required: true, 'aria-label': t('Name') }"
-                v-model="student.name"
-                :disabled="adding"
-                maxlength="100"
-                @blur="student.name = student.name.trim()"
-              />
-            </label>
-            <label>
-              {{ t("Username") }}
-              <TInput
-                v-control-attrs="{
-                  required: true,
-                  pattern: '[A-Za-z0-9_.-]{3,64}',
-                  'aria-label': t('Username'),
-                  title: t(
-                    'Use 3–64 letters, numbers, underscores, full stops or hyphens.',
-                  ),
-                }"
-                v-model="student.username"
-                :disabled="adding"
-                maxlength="64"
-                @blur="student.username = student.username.trim().toLowerCase()"
-              />
-            </label>
-          </template>
           <TButton
             theme="primary"
             type="submit"
             :loading="adding"
-            :disabled="adding"
+            :disabled="busy || !account.trim()"
           >
-            {{
-              t(
-                addMode === "existing"
-                  ? "Add student"
-                  : "Create and add student",
-              )
-            }}
+            {{ t("Add student") }}
           </TButton>
         </form>
-        <small v-if="addMode === 'new'" class="muted">
+        <small class="muted">
           {{
             t(
-              "New students are added to this course automatically. Give them the username and personal sign-in code to sign in.",
+              "Enter an existing student's username or email to add them to this course. Account creation is managed by administrators.",
             )
           }}
         </small>
         <p v-if="formError" class="error" role="alert">{{ formError }}</p>
       </section>
-      <section
-        v-if="createdStudent"
-        class="student-sign-in-details"
-        role="status"
-      >
-        <strong>
-          {{ t("Student created and added to this course.") }}
-          {{ createdStudent.name }}
-        </strong>
-        <div class="course-student-form">
-          <label>
-            {{ t("Username") }}
-            <TInput
-              v-control-attrs="{ 'aria-label': t('Username') }"
-              :value="createdStudent.username"
-              readonly
-            />
-          </label>
-          <label>
-            {{ t("Personal sign-in code") }}
-            <TInput
-              v-control-attrs="{ 'aria-label': t('Personal sign-in code') }"
-              :value="createdStudent.invitationCode"
-              readonly
-            />
-          </label>
-          <TButton
-            theme="default"
-            variant="outline"
-            type="button"
-            @click="copyStudentSignIn"
-          >
-            {{ t("Copy sign-in details") }}
-          </TButton>
-        </div>
-        <small class="muted">
-          {{
-            t(
-              "This personal code is for signing in. The student has already joined this course.",
-            )
-          }}
-        </small>
-      </section>
       <section>
         <div class="row spread wrap">
-          <h3>{{ t("Current course members") }}</h3>
+          <h3>{{ t("Current students") }}</h3>
           <div class="row">
             <small class="muted">{{
-              t("Student count: {0}", [studentCount])
+              t("Student count: {0}", [activeStudents.length])
             }}</small>
             <TButton
               theme="default"
               variant="text"
               type="button"
               :loading="loading"
-              :disabled="loading || adding"
+              :disabled="loading || busy"
               @click="refreshMembers"
             >
               {{ t("Refresh") }}
@@ -323,7 +247,7 @@ onBeforeUnmount(() => {
         <p v-if="membersError" class="error" role="alert">{{ membersError }}</p>
         <TTable
           row-key="id"
-          :data="activeMembers"
+          :data="activeStudents"
           :columns="columns"
           :loading="loading"
           :max-height="320"
@@ -332,8 +256,17 @@ onBeforeUnmount(() => {
           <template #account="{ row }">
             {{ row.username || row.email || "—" }}
           </template>
-          <template #membershipRole="{ row }">
-            {{ t(row.membershipRole === "student" ? "Student" : "Teacher") }}
+          <template #actions="{ row }">
+            <TButton
+              theme="danger"
+              variant="text"
+              type="button"
+              :loading="removingId === row.id"
+              :disabled="busy"
+              @click="removeStudent(row)"
+            >
+              {{ t("Remove from course") }}
+            </TButton>
           </template>
         </TTable>
       </section>
@@ -366,7 +299,7 @@ onBeforeUnmount(() => {
 }
 .course-student-form {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: end;
   gap: 12px;
   margin: 14px 0 8px;
@@ -374,21 +307,9 @@ onBeforeUnmount(() => {
 .course-student-form label {
   min-width: 0;
 }
-.student-account-field {
-  grid-column: span 2;
-}
-.student-sign-in-details {
-  padding: 16px;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: var(--soft);
-}
 @media (max-width: 650px) {
   .course-student-form {
     grid-template-columns: minmax(0, 1fr);
-  }
-  .student-account-field {
-    grid-column: auto;
   }
   .course-student-form > .t-button {
     justify-self: start;

@@ -28,10 +28,6 @@ public final class Requests {
         @NotBlank @Size(max = 64) private String username;
         @NotBlank @Size(max = 128) private String invitationCode;
     }
-    @Data public static class StudentInvitation {
-        @NotBlank @Size(max = 100) private String name;
-        @NotBlank @Pattern(regexp = "[A-Za-z0-9_.-]{3,64}") private String username;
-    }
     @Data public static class CourseStudent {
         @NotBlank @Size(max = 254) private String account;
     }

@@ -6,13 +6,7 @@ import {
 } from "tdesign-vue-next";
 import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { Save } from "lucide-vue-next";
-import {
-  call,
-  key,
-  type Course,
-  type StudentInvitation,
-  type TeacherReply,
-} from "../classroom-api";
+import { call, key, type Course, type TeacherReply } from "../classroom-api";
 import { systemText, t } from "../i18n";
 import {
   courses,
@@ -108,44 +102,15 @@ async function configure(reply: TeacherReply) {
     }
   }
   if (
-    [
-      "newTask",
-      "members",
-      "progress",
-      "inviteStudent",
-      "files",
-      "selectFiles",
-    ].includes(reply.action) &&
+    ["newTask", "members", "progress", "files", "selectFiles"].includes(
+      reply.action,
+    ) &&
     !currentId.value
   )
     return outcome + "\n" + t("Save a course name and code before continuing.");
   if (reply.action === "members") {
     showStudents.value = true;
     outcome += "\n" + t("The current class members are shown below.");
-  } else if (reply.action === "inviteStudent") {
-    if (
-      !reply.fields.studentName?.trim() ||
-      !reply.fields.studentUsername?.trim()
-    )
-      return (
-        outcome +
-        "\n" +
-        t("Provide the student's name and a username for the invitation.")
-      );
-    const result = await call<StudentInvitation>(
-      `/courses/${key(currentId.value)}/student-invitations`,
-      "POST",
-      {
-        name: reply.fields.studentName,
-        username: reply.fields.studentUsername,
-      },
-    );
-    outcome +=
-      "\n" +
-      t(
-        "Student invitation created. Username: {0}; personal invitation code: {1}.",
-        [result.username, result.invitationCode],
-      );
   } else if (reply.action === "newTask")
     outcome +=
       "\n" +

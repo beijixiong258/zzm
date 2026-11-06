@@ -104,24 +104,6 @@ public class AccountServiceImpl extends ServiceImpl<AccountUserMapper, AccountUs
             throw error(401, "Username or invitation code is incorrect");
         issue(user, response); return user;
     }
-    @Override @Transactional public Map<String, Object> createInvitedStudent(Requests.StudentInvitation input) {
-        String username = input.getUsername().trim().toLowerCase(Locale.ROOT);
-        if (lambdaQuery().eq(AccountUser::getUsername, username).exists()) throw error(409, "This username is already in use");
-        AccountUser user = new AccountUser(); user.setName(input.getName().trim()); user.setUsername(username);
-        user.setRole("student"); user.setArchived(false); user.setDemo(false); user.setMustChangePassword(false);
-        user.setInvitationEnabled(false); save(user); return invitation(user.getId(), true);
-    }
-    @Override public Map<String, Object> invitation(String userId, boolean enabled) {
-        AccountUser user = getById(userId);
-        if (user == null || !"student".equals(user.getRole()) || user.getUsername() == null) throw error(422, "This student does not have a username-based account");
-        byte[] bytes = new byte[15]; new java.security.SecureRandom().nextBytes(bytes);
-        String code = enabled ? Base64.getUrlEncoder().withoutPadding().encodeToString(bytes) : "";
-        lambdaUpdate().eq(AccountUser::getId, userId).set(AccountUser::getInvitationEnabled, enabled)
-            .set(AccountUser::getInvitationHash, enabled ? encoder.encode(code) : null).update();
-        sessions.delete(Wrappers.<AuthSession>lambdaQuery().eq(AuthSession::getUserId, userId));
-        user.setInvitationEnabled(enabled);
-        Map<String, Object> result = new LinkedHashMap<>(publicUser(user)); result.put("invitationCode", code); return result;
-    }
     @Override @Transactional public void ensureDemoAccounts() {
         if (!properties.isDemoEnabled()) return;
         for (String role : List.of("teacher", "student")) {

@@ -263,10 +263,6 @@ export type Member = User & {
   membershipRole: string;
   membershipArchived: boolean;
 };
-export type StudentInvitation = Pick<User, "id" | "name"> & {
-  username: string;
-  invitationCode: string;
-};
 export type Bootstrap = {
   needsSetup: boolean;
   defaultLocale: string;
@@ -295,6 +291,7 @@ export async function call<T>(
     method,
     signal,
     credentials: "include",
+    cache: "no-store",
     headers:
       body == null || multipart ? {} : { "Content-Type": "application/json" },
     body: body == null ? undefined : multipart ? body : JSON.stringify(body),

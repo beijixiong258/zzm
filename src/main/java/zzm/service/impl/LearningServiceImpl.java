@@ -56,8 +56,11 @@ public class LearningServiceImpl extends ServiceImpl<LearningRecordMapper, Learn
         LearningRecord record = latestRecord(sessionId, user.getId());
         Map<String, Object> result = new LinkedHashMap<>(); result.put("task", task); result.put("record", record == null ? null : view(record)); return result;
     }
-    @Override public LearningRecord start(String sessionId, String versionId, AccountUser user) {
+    @Override @Transactional public LearningRecord start(String sessionId, String versionId, AccountUser user) {
         if (!"student".equals(user.getRole())) throw error(403, "Student access required");
+        // 与任务删除、课程删除和移出课程串行，取得锁后再核对最新的课程成员关系。
+        if (sessions.lambdaQuery().eq(TeachingSession::getId, sessionId).last("FOR UPDATE").one() == null)
+            throw error(404, "Task not found");
         Map<String, Object> task = sessions.published(sessionId, versionId, user);
         String selected = Objects.toString(task.get("versionId"));
         LearningRecord existing = latestRecord(sessionId, user.getId());
@@ -326,6 +329,7 @@ public class LearningServiceImpl extends ServiceImpl<LearningRecordMapper, Learn
     @Override @Transactional public Map<String,Object> uploadAttachment(String id, String questionId, org.springframework.web.multipart.MultipartFile file, AccountUser user) {
         LearningRecord record = owned(id, user, true);
         record = baseMapper.lockById(id);
+        if (record == null) throw error(404, "Learning record not found");
         if (Set.of("submitted", "confirmed").contains(record.getStatus())) throw error(409, "This submission is read-only until your teacher requests a revision");
         JSONObject snapshot = snapshot(record);
         if (questionId != null && !questionId.isBlank() && snapshot.getBean("content", TaskContent.class).getQuestions().stream().noneMatch(q -> questionId.equals(q.getId()))) throw error(422, "Question not found in this task");

@@ -23,6 +23,7 @@ public class CourseServiceImpl extends ServiceImpl<CourseMapper, Course> impleme
     private final TeachingSessionMapper tasks;
     private final GenerationJobMapper jobs;
     private final CourseMaterialMapper materials;
+    private final LearningRecordMapper records;
     @Override public Course requireAccess(String id, AccountUser user, boolean teacher) {
         if (Boolean.TRUE.equals(user.getMustChangePassword())) throw error(403, "Password change required");
         if (teacher) accounts.requireStaff(user);
@@ -132,7 +133,7 @@ public class CourseServiceImpl extends ServiceImpl<CourseMapper, Course> impleme
             member = new CourseMember(); member.setCourseId(id); member.setUserId(student.getId());
             member.setRole("student"); member.setArchived(false); members.insert(member);
         } else {
-            // 教师重新添加时恢复原有成员关系，保留该学生的学习记录。
+            // 教师重新添加时恢复入课资格，已删除的学习记录不会恢复。
             members.update(Wrappers.<CourseMember>lambdaUpdate().eq(CourseMember::getId, member.getId())
                 .set(CourseMember::getRole, "student").set(CourseMember::getArchived, false));
         }
@@ -146,20 +147,12 @@ public class CourseServiceImpl extends ServiceImpl<CourseMapper, Course> impleme
         if (new HashSet<>(emails).size() != emails.size()) throw error(422, "The member list contains duplicate email addresses");
         Map<String, AccountUser> known = new HashMap<>();
         accounts.lambdaQuery().in(AccountUser::getEmail, emails).list().forEach(a -> known.put(a.getEmail(), a));
-        List<Requests.Account> create = new ArrayList<>();
         for (Requests.Account account : input) {
             AccountUser person = known.get(account.getEmail().trim().toLowerCase(Locale.ROOT));
-            if (person == null) {
-                if (!"student".equals(account.getRole())) throw error(422, "Create teacher accounts in account management first");
-                create.add(account);
-            } else {
-                if (Boolean.TRUE.equals(person.getArchived())) throw error(422, "Account is archived");
-                if ("student".equals(account.getRole()) != "student".equals(person.getRole())) throw error(422, "The account role does not match the requested course membership");
-            }
+            if (person == null) throw error(404, "Account not found. Only existing accounts can be added to a course.");
+            if (Boolean.TRUE.equals(person.getArchived())) throw error(422, "Account is archived");
+            if ("student".equals(account.getRole()) != "student".equals(person.getRole())) throw error(422, "The account role does not match the requested course membership");
         }
-        List<AccountUser> created = create.isEmpty() ? List.of() : accounts.createMany(create, "student");
-        if (!created.isEmpty()) accounts.lambdaUpdate().in(AccountUser::getId, created.stream().map(AccountUser::getId).toList()).set(AccountUser::getMustChangePassword, true).update();
-        created.forEach(a -> known.put(a.getEmail(), a));
         Set<String> existingIds = new HashSet<>();
         members.selectList(Wrappers.<CourseMember>lambdaQuery().eq(CourseMember::getCourseId, id)).forEach(m -> existingIds.add(m.getUserId()));
         List<CourseMember> additions = new ArrayList<>();
@@ -172,23 +165,40 @@ public class CourseServiceImpl extends ServiceImpl<CourseMapper, Course> impleme
         members.update(Wrappers.<CourseMember>lambdaUpdate().eq(CourseMember::getCourseId, id)
             .in(CourseMember::getUserId, known.values().stream().map(AccountUser::getId).toList()).set(CourseMember::getArchived, false));
     }
-    @Override public void archiveMember(String id, String userId, boolean archived, AccountUser user) {
-        Course course = requireAccess(id, user, true);
-        if (archived && course.getOwnerId().equals(userId)) throw error(422, "The course owner must remain a member");
-        members.update(Wrappers.<CourseMember>lambdaUpdate().eq(CourseMember::getCourseId, id).eq(CourseMember::getUserId, userId).set(CourseMember::getArchived, archived));
+    @Override @Transactional public void archiveMember(String id, String userId, boolean archived, AccountUser user) {
+        requireAccess(id, user, true);
+        CourseMember member = members.selectOne(Wrappers.<CourseMember>lambdaQuery()
+            .eq(CourseMember::getCourseId, id).eq(CourseMember::getUserId, userId));
+        if (member == null) throw error(404, "Course member not found");
+        if (!"student".equals(member.getRole())) throw error(403, "Only student memberships can be changed here.");
+        if (archived) deleteStudentRecords(id, userId, user);
+        members.update(Wrappers.<CourseMember>lambdaUpdate().eq(CourseMember::getId, member.getId())
+            .set(CourseMember::getArchived, archived));
     }
-    @Override @Transactional public Map<String, Object> inviteStudent(String courseId, Requests.StudentInvitation input, AccountUser user) {
-        requireAccess(courseId, user, true);
-        Map<String, Object> result = accounts.createInvitedStudent(input);
-        CourseMember member = new CourseMember(); member.setCourseId(courseId); member.setUserId(result.get("id").toString());
-        member.setRole("student"); member.setArchived(false); members.insert(member); return result;
-    }
-    @Override @Transactional public Map<String, Object> changeInvitation(String courseId, String studentId, boolean enabled, AccountUser user) {
-        requireAccess(courseId, user, true);
-        if (members.selectCount(Wrappers.<CourseMember>lambdaQuery().eq(CourseMember::getCourseId, courseId)
-            .eq(CourseMember::getUserId, studentId).eq(CourseMember::getRole, "student").eq(CourseMember::getArchived, false)) == 0)
-            throw error(404, "Student is not an active member of this course");
-        return accounts.invitation(studentId, enabled);
+    private void deleteStudentRecords(String courseId, String studentId, AccountUser user) {
+        // 与开始任务共用任务行锁，防止移出课程时并发创建新的学习记录。
+        List<String> taskIds = tasks.selectList(Wrappers.<TeachingSession>lambdaQuery()
+            .eq(TeachingSession::getCourseId, courseId).orderByAsc(TeachingSession::getId).last("FOR UPDATE"))
+            .stream().map(TeachingSession::getId).toList();
+        if (taskIds.isEmpty()) return;
+        List<String> recordIds = records.selectList(Wrappers.<LearningRecord>lambdaQuery()
+            .select(LearningRecord::getId).in(LearningRecord::getSessionId, taskIds).eq(LearningRecord::getUserId, studentId)
+            .orderByAsc(LearningRecord::getId).last("FOR UPDATE"))
+            .stream().map(LearningRecord::getId).toList();
+        if (recordIds.isEmpty()) return;
+        List<CourseMaterial> attachments = materials.selectList(Wrappers.<CourseMaterial>lambdaQuery()
+            .select(CourseMaterial::getId, CourseMaterial::getStatus).in(CourseMaterial::getRecordId, recordIds)
+            .orderByAsc(CourseMaterial::getId).last("FOR UPDATE"));
+        if (attachments.stream().anyMatch(file -> "processing".equals(file.getStatus())))
+            throw error(409, "Wait for the student's attachments to finish processing before removing them from the course.");
+        materials.update(Wrappers.<CourseMaterial>lambdaUpdate().in(CourseMaterial::getRecordId, recordIds)
+            .isNull(CourseMaterial::getFileRemovedAt).set(CourseMaterial::getFileRemovedAt, LocalDateTime.now(ZoneOffset.UTC))
+            .set(CourseMaterial::getRemovedBy, user.getId()));
+        materials.update(Wrappers.<CourseMaterial>lambdaUpdate().in(CourseMaterial::getRecordId, recordIds)
+            .set(CourseMaterial::getArchived, true).set(CourseMaterial::getStatus, "taskDeleted")
+            .set(CourseMaterial::getTextContent, "").set(CourseMaterial::getExtractionReportJson, null).set(CourseMaterial::getErrorMessage, ""));
+        // 作答、对话和辅导状态随主记录删除，历史表由外键级联删除；附件进入现有回收流程。
+        records.delete(Wrappers.<LearningRecord>lambdaQuery().in(LearningRecord::getId, recordIds));
     }
     @Override @Transactional public void join(String code, AccountUser user) {
         if (!"student".equals(user.getRole()) || Boolean.TRUE.equals(user.getMustChangePassword())) throw error(403, "Student access required");
