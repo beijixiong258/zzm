@@ -1,5 +1,9 @@
 <script setup lang="ts">
-import { Button as TButton } from "tdesign-vue-next";
+import {
+  Button as TButton,
+  Collapse as TCollapse,
+  CollapsePanel as TCollapsePanel,
+} from "tdesign-vue-next";
 import { ref, watch } from "vue";
 import { systemText, t } from "../i18n";
 import { upload, type Material } from "../classroom-api";
@@ -150,36 +154,50 @@ async function send(item: Upload) {
         )
       }}
     </p>
-    <ul v-if="queue.length" class="upload-queue" aria-live="polite">
-      <li v-for="item in queue" :key="item.id">
-        <span>{{ item.file.name }}</span
-        ><small>{{
-          t(
-            {
-              queued: "Queued",
-              uploading: "Uploading",
-              done: "Uploaded",
-              failed: "Failed",
-            }[item.status],
-          )
-        }}</small>
-        <ProgressStatus
-          v-if="item.status === 'uploading'"
-          :label="t(item.progress >= 100 ? 'Saving upload…' : 'Uploading')"
-          :value="item.progress >= 100 ? null : item.progress"
-        />
-        <span v-if="item.error" class="error">{{ systemText(item.error) }}</span
-        ><TButton
-          theme="default"
-          variant="outline"
-          v-if="item.status === 'failed'"
-          type="button"
-          :disabled="disabled"
-          @click="retry(item)"
-        >
-          {{ t("Retry") }}
-        </TButton>
-      </li>
-    </ul>
+    <TCollapse
+      v-if="queue.length"
+      class="upload-queue-collapse"
+      borderless
+      :default-value="['uploads']"
+    >
+      <TCollapsePanel
+        value="uploads"
+        :header="t('Upload list ({0})', [queue.length])"
+      >
+        <ul class="upload-queue" aria-live="polite">
+          <li v-for="item in queue" :key="item.id">
+            <span>{{ item.file.name }}</span
+            ><small>{{
+              t(
+                {
+                  queued: "Queued",
+                  uploading: "Uploading",
+                  done: "Uploaded",
+                  failed: "Failed",
+                }[item.status],
+              )
+            }}</small>
+            <ProgressStatus
+              v-if="item.status === 'uploading'"
+              :label="t(item.progress >= 100 ? 'Saving upload…' : 'Uploading')"
+              :value="item.progress >= 100 ? null : item.progress"
+            />
+            <span v-if="item.error" class="error">{{
+              systemText(item.error)
+            }}</span
+            ><TButton
+              theme="default"
+              variant="outline"
+              v-if="item.status === 'failed'"
+              type="button"
+              :disabled="disabled"
+              @click="retry(item)"
+            >
+              {{ t("Retry") }}
+            </TButton>
+          </li>
+        </ul>
+      </TCollapsePanel>
+    </TCollapse>
   </div>
 </template>

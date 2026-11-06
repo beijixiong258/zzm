@@ -1485,6 +1485,9 @@ td button {
   width: 100%;
   min-width: 0;
 }
+.upload-queue-collapse {
+  margin-top: 8px;
+}
 .upload-queue {
   padding: 0;
   list-style: none;
@@ -1944,27 +1947,13 @@ td button {
   margin: 10px 0;
 }
 .selected-materials {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 7px;
-  align-items: center;
-  margin-top: 9px;
+  display: grid;
+  gap: 8px;
+  max-width: 720px;
+  margin-top: 12px;
 }
 .selected-materials > small {
   width: 100%;
-  color: var(--muted);
-}
-.selected-materials > button {
-  max-width: 240px;
-  font-size: 12px;
-  text-align: left;
-  padding: 7px 10px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.selected-materials > button small {
-  display: block;
-  font-size: 10px;
   color: var(--muted);
 }
 .selected-empty {
@@ -2153,7 +2142,6 @@ td button {
   justify-content: flex-start;
 }
 .classroom-sidebar .t-button,
-.selected-materials .t-button,
 .tree-file .t-button,
 .progress-row.t-button {
   height: auto;
@@ -2161,7 +2149,6 @@ td button {
   white-space: normal;
 }
 .classroom-sidebar .t-button__text,
-.selected-materials .t-button__text,
 .tree-file .t-button__text {
   display: block;
   overflow-wrap: anywhere;

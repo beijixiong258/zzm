@@ -762,17 +762,27 @@ void load();
         />
         <div v-if="selected.length" class="selected-materials">
           <small>{{ t("Selected materials: {0}", [selected.length]) }}</small>
-          <TButton
-            v-for="material in selected"
-            :key="material.id"
-            theme="default"
-            variant="outline"
-            type="button"
-            @click="selectedMaterial = material"
+          <TSelect
+            v-control-attrs="{
+              'aria-label': t('Selected materials: {0}', [selected.length]),
+            }"
+            :value="selectedMaterial?.id || ''"
+            :placeholder="t('Select a file to preview')"
+            filterable
+            @change="
+              (value) =>
+                (selectedMaterial =
+                  selected.find((material) => material.id === value) || null)
+            "
           >
-            {{ material.title }}
-            <small>{{ statusText(material.status) }}</small>
-          </TButton>
+            <TOption
+              v-for="material in selected"
+              :key="material.id"
+              :value="material.id"
+              :label="`${material.fileName} · ${statusText(material.status)}`"
+              :title="material.relativePath || material.fileName"
+            />
+          </TSelect>
         </div>
         <p v-if="selected.length && !materialsReady" class="muted">
           {{
