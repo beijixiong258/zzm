@@ -6,7 +6,7 @@ AIcademiya 用于教师备课与学生学习。教师创建课程、上传材料
 
 安装并启动 Docker，确认可以使用 `docker compose`。程序已提供数据库、端口、存储目录和模型的默认配置。
 
-1. 编辑根目录的 `application.yaml`，填写 `app.ai.api-key`。默认使用硅基流动接口和 `Qwen/Qwen3.8-27B`；使用其他兼容接口时，同时修改 `provider`、`base-url` 和 `model`，其中 `provider` 可设为 `openai`。
+1. 编辑根目录的 `application.yaml`，填写 `GJLD_API_KEY`。默认使用硅基流动接口和 `Qwen/Qwen3.8-27B`；使用其他兼容接口时，同时修改 `provider`、`base-url` 和 `model`，其中 `provider` 可设为 `openai`。
 2. 在项目根目录执行：
 
    ```powershell
@@ -29,7 +29,7 @@ app:
     provider: siliconflow
     base-url: https://api.siliconflow.cn/v1
     model: Qwen/Qwen3.8-27B
-    api-key: '你的 API 密钥'
+GJLD_API_KEY: '你的 API 密钥'
 ```
 
 其他设置保持默认即可。修改配置后执行 `docker compose restart backend` 生效。需要演示教师和演示学生入口时，在 `app` 下添加 `demo-enabled: true`。

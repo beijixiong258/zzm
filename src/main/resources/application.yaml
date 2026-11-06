@@ -25,6 +25,8 @@ mybatis-plus:
   configuration:
     default-enum-type-handler: org.apache.ibatis.type.EnumTypeHandler
 app:
+  ai:
+    api-key: ${GJLD_API_KEY:}
   upload-dir: data/uploads
   trash-dir: data/recycle
   allowed-origins:
