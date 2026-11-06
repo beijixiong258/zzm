@@ -64,7 +64,9 @@ async function archive() {
     !selected.value ||
     !(await confirmAction(
       t(
-        "Change the archive state of this material? Published versions keep their original references.",
+        selected.value.archived
+          ? "Restore this material to course materials? Existing task references will be kept."
+          : "Change the archive state of this material? Published versions keep their original references.",
       ),
     ))
   )
