@@ -30,7 +30,6 @@ const selectedId = ref(""),
   error = ref("");
 const title = ref(""),
   visibility = ref<"student" | "teacher">("student");
-const uploadVisibility = ref<"student" | "teacher">("student");
 const selected = computed(() =>
   materials.value.find((m) => m.id === selectedId.value),
 );
@@ -125,23 +124,11 @@ void load();
     </div>
   </header>
   <section class="panel library-upload">
-    <div class="form-stack">
-      <label
-        >{{ t("Visibility for new uploads")
-        }}<TSelect v-model="uploadVisibility">
-          <TOption value="student" :label="t('Students and teachers')" />
-          <TOption
-            value="teacher"
-            :label="t('Teachers and AI only')"
-          /> </TSelect
-      ></label>
-      <FileUploader
-        :endpoint="`/courses/${key(courseId)}/materials`"
-        :visibility="uploadVisibility"
-        @uploaded="select"
-        @settled="load"
-      />
-    </div>
+    <FileUploader
+      :endpoint="`/courses/${key(courseId)}/materials`"
+      @uploaded="select"
+      @settled="load"
+    />
   </section>
   <p class="muted">
     {{

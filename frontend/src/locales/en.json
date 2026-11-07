@@ -1205,7 +1205,6 @@
   "AI did not return a complete handout and opening message. Retry generation.": "The AI did not return a complete handout and opening message. Try generating again.",
   "This attachment cannot be changed": "This attachment cannot be changed at the moment.",
   "Answer all questions or upload a processed question attachment before submitting": "Answer all questions or upload a processed question attachment before submitting.",
-  "Visibility for new uploads": "Visibility for new uploads",
   "Download Markdown": "Download Markdown",
   "Remove attachment": "Remove attachment",
   "Removed attachment: {0}": "Removed attachment: {0}",

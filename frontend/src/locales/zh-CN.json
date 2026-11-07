@@ -1204,7 +1204,6 @@
   "AI did not return a complete handout and opening message. Retry generation.": "AI 未返回完整讲义和开场白，请重新生成。",
   "This attachment cannot be changed": "此附件当前无法修改。",
   "Answer all questions or upload a processed question attachment before submitting": "提交前，请为每道题填写答案，或上传已处理完成的题目附件。",
-  "Visibility for new uploads": "新上传材料的可见性",
   "Download Markdown": "下载 Markdown",
   "Remove attachment": "移除附件",
   "Removed attachment: {0}": "已移除的附件：{0}",
