@@ -9,7 +9,11 @@ import {
   statusText,
   type Material,
 } from "../classroom-api";
-const props = defineProps<{ material: Material }>();
+const props = defineProps<{ material: Material; inline?: boolean }>();
+const originalPath = computed(() => {
+  const path = props.material.relativePath || props.material.fileName;
+  return path.split("/").at(-1) === props.material.title ? "" : path;
+});
 const isPdf = computed(
   () =>
     props.material.mimeType === "application/pdf" ||
@@ -49,12 +53,13 @@ watch(
 <template>
   <div class="material-preview">
     <div class="row spread">
-      <h3>{{ material.title }}</h3>
+      <h3 v-if="!inline">{{ material.title }}</h3>
+      <span v-else-if="originalPath" class="muted">{{ originalPath }}</span>
       <a :href="fileUrl(material.id)" target="_blank" rel="noopener">{{
         t("Open original")
       }}</a>
     </div>
-    <p class="row wrap">
+    <p v-if="!inline" class="row wrap">
       <span class="muted">{{ material.relativePath }}</span
       ><span class="badge status-label" :data-status="material.status">{{
         statusText(material.status)
@@ -85,8 +90,9 @@ watch(
     <details
       v-if="material.extractionReport && (!isPdf || pdfMode)"
       :open="
-        material.status === 'processing' ||
-        !!material.extractionReport.failedUnits.length
+        !inline &&
+        (material.status === 'processing' ||
+          !!material.extractionReport.failedUnits.length)
       "
     >
       <summary>{{ t("Processing report") }}</summary>

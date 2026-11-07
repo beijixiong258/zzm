@@ -674,10 +674,14 @@ footer {
   margin-top: 24px;
   padding-top: 20px;
 }
-.library-layout {
-  display: grid;
-  grid-template-columns: 290px minmax(0, 1fr);
-  gap: 22px;
+.course-materials-scroll {
+  max-height: 70dvh;
+  overflow-y: auto;
+  margin-top: 8px;
+  padding: 4px;
+}
+.course-materials-scroll > .material-tree {
+  margin: 0;
 }
 .material-tree {
   list-style: none;
@@ -687,7 +691,7 @@ footer {
 .material-tree .material-tree {
   margin-left: 14px;
 }
-.material-tree summary {
+.material-tree > li > details > summary {
   padding: 7px 3px;
   font-weight: 550;
   overflow-wrap: anywhere;
@@ -717,6 +721,51 @@ footer {
 .tree-file .status-label {
   font-size: 11px;
   text-align: left;
+}
+.tree-file-card {
+  border: 1px solid var(--line);
+  border-radius: 7px;
+}
+.tree-file-card + .tree-file-card {
+  margin-top: 6px;
+}
+.tree-file-card > .tree-file.selected {
+  border-radius: 6px 6px 0 0;
+}
+.tree-file-card > .tree-file > .material-delete {
+  align-self: center;
+  margin-inline-end: 4px;
+}
+.tree-file > .tree-file-toggle {
+  flex-direction: row;
+  justify-content: flex-start;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 8px 10px;
+  font-size: 14px;
+}
+.tree-file > .tree-file-toggle > .t-button__text {
+  display: flex;
+  flex: 1;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+}
+.tree-file-toggle .tree-file-title {
+  flex: 1 1 150px;
+  min-width: 0;
+}
+.tree-file-chevron {
+  flex: none;
+}
+.tree-file-toggle[aria-expanded="true"] .tree-file-chevron {
+  transform: rotate(90deg);
+}
+.tree-file-details {
+  border-top: 1px solid var(--line);
+  padding: clamp(12px, 2vw, 20px);
+  overflow-wrap: anywhere;
 }
 .material-status-row {
   display: flex;
@@ -753,10 +802,20 @@ footer {
   font-size: 12px;
 }
 .material-edit {
-  padding-bottom: 22px;
-  margin-bottom: 22px;
+  padding-bottom: 16px;
+  margin-bottom: 16px;
   border-bottom: 1px solid var(--line);
   align-items: flex-end;
+}
+.material-edit > label {
+  flex: 1 1 190px;
+  min-width: 0;
+}
+.material-edit > .grow {
+  flex-grow: 2;
+}
+.material-edit-actions {
+  flex-basis: 100%;
 }
 .table-wrap {
   overflow-x: auto;
@@ -1365,9 +1424,6 @@ td button {
   .panel {
     padding: 20px;
   }
-  .library-layout {
-    grid-template-columns: 230px minmax(0, 1fr);
-  }
   .learning-layout {
     grid-template-columns: minmax(0, 1.1fr) minmax(300px, 0.9fr);
   }
@@ -1396,9 +1452,6 @@ td button {
   }
   .overview-grid {
     gap: 12px;
-  }
-  .library-layout {
-    grid-template-columns: 1fr;
   }
 }
 @media (max-width: 760px) {

@@ -7,7 +7,7 @@ import {
   Option as TOption,
   Input as TInput,
 } from "tdesign-vue-next";
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import { systemText, t } from "../i18n";
 import { call, key, type Material } from "../classroom-api";
 import { courses, navigate } from "../classroom-state";
@@ -24,17 +24,28 @@ const {
   error: materialError,
   load,
 } = useCourseMaterials(() => props.courseId);
-const selectedId = ref(""),
+const expandedId = ref(""),
   showArchived = ref(false),
   busy = ref(false),
   error = ref("");
 const title = ref(""),
   visibility = ref<"student" | "teacher">("student");
-const selected = computed(() =>
-  materials.value.find((m) => m.id === selectedId.value),
+const visibleMaterials = computed(() =>
+  materials.value.filter(
+    (material) => showArchived.value || !material.archived,
+  ),
 );
-function select(material: Material) {
-  selectedId.value = material.id;
+watch(visibleMaterials, (visible) => {
+  if (!visible.some((material) => material.id === expandedId.value)) {
+    expandedId.value = "";
+  }
+});
+function toggleMaterial(material: Material) {
+  if (expandedId.value === material.id) {
+    expandedId.value = "";
+    return;
+  }
+  expandedId.value = material.id;
   title.value = material.title;
   visibility.value = material.visibility;
 }
@@ -50,20 +61,19 @@ async function action(fn: () => Promise<void>) {
     busy.value = false;
   }
 }
-async function save() {
+async function saveMaterial(material: Material) {
   await action(async () => {
-    await call(`/materials/${key(selectedId.value)}`, "PUT", {
+    await call(`/materials/${key(material.id)}`, "PUT", {
       title: title.value,
       visibility: visibility.value,
     });
   });
 }
-async function archive() {
+async function archiveMaterial(material: Material) {
   if (
-    !selected.value ||
     !(await confirmAction(
       t(
-        selected.value.archived
+        material.archived
           ? "Restore this material to course materials? Existing task references will be kept."
           : "Change the archive state of this material? Published versions keep their original references.",
       ),
@@ -72,14 +82,14 @@ async function archive() {
     return;
   await action(async () => {
     await call(
-      `/materials/${key(selectedId.value)}/archive?archived=${!selected.value!.archived}`,
+      `/materials/${key(material.id)}/archive?archived=${!material.archived}`,
       "POST",
     );
   });
 }
-async function retry() {
+async function retryMaterial(material: Material) {
   await action(async () => {
-    await call(`/materials/${key(selectedId.value)}/retry`, "POST");
+    await call(`/materials/${key(material.id)}/retry`, "POST");
   });
 }
 async function removeMaterial(material: Material) {
@@ -95,7 +105,7 @@ async function removeMaterial(material: Material) {
     return;
   await action(async () => {
     await call(`/materials/${key(material.id)}`, "DELETE");
-    if (selectedId.value === material.id) selectedId.value = "";
+    if (expandedId.value === material.id) expandedId.value = "";
   });
 }
 void load();
@@ -126,7 +136,6 @@ void load();
   <section class="panel library-upload">
     <FileUploader
       :endpoint="`/courses/${key(courseId)}/materials`"
-      @uploaded="select"
       @settled="load"
     />
   </section>
@@ -140,82 +149,90 @@ void load();
   <p v-if="error || materialError" class="error" role="alert">
     {{ systemText(error || materialError) }}
   </p>
-  <div class="library-layout">
-    <aside class="panel">
-      <TCheckbox v-model="showArchived">{{
-        t("Show archived items")
-      }}</TCheckbox
-      ><MaterialTree
-        :materials="materials.filter((m) => showArchived || !m.archived)"
-        :selected="selectedId"
+  <section class="panel">
+    <TCheckbox v-model="showArchived">{{ t("Show archived items") }}</TCheckbox>
+    <div v-if="visibleMaterials.length" class="course-materials-scroll">
+      <MaterialTree
+        :materials="visibleMaterials"
+        :selected="expandedId"
         deletable
         :disabled="busy"
-        @select="select"
+        @select="toggleMaterial"
         @remove="removeMaterial"
-      />
-      <p v-if="!materials.length" class="empty">
-        {{ t("Upload course materials to begin.") }}
-      </p>
-    </aside>
-    <section class="panel">
-      <template v-if="selected"
-        ><form class="row wrap material-edit" @submit.prevent="save">
-          <label class="grow"
-            >{{ t("Material title")
-            }}<TInput
-              v-control-attrs="{ required: true }"
-              v-model="title" /></label
-          ><label
-            >{{ t("Visibility")
-            }}<TSelect v-model="visibility">
-              <TOption value="student" :label="t('Students and teachers')" />
-              <TOption
-                value="teacher"
-                :label="t('Teachers and AI only')"
-              /> </TSelect></label
-          ><TButton
-            theme="default"
-            variant="outline"
-            type="submit"
-            :disabled="busy"
-            >{{ t("Save") }}</TButton
-          ><TButton
-            theme="default"
-            variant="outline"
-            type="button"
-            :class="{ 'warning-action': !selected.archived }"
-            :disabled="busy"
-            @click="archive"
+      >
+        <template #details="{ material }">
+          <form
+            class="row wrap material-edit"
+            @submit.prevent="saveMaterial(material)"
           >
-            {{ t(selected.archived ? "Restore" : "Archive") }}</TButton
-          ><TButton
-            theme="default"
-            variant="outline"
-            v-if="
-              !['queued', 'processing'].includes(selected.status) &&
-              !selected.archived
-            "
-            type="button"
-            :disabled="busy"
-            @click="retry"
-          >
-            {{ t("Reprocess material") }}
-          </TButton>
-        </form>
-        <p class="muted">
-          {{
-            t(
-              "Archive hides a material and preserves its file and published references. Show archived items to restore it.",
-            )
-          }}
-        </p>
-        <CourseMaterialPreview
-          :key="selected.id + selected.status"
-          :material="selected"
-      /></template>
-      <p v-else class="empty">
-        {{ t("Select a material from the folder tree to preview it.") }}
-      </p>
-    </section>
-  </div>
+            <label class="grow">
+              {{ t("Material title") }}
+              <TInput v-control-attrs="{ required: true }" v-model="title" />
+            </label>
+            <label>
+              {{ t("Visibility") }}
+              <TSelect v-model="visibility">
+                <TOption value="student" :label="t('Students and teachers')" />
+                <TOption value="teacher" :label="t('Teachers and AI only')" />
+              </TSelect>
+            </label>
+            <div class="row wrap material-edit-actions">
+              <TButton
+                theme="default"
+                variant="outline"
+                type="submit"
+                :disabled="busy"
+              >
+                {{ t("Save") }}
+              </TButton>
+              <TButton
+                theme="default"
+                variant="outline"
+                type="button"
+                :class="{ 'warning-action': !material.archived }"
+                :disabled="busy"
+                @click="archiveMaterial(material)"
+              >
+                {{ t(material.archived ? "Restore" : "Archive") }}
+              </TButton>
+              <TButton
+                v-if="
+                  !['queued', 'processing'].includes(material.status) &&
+                  !material.archived
+                "
+                theme="default"
+                variant="outline"
+                type="button"
+                :disabled="busy"
+                @click="retryMaterial(material)"
+              >
+                {{ t("Reprocess material") }}
+              </TButton>
+            </div>
+          </form>
+          <p class="muted">
+            {{
+              t(
+                "Archive hides a material and preserves its file and published references. Show archived items to restore it.",
+              )
+            }}
+          </p>
+          <CourseMaterialPreview
+            :key="material.status"
+            :material="material"
+            inline
+          />
+        </template>
+      </MaterialTree>
+    </div>
+    <p v-else class="empty">
+      {{
+        t(
+          materials.length
+            ? "No matching materials"
+            : "Upload course materials to begin.",
+        )
+      }}
+    </p>
+  </section>
 </template>
