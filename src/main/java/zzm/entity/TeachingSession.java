@@ -25,15 +25,14 @@ public class TeachingSession {
     @TableField(updateStrategy = FieldStrategy.NEVER)
     private Boolean available;
     @TableField(updateStrategy = FieldStrategy.NEVER)
-    private LocalDateTime opensAt;
-    @TableField(updateStrategy = FieldStrategy.NEVER)
     private LocalDateTime closesAt;
+    private LocalDateTime updatedAt;
 
     public String availabilityStatus(LocalDateTime now) {
         if (Boolean.TRUE.equals(archived)) return "recycled";
         if (publishedVersionId == null) return "draft";
-        if (!Boolean.TRUE.equals(available) || closesAt != null && !now.isBefore(closesAt)) return "expired";
-        if (opensAt != null && now.isBefore(opensAt)) return "scheduled";
+        if (closesAt != null && !now.isBefore(closesAt)) return "expired";
+        if (!Boolean.TRUE.equals(available)) return "closed";
         return "open";
     }
 

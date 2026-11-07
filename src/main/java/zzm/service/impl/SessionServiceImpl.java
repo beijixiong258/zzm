@@ -103,6 +103,7 @@ public class SessionServiceImpl extends ServiceImpl<TeachingSessionMapper, Teach
         session.setTitle(input.getTitle().trim()); session.setDescription(input.getDescription()); session.setSessionType(input.getSessionType());
         session.setTopic(input.getTopic()); session.setLearningGoals(input.getLearningGoals()); session.setAdditionalInstructions(input.getAdditionalInstructions());
         session.setTeachingLanguage(input.getTeachingLanguage()); session.setMaterialIdsJson(JSONUtil.toJsonStr(input.getMaterialIds())); session.setContentJson(JSONUtil.toJsonStr(content));
+        session.setUpdatedAt(LocalDateTime.now(ZoneOffset.UTC));
     }
     @Override public Map<String, Object> view(TeachingSession session, boolean teacher) {
         Map<String, Object> result = new LinkedHashMap<>();
@@ -122,7 +123,6 @@ public class SessionServiceImpl extends ServiceImpl<TeachingSessionMapper, Teach
         view.put("archived", session.getArchived());
         view.put("available", session.getAvailable());
         view.put("availabilityStatus", session.availabilityStatus(now));
-        view.put("opensAt", session.getOpensAt() == null ? null : session.getOpensAt().toInstant(ZoneOffset.UTC).toString());
         view.put("closesAt", session.getClosesAt() == null ? null : session.getClosesAt().toInstant(ZoneOffset.UTC).toString());
     }
     private Map<String, Object> publishedView(TeachingSession session, SessionVersion version, LocalDateTime now) {
@@ -154,9 +154,10 @@ public class SessionServiceImpl extends ServiceImpl<TeachingSessionMapper, Teach
         if (firstPublish) {
             applySchedule(session, input);
             session.setPublishedVersionId(IdUtil.fastSimpleUUID());
-        } else if (input.getOpensAt() != null || input.getClosesAt() != null) {
+        } else if (input.getClosesAt() != null) {
             throw error(422, "Change the schedule in task availability.");
         }
+        session.setUpdatedAt(LocalDateTime.now(ZoneOffset.UTC));
         if (!updateById(session)) throw error(409, "Task changed. Reload before publishing.");
         if (firstPublish) storeAvailability(session);
         return storePublishedContent(session);
@@ -173,30 +174,28 @@ public class SessionServiceImpl extends ServiceImpl<TeachingSessionMapper, Teach
         return session;
     }
     private void applySchedule(TeachingSession session, Requests.TaskSchedule input) {
-        String opens = input.getOpensAt(), closes = input.getClosesAt();
-        if ((opens == null) == (closes == null)) throw error(422, "Choose exactly one opening or closing time.");
+        if (input.getClosesAt() == null) throw error(422, "Choose a deadline.");
         Instant time;
         try {
-            time = Instant.parse(opens == null ? closes : opens).truncatedTo(ChronoUnit.MILLIS);
+            time = Instant.parse(input.getClosesAt()).truncatedTo(ChronoUnit.MILLIS);
         } catch (DateTimeException exception) {
             throw error(422, "Choose a valid time in the future.");
         }
         if (!time.isAfter(Instant.now()) || time.isAfter(MAX_SCHEDULE_TIME)) throw error(422, "Choose a valid time in the future.");
-        LocalDateTime scheduled = LocalDateTime.ofInstant(time, ZoneOffset.UTC);
-        session.setOpensAt(opens == null ? null : scheduled);
-        session.setClosesAt(closes == null ? null : scheduled);
+        session.setClosesAt(LocalDateTime.ofInstant(time, ZoneOffset.UTC));
+        session.setUpdatedAt(LocalDateTime.now(ZoneOffset.UTC));
         session.setAvailable(true);
     }
     private void storeAvailability(TeachingSession session) {
         lambdaUpdate().eq(TeachingSession::getId, session.getId())
             .set(TeachingSession::getAvailable, session.getAvailable())
-            .set(TeachingSession::getOpensAt, session.getOpensAt())
             .set(TeachingSession::getClosesAt, session.getClosesAt()).update();
     }
     @Override public void expireTasks() {
         // 读写请求仍按实际截止时刻判定；后台任务负责把到期状态写入数据库。
-        lambdaUpdate().eq(TeachingSession::getAvailable, true).le(TeachingSession::getClosesAt, LocalDateTime.now(ZoneOffset.UTC))
-            .set(TeachingSession::getAvailable, false).update();
+        LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
+        lambdaUpdate().eq(TeachingSession::getAvailable, true).le(TeachingSession::getClosesAt, now)
+            .set(TeachingSession::getAvailable, false).set(TeachingSession::getUpdatedAt, now).update();
     }
     /** 复用同一份发布内容；学习记录继续使用原记录，不随更新另起一份。 */
     private SessionVersion storePublishedContent(TeachingSession session) {
@@ -231,6 +230,7 @@ public class SessionServiceImpl extends ServiceImpl<TeachingSessionMapper, Teach
         }
         session.setArchived(archived);
         session.setAvailable(false);
+        session.setUpdatedAt(LocalDateTime.now(ZoneOffset.UTC));
         if (!updateById(session)) throw error(409, "Task changed. Reload before saving.");
         storeAvailability(session);
     }

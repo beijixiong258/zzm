@@ -20,7 +20,7 @@ export const dirty = ref(false);
 export const staff = computed(() => user.value?.role !== "student");
 export const taskTime = useTaskTime(() =>
   Object.values(tasks.value).flatMap((courseTasks) =>
-    courseTasks.flatMap((task) => [task.opensAt, task.closesAt]),
+    courseTasks.map((task) => task.closesAt),
   ),
 );
 

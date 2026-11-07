@@ -138,11 +138,10 @@ export type TaskContent = {
   };
 };
 export type TaskSchedule = {
-  opensAt: string | null;
   closesAt: string | null;
 };
 export type TaskAvailability =
-  "draft" | "scheduled" | "open" | "expired" | "recycled";
+  "draft" | "closed" | "open" | "expired" | "recycled";
 export type Task = TaskSchedule & {
   id: string;
   courseId: string;
@@ -253,7 +252,6 @@ export type TaskSummary = Pick<
   | "revision"
   | "available"
   | "availabilityStatus"
-  | "opensAt"
   | "closesAt"
 >;
 export type StudentRow = {
@@ -469,7 +467,6 @@ export function blankTask(courseId: string): Task {
     archived: false,
     available: false,
     availabilityStatus: "draft",
-    opensAt: null,
     closesAt: null,
   };
 }
@@ -496,7 +493,7 @@ export function statusText(status: string) {
       {
         notStarted: "Not started",
         draft: "Draft",
-        scheduled: "Scheduled to open",
+        closed: "Awaiting re-enablement",
         open: "Open for responses",
         expired: "Expired",
         recycled: "In the recycle bin",
@@ -527,12 +524,8 @@ export function taskAvailability(
 ): TaskAvailability {
   if (task.archived) return "recycled";
   if (!task.publishedVersionId) return "draft";
-  if (
-    task.available === false ||
-    (task.closesAt && Date.parse(task.closesAt) <= now)
-  )
-    return "expired";
-  if (task.opensAt && Date.parse(task.opensAt) > now) return "scheduled";
+  if (task.closesAt && Date.parse(task.closesAt) <= now) return "expired";
+  if (task.available === false) return "closed";
   return "open";
 }
 export const questionTypes = {

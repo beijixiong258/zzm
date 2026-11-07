@@ -55,6 +55,7 @@ public class GenerationServiceImpl extends ServiceImpl<GenerationJobMapper, Gene
         materials.requireProcessed(selected);
         if (input.getSourceMaterialIds().isEmpty() && input.getSourceMaterialId() != null) input.setSourceMaterialIds(List.of(input.getSourceMaterialId()));
         if ("import".equals(input.getKind()) && (input.getSourceMaterialIds().isEmpty() || !ids.containsAll(input.getSourceMaterialIds()))) throw error(422, "Choose one or more selected materials to extract questions from");
+        session.setUpdatedAt(LocalDateTime.now(ZoneOffset.UTC));
         if (!sessions.updateById(session)) throw error(409, "Task changed. Reload before generating.");
         GenerationJob job = new GenerationJob(); job.setSessionId(sessionId); job.setOwnerId(user.getId()); job.setKind(input.getKind());
         job.setExpectedRevision(session.getRevision()); job.setStatus("queued"); job.setStage("queued");
@@ -92,6 +93,7 @@ public class GenerationServiceImpl extends ServiceImpl<GenerationJobMapper, Gene
         session.setContentJson(JSONUtil.toJsonStr(generated)); session.setLearningGoals(String.join("\n", generated.getLearningGoals()));
         if (!"import".equals(job.getKind()) || session.getDescription().isBlank())
             session.setDescription(Objects.toString(generated.getDescription(), ""));
+        session.setUpdatedAt(LocalDateTime.now(ZoneOffset.UTC));
         if (!sessions.updateById(session)) throw error(409, "Task changed. Generated result was retained.");
         lambdaUpdate().eq(GenerationJob::getId, id).eq(GenerationJob::getStatus, "succeeded").set(GenerationJob::getStatus, "applied").set(GenerationJob::getUpdatedAt, LocalDateTime.now(ZoneOffset.UTC)).update();
         return session;

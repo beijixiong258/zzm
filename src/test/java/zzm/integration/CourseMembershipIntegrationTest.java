@@ -179,13 +179,11 @@ class CourseMembershipIntegrationTest {
         assertEquals(0, membershipCount(course, student));
     }
 
-    @Test void firstPublishRequiresExactlyOneFutureTime() throws Exception {
+    @Test void firstPublishRequiresAFutureDeadline() throws Exception {
         TeachingSession draft = draftTask(course, "必须定时");
-        String future = Instant.now().plusSeconds(3600).toString();
         for (Map<String, Object> input : List.<Map<String, Object>>of(
             Map.of("revision", draft.getRevision()),
-            Map.of("revision", draft.getRevision(), "opensAt", future, "closesAt", future),
-            Map.of("revision", draft.getRevision(), "opensAt", "invalid"),
+            Map.of("revision", draft.getRevision(), "closesAt", "invalid"),
             Map.of("revision", draft.getRevision(), "closesAt", "2020-01-01T00:00:00Z"))) {
             http.perform(post("/api/sessions/{id}/publish", draft.getId()).cookie(cookie(teacher))
                 .contentType("application/json").content(JSONUtil.toJsonStr(input))).andExpect(status().isUnprocessableEntity());
@@ -195,22 +193,18 @@ class CourseMembershipIntegrationTest {
         assertFalse(unchanged.getAvailable());
     }
 
-    @Test void scheduledOpeningHidesTheTaskUntilTheOpeningTime() throws Exception {
+    @Test void publishingWithADeadlineOpensImmediately() throws Exception {
         enrol(course, student);
-        TeachingSession draft = draftTask(course, "待生效");
-        String opensAt = Instant.now().plusSeconds(3600).toString();
+        TeachingSession draft = draftTask(course, "立即开放");
+        String closesAt = Instant.now().plusSeconds(3600).truncatedTo(java.time.temporal.ChronoUnit.MILLIS).toString();
         http.perform(post("/api/sessions/{id}/publish", draft.getId()).cookie(cookie(teacher))
-            .contentType("application/json").content(JSONUtil.toJsonStr(Map.of("revision", draft.getRevision(), "opensAt", opensAt))))
+            .contentType("application/json").content(JSONUtil.toJsonStr(Map.of("revision", draft.getRevision(), "closesAt", closesAt))))
             .andExpect(status().isOk());
         TeachingSession task = sessions.getById(draft.getId());
-        assertFalse(task.openAt(task.getOpensAt().minusNanos(1)));
-        assertTrue(task.openAt(task.getOpensAt()));
+        assertNotNull(task.getUpdatedAt());
         http.perform(get("/api/sessions/{id}", task.getId()).cookie(cookie(teacher)))
-            .andExpect(status().isOk()).andExpect(jsonPath("$.availabilityStatus").value("scheduled"));
-        assertStudentTaskHidden(task);
-        assertEquals(0, count("learning_record"));
-
-        jdbc.update("UPDATE teaching_session SET opens_at=UTC_TIMESTAMP(3)-INTERVAL 1 MINUTE WHERE id=?", task.getId());
+            .andExpect(status().isOk()).andExpect(jsonPath("$.availabilityStatus").value("open"))
+            .andExpect(jsonPath("$.closesAt").value(closesAt)).andExpect(jsonPath("$.opensAt").doesNotExist());
         http.perform(get("/api/courses/{id}/sessions", course.getId()).cookie(cookie(student)))
             .andExpect(status().isOk()).andExpect(jsonPath("$[0].availabilityStatus").value("open"));
         http.perform(post("/api/sessions/{id}/start", task.getId()).cookie(cookie(student))).andExpect(status().isOk());

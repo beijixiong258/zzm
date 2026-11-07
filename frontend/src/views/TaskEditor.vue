@@ -105,6 +105,9 @@ const active = computed(
 const availability = computed(() =>
   taskAvailability(draft.value, taskTime.value),
 );
+const needsReopening = computed(() =>
+  ["expired", "closed"].includes(availability.value),
+);
 const hasContent = computed(
   () =>
     !!draft.value.content.handout?.trim() ||
@@ -151,7 +154,7 @@ const taskActions = computed<DropdownOption[]>(() => [
         },
       ]
     : []),
-  ...(draft.value.publishedVersionId && availability.value !== "expired"
+  ...(draft.value.publishedVersionId && !needsReopening.value
     ? [
         {
           content: t("Change availability"),
@@ -495,7 +498,7 @@ function requestPublish() {
 }
 function openAvailabilityEditor() {
   error.value = "";
-  scheduleDialog.value = availability.value === "expired" ? "reopen" : "edit";
+  scheduleDialog.value = needsReopening.value ? "reopen" : "edit";
 }
 async function publish(schedule?: TaskSchedule) {
   await action(async () => {
@@ -519,24 +522,16 @@ async function saveAvailability(schedule: TaskSchedule) {
   }
   const reopening = scheduleDialog.value === "reopen";
   await action(async () => {
-    const {
-      available,
-      availabilityStatus,
-      opensAt,
-      closesAt,
-      revision,
-      archived,
-    } = await call<Task>(
-      `/sessions/${key(draft.value.id)}/availability`,
-      "PUT",
-      { revision: draft.value.revision, ...schedule },
-    );
+    const { available, availabilityStatus, closesAt, revision, archived } =
+      await call<Task>(`/sessions/${key(draft.value.id)}/availability`, "PUT", {
+        revision: draft.value.revision,
+        ...schedule,
+      });
     if (disposed) return;
     // 开放时间单独保存，保留编辑器里尚未保存的讲义改动。
     const updated = {
       available,
       availabilityStatus,
-      opensAt,
       closesAt,
       revision,
       archived,
@@ -673,9 +668,6 @@ void load();
             <span class="badge status-label" :data-status="availability">{{
               statusText(availability)
             }}</span>
-            <small v-if="draft.opensAt" class="muted">{{
-              t("Opening time: {0}", [dateText(draft.opensAt)])
-            }}</small>
             <small v-if="draft.closesAt" class="muted">{{
               t("Closing time: {0}", [dateText(draft.closesAt)])
             }}</small>
@@ -683,7 +675,7 @@ void load();
         </div>
         <div class="row wrap task-heading-actions">
           <TButton
-            v-if="availability === 'expired'"
+            v-if="needsReopening"
             theme="primary"
             type="button"
             :disabled="busy || !!active"

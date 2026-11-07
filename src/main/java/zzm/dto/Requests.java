@@ -72,7 +72,6 @@ public final class Requests {
     }
     @Data public static class TaskSchedule {
         @NotNull @Min(0) private Long revision;
-        @Size(max = 40) private String opensAt;
         @Size(max = 40) private String closesAt;
     }
     @Data public static class Generation {

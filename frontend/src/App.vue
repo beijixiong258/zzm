@@ -683,7 +683,7 @@ void boot();
               <small
                 v-if="
                   staff &&
-                  ['scheduled', 'expired'].includes(
+                  ['closed', 'expired'].includes(
                     taskAvailability(task, taskTime),
                   )
                 "

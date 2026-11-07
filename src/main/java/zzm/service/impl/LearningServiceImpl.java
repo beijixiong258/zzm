@@ -259,7 +259,7 @@ public class LearningServiceImpl extends ServiceImpl<LearningRecordMapper, Learn
         LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
         List<String> sessionIds = sessions.lambdaQuery()
             .select(TeachingSession::getId, TeachingSession::getArchived, TeachingSession::getAvailable,
-                TeachingSession::getPublishedVersionId, TeachingSession::getOpensAt, TeachingSession::getClosesAt)
+                TeachingSession::getPublishedVersionId, TeachingSession::getClosesAt)
             .in(TeachingSession::getCourseId, courseIds).eq(TeachingSession::getArchived, false)
             .eq(TeachingSession::getAvailable, true).list().stream().filter(task -> task.openAt(now)).map(TeachingSession::getId).toList();
         if (sessionIds.isEmpty()) return List.of();
