@@ -137,6 +137,7 @@ small {
 [data-status="running"],
 [data-status="planning"],
 [data-status="validating"],
+[data-status="scheduled"],
 [data-status="processing"] {
   --status-color: var(--blue);
   --status-surface: var(--blue-soft);
@@ -146,6 +147,7 @@ small {
 [data-status="completed"],
 [data-status="confirmed"],
 [data-status="published"],
+[data-status="open"],
 [data-status="active"],
 [data-status="ready"],
 [data-status="needsReview"],
@@ -158,6 +160,7 @@ small {
 }
 [data-status="submitted"],
 [data-status="inputLimitExceeded"],
+[data-status="expired"],
 [data-status="needsRevision"] {
   --status-color: var(--warning);
   --status-surface: var(--warning-soft);
@@ -378,6 +381,10 @@ small {
   gap: 3px;
 }
 .sidebar-user small {
+  color: var(--muted);
+}
+.sidebar-task-status {
+  display: block;
   color: var(--muted);
 }
 .sidebar-user button {
@@ -2082,6 +2089,17 @@ td button {
   flex: 1 1 180px;
   min-width: 0;
   overflow-wrap: anywhere;
+}
+.task-availability {
+  margin-top: 6px;
+}
+.task-availability small,
+.task-closing-time {
+  overflow-wrap: anywhere;
+}
+.task-closing-time {
+  display: block;
+  margin-top: 4px;
 }
 .task-heading-actions {
   justify-content: flex-end;

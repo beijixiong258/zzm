@@ -20,6 +20,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 import java.time.*;
 import java.util.*;
 import static zzm.exception.ApiErrors.error;
@@ -40,6 +41,7 @@ public class LearningServiceImpl extends ServiceImpl<LearningRecordMapper, Learn
     private final ContextBudget budget;
     private final QmdClient qmd;
     private final PdfInputReader pdf;
+    private final TransactionTemplate transactions;
     @Override public byte[] exportResult(String id, AccountUser user, String materialBaseUrl) {
         if (!"student".equals(user.getRole())) throw error(403, "Only students can export their own learning results");
         LearningRecord record = owned(id, user, false);
@@ -95,6 +97,17 @@ public class LearningServiceImpl extends ServiceImpl<LearningRecordMapper, Learn
         if (editable && Set.of("submitted", "confirmed").contains(record.getStatus())) throw error(409, "This submission is read-only until your teacher requests a revision");
         return record;
     }
+    private LearningRecord editableRecord(String id, AccountUser user) {
+        LearningRecord record = owned(id, user, true);
+        lockAvailableTask(record);
+        return record;
+    }
+    private void lockAvailableTask(LearningRecord record) {
+        if (Boolean.TRUE.equals(record.getPreview())) return;
+        // 先锁任务，再写学习记录，和回收、重新启用及移出课程共用锁顺序。
+        TeachingSession task = sessions.lambdaQuery().eq(TeachingSession::getId, record.getSessionId()).last("FOR UPDATE").one();
+        if (task == null || !task.openAt(LocalDateTime.now(ZoneOffset.UTC))) throw error(404, "Task is not currently available.");
+    }
     private void saveRevision(LearningRecord record, long expected) {
         if (record.getRevision() != expected) throw error(409, "Learning record changed. Reload before saving.");
         if ("notStarted".equals(record.getStatus())) { record.setStatus("inProgress"); record.setStartedAt(LocalDateTime.now(ZoneOffset.UTC)); }
@@ -102,7 +115,7 @@ public class LearningServiceImpl extends ServiceImpl<LearningRecordMapper, Learn
         if (!updateById(record)) throw error(409, "Learning record changed. Reload before saving.");
     }
     @Override @Transactional public Map<String, Object> saveAnswers(String id, Requests.Answer input, AccountUser user) {
-        LearningRecord record = owned(id, user, true);
+        LearningRecord record = editableRecord(id, user);
         TaskContent content = snapshot(record).getBean("content", TaskContent.class);
         Set<String> ids = new HashSet<>(); content.getQuestions().forEach(q -> ids.add(q.getId()));
         JSONObject savedAnswers = JSONUtil.parseObj(record.getAnswersJson());
@@ -127,7 +140,7 @@ public class LearningServiceImpl extends ServiceImpl<LearningRecordMapper, Learn
         appendHistory(record, "answer", previous, null); return view(record);
     }
     @Override @Transactional public Map<String, Object> resetConversation(String id, long revision, AccountUser user) {
-        LearningRecord record = owned(id,user,true);
+        LearningRecord record = editableRecord(id, user);
         List<Requests.ChatMessage> messages = JSONUtil.toList(record.getMessagesJson(),Requests.ChatMessage.class);
         if(messages.stream().anyMatch(Requests.ChatMessage::isPendingReview)) throw error(409,"Your AI feedback is awaiting teacher review");
         Map<String, Object> previous = Map.of("archivedAt", Instant.now().toString(), "messages", messages);
@@ -167,7 +180,6 @@ public class LearningServiceImpl extends ServiceImpl<LearningRecordMapper, Learn
         var context = tutor.messages(snapshot, turn.content, turn.answers, turn.focus, turn.state, messages, input);
         turn.prefetch(context);
         var response = ai.studentReply(context, turn);
-        turn.validate();
         response.usage().put("summaryUsage", turn.summaryUsage);
         response.usage().put("retrievalMs", turn.retrievalMs);
         response.usage().put("searchCalls", turn.searchCalls);
@@ -183,10 +195,16 @@ public class LearningServiceImpl extends ServiceImpl<LearningRecordMapper, Learn
         Requests.ChatMessage answer = new Requests.ChatMessage(); answer.setRole("assistant"); answer.setContent(response.text()); answer.setUsage(response.usage()); answer.setPendingReview("teacherReview".equals(snapshot.getJSONObject("content").getStr("feedbackMode")));
         answer.setRequestId(input.getRequestId()); answer.setCreatedAt(Instant.now().toString()); messages.add(question); messages.add(answer);
         record.setTutorStateJson(JSONUtil.toJsonStr(turn.state));
-        record.setMessagesJson(JSONUtil.toJsonStr(messages)); saveRevision(record, input.getRevision()); return view(record);
+        record.setMessagesJson(JSONUtil.toJsonStr(messages));
+        transactions.executeWithoutResult(status -> {
+            lockAvailableTask(record);
+            turn.validate();
+            saveRevision(record, input.getRevision());
+        });
+        return view(record);
     }
-    @Override public Map<String, Object> submit(String id, long revision, AccountUser user) {
-        LearningRecord record = owned(id, user, true);
+    @Override @Transactional public Map<String, Object> submit(String id, long revision, AccountUser user) {
+        LearningRecord record = editableRecord(id, user);
         TaskContent content = snapshot(record).getBean("content", TaskContent.class);
         JSONObject answers = currentAnswers(record, content);
         List<CourseMaterial> submittedFiles = materials.lambdaQuery().eq(CourseMaterial::getRecordId,id).eq(CourseMaterial::getOwnerId,user.getId())
@@ -238,8 +256,12 @@ public class LearningServiceImpl extends ServiceImpl<LearningRecordMapper, Learn
         List<String> courseIds = courses.mine(user).stream().filter(course -> !Boolean.TRUE.equals(course.get("archived")))
             .map(course -> Objects.toString(course.get("id"))).toList();
         if (courseIds.isEmpty()) return List.of();
-        List<String> sessionIds = sessions.lambdaQuery().in(TeachingSession::getCourseId, courseIds)
-            .eq(TeachingSession::getArchived, false).list().stream().map(TeachingSession::getId).toList();
+        LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
+        List<String> sessionIds = sessions.lambdaQuery()
+            .select(TeachingSession::getId, TeachingSession::getArchived, TeachingSession::getAvailable,
+                TeachingSession::getPublishedVersionId, TeachingSession::getOpensAt, TeachingSession::getClosesAt)
+            .in(TeachingSession::getCourseId, courseIds).eq(TeachingSession::getArchived, false)
+            .eq(TeachingSession::getAvailable, true).list().stream().filter(task -> task.openAt(now)).map(TeachingSession::getId).toList();
         if (sessionIds.isEmpty()) return List.of();
         Set<String> seenTasks = new HashSet<>();
         return lambdaQuery().select(LearningRecord::getId, LearningRecord::getSessionId, LearningRecord::getVersionId,
@@ -327,7 +349,7 @@ public class LearningServiceImpl extends ServiceImpl<LearningRecordMapper, Learn
             .orderByAsc(CourseMaterial::getCreatedAt).list().stream().map(materials::view).toList();
     }
     @Override @Transactional public Map<String,Object> uploadAttachment(String id, String questionId, org.springframework.web.multipart.MultipartFile file, AccountUser user) {
-        LearningRecord record = owned(id, user, true);
+        LearningRecord record = editableRecord(id, user);
         record = baseMapper.lockById(id);
         if (record == null) throw error(404, "Learning record not found");
         if (Set.of("submitted", "confirmed").contains(record.getStatus())) throw error(409, "This submission is read-only until your teacher requests a revision");
@@ -337,7 +359,7 @@ public class LearningServiceImpl extends ServiceImpl<LearningRecordMapper, Learn
         return materials.view(materials.uploadForRecord(snapshot.getStr("courseId"), id, questionId, file, user));
     }
     @Override @Transactional public Map<String,Object> removeAttachment(String id, String attachmentId, long revision, AccountUser user) {
-        LearningRecord record = owned(id, user, true);
+        LearningRecord record = editableRecord(id, user);
         CourseMaterial attachment = materials.getById(attachmentId);
         if (attachment == null || !id.equals(attachment.getRecordId()) || !user.getId().equals(attachment.getOwnerId()))
             throw error(404, "Attachment not found in this learning record");

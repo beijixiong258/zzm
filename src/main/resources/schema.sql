@@ -26,7 +26,10 @@ CREATE TABLE IF NOT EXISTS teaching_session (
  description TEXT NOT NULL, session_type VARCHAR(20) NOT NULL, topic TEXT NOT NULL,
  learning_goals TEXT NOT NULL, additional_instructions TEXT NOT NULL, teaching_language VARCHAR(16) NOT NULL,
  material_ids_json JSON NOT NULL, content_json JSON NOT NULL, revision BIGINT NOT NULL DEFAULT 0,
- published_version_id VARCHAR(64), archived BOOLEAN NOT NULL DEFAULT FALSE,
+ published_version_id VARCHAR(64), archived BOOLEAN NOT NULL DEFAULT FALSE, available BOOLEAN NOT NULL DEFAULT FALSE,
+ opens_at DATETIME(3) NULL, closes_at DATETIME(3) NULL, INDEX ix_task_expiry(available,closes_at),
+ CONSTRAINT ck_task_available CHECK (available IN (0,1)),
+ CONSTRAINT ck_task_schedule CHECK (opens_at IS NULL OR closes_at IS NULL),
  INDEX(course_id,archived), FOREIGN KEY(course_id) REFERENCES course(id) ON DELETE CASCADE
 ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 CREATE TABLE IF NOT EXISTS session_version (

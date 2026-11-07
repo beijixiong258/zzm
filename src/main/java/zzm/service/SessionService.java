@@ -14,7 +14,9 @@ public interface SessionService extends IService<TeachingSession> {
     Map<String, Object> view(TeachingSession session, boolean teacher);
     Map<String, Object> published(String id, String versionId, AccountUser user);
     SessionVersion version(String sessionId, String versionId);
-    SessionVersion publish(String id, long revision, AccountUser user);
+    SessionVersion publish(String id, Requests.TaskSchedule input, AccountUser user);
+    TeachingSession schedule(String id, Requests.TaskSchedule input, AccountUser user);
+    void expireTasks();
     void archive(String id, boolean archived, AccountUser user);
     void deleteArchived(String id, AccountUser user);
     TaskContent validateContent(TaskContent content, List<String> materialIds, boolean publishing);

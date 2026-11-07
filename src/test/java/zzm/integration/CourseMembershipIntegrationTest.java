@@ -62,6 +62,7 @@ class CourseMembershipIntegrationTest {
 
     private static final List<String> TABLES = List.of("learning_record_history", "learning_record", "generation_job",
         "session_version", "teaching_session", "course_member", "course_material", "course", "auth_session", "legacy_record", "account_user");
+    private static final String TEST_SCHEMA = System.getProperty("zzm.test.schema", "zzm");
     private static final Path TEST_DIRECTORY = Path.of(System.getProperty("zzm.test.directory", System.getProperty("java.io.tmpdir") + "/zzm-membership-tests"));
     private static final Path RECYCLE_DIRECTORY = Path.of(System.getProperty("zzm.test.recycle-root", System.getProperty("java.io.tmpdir") + "/zzm-membership-recycle"));
 
@@ -74,7 +75,9 @@ class CourseMembershipIntegrationTest {
         String configuredUrl = Objects.requireNonNull(config.getProperty("spring.datasource.url"));
         if (!configuredUrl.matches("jdbc:mysql://(mysql|localhost|127\\.0\\.0\\.1):3306/zzm(?:\\?.*)?"))
             throw new IllegalStateException("集成测试只允许连接本机 zzm 数据库。");
-        String url = configuredUrl.replaceFirst("jdbc:mysql://[^/]+/", "jdbc:mysql://127.0.0.1:3306/");
+        if (!TEST_SCHEMA.matches("zzm|zzm_test_[0-9a-f]{12}"))
+            throw new IllegalStateException("测试库名称必须是 zzm 或本次创建的隔离测试库。");
+        String url = configuredUrl.replaceFirst("jdbc:mysql://[^/]+/zzm", "jdbc:mysql://127.0.0.1:3306/" + TEST_SCHEMA);
         registry.add("spring.datasource.url", () -> url);
         registry.add("spring.datasource.username", () -> config.getProperty("spring.datasource.username"));
         registry.add("spring.datasource.password", () -> config.getProperty("spring.datasource.password"));
@@ -108,7 +111,7 @@ class CourseMembershipIntegrationTest {
 
     @BeforeAll void checkDatabaseAndCleanExistingTestData() throws Exception {
         assertEquals("true", System.getProperty("zzm.test.allow-clean"), "清库必须单独显式授权。");
-        assertEquals("zzm", jdbc.queryForObject("SELECT DATABASE()", String.class));
+        assertEquals(TEST_SCHEMA, jdbc.queryForObject("SELECT DATABASE()", String.class));
         System.out.println("测试前业务表行数：" + tableCounts());
         cleanDatabase();
     }
@@ -174,6 +177,131 @@ class CourseMembershipIntegrationTest {
         courses.archive(course.getId(), true, teacher); joinCourse(course.getJoinCode(), student, 404);
         Course workbench = courses.workbench(teacher); joinCourse(workbench.getJoinCode(), student, 404);
         assertEquals(0, membershipCount(course, student));
+    }
+
+    @Test void firstPublishRequiresExactlyOneFutureTime() throws Exception {
+        TeachingSession draft = draftTask(course, "必须定时");
+        String future = Instant.now().plusSeconds(3600).toString();
+        for (Map<String, Object> input : List.<Map<String, Object>>of(
+            Map.of("revision", draft.getRevision()),
+            Map.of("revision", draft.getRevision(), "opensAt", future, "closesAt", future),
+            Map.of("revision", draft.getRevision(), "opensAt", "invalid"),
+            Map.of("revision", draft.getRevision(), "closesAt", "2020-01-01T00:00:00Z"))) {
+            http.perform(post("/api/sessions/{id}/publish", draft.getId()).cookie(cookie(teacher))
+                .contentType("application/json").content(JSONUtil.toJsonStr(input))).andExpect(status().isUnprocessableEntity());
+        }
+        TeachingSession unchanged = sessions.getById(draft.getId());
+        assertNull(unchanged.getPublishedVersionId());
+        assertFalse(unchanged.getAvailable());
+    }
+
+    @Test void scheduledOpeningHidesTheTaskUntilTheOpeningTime() throws Exception {
+        enrol(course, student);
+        TeachingSession draft = draftTask(course, "待生效");
+        String opensAt = Instant.now().plusSeconds(3600).toString();
+        http.perform(post("/api/sessions/{id}/publish", draft.getId()).cookie(cookie(teacher))
+            .contentType("application/json").content(JSONUtil.toJsonStr(Map.of("revision", draft.getRevision(), "opensAt", opensAt))))
+            .andExpect(status().isOk());
+        TeachingSession task = sessions.getById(draft.getId());
+        assertFalse(task.openAt(task.getOpensAt().minusNanos(1)));
+        assertTrue(task.openAt(task.getOpensAt()));
+        http.perform(get("/api/sessions/{id}", task.getId()).cookie(cookie(teacher)))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.availabilityStatus").value("scheduled"));
+        assertStudentTaskHidden(task);
+        assertEquals(0, count("learning_record"));
+
+        jdbc.update("UPDATE teaching_session SET opens_at=UTC_TIMESTAMP(3)-INTERVAL 1 MINUTE WHERE id=?", task.getId());
+        http.perform(get("/api/courses/{id}/sessions", course.getId()).cookie(cookie(student)))
+            .andExpect(status().isOk()).andExpect(jsonPath("$[0].availabilityStatus").value("open"));
+        http.perform(post("/api/sessions/{id}/start", task.getId()).cookie(cookie(student))).andExpect(status().isOk());
+    }
+
+    @Test void expirationClosesStudentAccessAndReopeningPreservesTheLearningRecord() throws Exception {
+        enrol(course, student);
+        CourseMaterial source = courseMaterial(course, "ready", null);
+        TeachingSession task = task(course, "截止后重新启用", source.getId());
+        LearningRecord previous = record(task, student);
+        CourseMaterial answerFile = attachment(previous, "ready");
+        assertTrue(task.openAt(task.getClosesAt().minusNanos(1)));
+        assertFalse(task.openAt(task.getClosesAt()));
+        jdbc.update("UPDATE teaching_session SET closes_at=UTC_TIMESTAMP(3)-INTERVAL 1 MINUTE WHERE id=?", task.getId());
+        assertTrue(sessions.getById(task.getId()).getAvailable(), "到期校验须在后台写入前立即生效");
+        assertStudentTaskHidden(task);
+        http.perform(get("/api/history").cookie(cookie(student))).andExpect(status().isOk()).andExpect(jsonPath("$").isEmpty());
+        http.perform(put("/api/records/{id}/answers", previous.getId()).cookie(cookie(student)).contentType("application/json")
+            .content(JSONUtil.toJsonStr(Map.of("revision", previous.getRevision(), "answers", Map.of("q1", "新答案")))))
+            .andExpect(status().isNotFound());
+        http.perform(post("/api/records/{id}/submit", previous.getId()).cookie(cookie(student)).contentType("application/json")
+            .content(JSONUtil.toJsonStr(Map.of("revision", previous.getRevision())))).andExpect(status().isNotFound());
+        http.perform(get("/api/records/{id}/export", previous.getId()).cookie(cookie(student))).andExpect(status().isNotFound());
+        http.perform(get("/api/records/{id}/attachments", previous.getId()).cookie(cookie(student))).andExpect(status().isNotFound());
+        http.perform(get("/api/materials/{id}/file", answerFile.getId()).cookie(cookie(student))).andExpect(status().isNotFound());
+        http.perform(get("/api/materials/{id}/text", source.getId()).param("versionId", task.getPublishedVersionId())
+            .cookie(cookie(student))).andExpect(status().isNotFound());
+        http.perform(get("/api/records/{id}/observe", previous.getId()).cookie(cookie(teacher))).andExpect(status().isOk());
+        http.perform(get("/api/sessions/{id}", task.getId()).cookie(cookie(teacher)))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.availabilityStatus").value("expired"));
+        sessions.expireTasks();
+        assertFalse(sessions.getById(task.getId()).getAvailable());
+        assertFalse(sessions.getById(task.getId()).getArchived());
+
+        Requests.TaskSchedule updateContent = new Requests.TaskSchedule(); updateContent.setRevision(task.getRevision());
+        sessions.publish(task.getId(), updateContent, teacher);
+        assertFalse(sessions.getById(task.getId()).getAvailable());
+        TeachingSession reopened = sessions.schedule(task.getId(), closingSchedule(sessions.getById(task.getId())), teacher);
+        assertEquals(task.getPublishedVersionId(), reopened.getPublishedVersionId());
+        assertEquals(1, count("session_version"));
+        assertEquals(previous.getId(), learning.start(task.getId(), null, student).getId());
+        assertEquals(previous.getAnswersJson(), records.selectById(previous.getId()).getAnswersJson());
+        assertEquals(previous.getMessagesJson(), records.selectById(previous.getId()).getMessagesJson());
+        assertTrue(historiesFor(previous) > 0);
+        http.perform(get("/api/materials/{id}/file", answerFile.getId()).cookie(cookie(student))).andExpect(status().isOk());
+        http.perform(put("/api/records/{id}/answers", previous.getId()).cookie(cookie(student)).contentType("application/json")
+            .content(JSONUtil.toJsonStr(Map.of("revision", previous.getRevision(), "answers", Map.of("q1", "继续作答")))))
+            .andExpect(status().isOk());
+    }
+
+    @Test void recycledPublishedTaskRequiresAValidScheduleAndCourseTeacher() throws Exception {
+        enrol(course, student);
+        TeachingSession task = task(course, "从回收站恢复");
+        LearningRecord previous = record(task, student);
+        learning.submit(previous.getId(), previous.getRevision(), student);
+        sessions.archive(task.getId(), true, teacher);
+        TeachingSession recycled = sessions.getById(task.getId());
+        assertTrue(recycled.getArchived());
+        assertFalse(recycled.getAvailable());
+        assertStudentTaskHidden(task);
+        http.perform(post("/api/sessions/{id}/archive", task.getId()).param("archived", "false").cookie(cookie(teacher)))
+            .andExpect(status().isUnprocessableEntity());
+        String payload = JSONUtil.toJsonStr(closingSchedule(recycled));
+        for (AccountUser outsider : List.of(student, otherTeacher)) {
+            http.perform(put("/api/sessions/{id}/availability", task.getId()).cookie(cookie(outsider))
+                .contentType("application/json").content(payload)).andExpect(status().isForbidden());
+        }
+        http.perform(put("/api/sessions/{id}/availability", task.getId()).cookie(cookie(teacher))
+            .contentType("application/json").content(payload)).andExpect(status().isOk())
+            .andExpect(jsonPath("$.availabilityStatus").value("open")).andExpect(jsonPath("$.archived").value(false));
+        assertEquals(previous.getId(), learning.start(task.getId(), null, student).getId());
+        assertEquals("submitted", records.selectById(previous.getId()).getStatus());
+    }
+
+    @Test void restoringADraftDoesNotMakeItAvailable() throws Exception {
+        enrol(course, student);
+        TeachingSession task = draftTask(course, "恢复草稿");
+        sessions.archive(task.getId(), true, teacher);
+        sessions.archive(task.getId(), false, teacher);
+        TeachingSession restored = sessions.getById(task.getId());
+        assertFalse(restored.getArchived());
+        assertFalse(restored.getAvailable());
+        assertNull(restored.getPublishedVersionId());
+        assertStudentTaskHidden(restored);
+    }
+
+    private void assertStudentTaskHidden(TeachingSession task) throws Exception {
+        http.perform(get("/api/courses/{id}/sessions", course.getId()).cookie(cookie(student)))
+            .andExpect(status().isOk()).andExpect(jsonPath("$").isEmpty());
+        http.perform(get("/api/sessions/{id}/workspace", task.getId()).cookie(cookie(student))).andExpect(status().isNotFound());
+        http.perform(post("/api/sessions/{id}/start", task.getId()).cookie(cookie(student))).andExpect(status().isNotFound());
     }
 
     @Test void simultaneousTeacherAndStudentEnrolmentCreatesOneMembership() throws Exception {
@@ -365,13 +493,23 @@ class CourseMembershipIntegrationTest {
         return courses.create(input, teacher);
     }
     private TeachingSession task(Course selected, String title, String... materialIds) {
+        TeachingSession draft = draftTask(selected, title, materialIds);
+        sessions.publish(draft.getId(), closingSchedule(draft), teacher);
+        return sessions.getById(draft.getId());
+    }
+    private TeachingSession draftTask(Course selected, String title, String... materialIds) {
         Requests.SessionInput input = new Requests.SessionInput(); input.setTitle(title); input.setMaterialIds(List.of(materialIds));
         input.getContent().setTeachingMode("autonomous");
         TaskContent.Question question = new TaskContent.Question(); question.setId("q1"); question.setType("openResponse");
         question.setPrompt("说明你的思路。"); question.setReferenceAnswer("教师参考答案"); question.setExplanation("教师解释");
         input.getContent().getQuestions().add(question);
-        TeachingSession result = sessions.create(selected.getId(), input, teacher);
-        sessions.publish(result.getId(), result.getRevision(), teacher); return sessions.getById(result.getId());
+        return sessions.create(selected.getId(), input, teacher);
+    }
+    private Requests.TaskSchedule closingSchedule(TeachingSession task) {
+        Requests.TaskSchedule schedule = new Requests.TaskSchedule();
+        schedule.setRevision(task.getRevision());
+        schedule.setClosesAt(Instant.now().plus(Duration.ofDays(1)).toString());
+        return schedule;
     }
     private void enrol(Course selected, AccountUser person) {
         Requests.CourseStudent input = new Requests.CourseStudent(); input.setAccount(person.getUsername()); courses.addStudent(selected.getId(), input, teacher);

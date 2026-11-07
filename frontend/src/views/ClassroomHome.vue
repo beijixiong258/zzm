@@ -4,10 +4,16 @@ import {
   Button as TButton,
   MessagePlugin,
 } from "tdesign-vue-next";
-import { computed, onBeforeUnmount, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { systemText, t } from "../i18n";
-import { call, key } from "../classroom-api";
-import { courses, navigate, refreshCourses, tasks } from "../classroom-state";
+import { call, dateText, key } from "../classroom-api";
+import {
+  courses,
+  navigate,
+  refreshCourses,
+  refreshCourseTasks,
+  visibleCourseTasks,
+} from "../classroom-state";
 
 const props = defineProps<{ courseId?: string }>();
 const course = computed(() =>
@@ -16,20 +22,33 @@ const course = computed(() =>
 const activeCourses = computed(() =>
   courses.value.filter((item) => !item.archived),
 );
-const courseTasks = computed(() =>
-  (tasks.value[props.courseId || ""] || []).filter((task) => !task.archived),
-);
-const totalTasks = computed(
-  () =>
-    Object.values(tasks.value)
-      .flat()
-      .filter((task) => !task.archived).length,
+const courseTasks = computed(() => visibleCourseTasks(props.courseId || ""));
+const totalTasks = computed(() =>
+  activeCourses.value.reduce(
+    (count, item) => count + visibleCourseTasks(item.id).length,
+    0,
+  ),
 );
 const error = ref(""),
   busy = ref(false),
   joinCode = ref("");
 let disposed = false;
-onBeforeUnmount(() => (disposed = true));
+let taskRefresh: ReturnType<typeof setTimeout>;
+async function refreshTaskList() {
+  const courseId = props.courseId;
+  if (!courseId || disposed) return;
+  try {
+    if (!document.hidden) await refreshCourseTasks(courseId);
+  } catch {
+    // 保留上一次可用列表，下一次刷新重试。
+  }
+  if (!disposed) taskRefresh = setTimeout(refreshTaskList, 30000);
+}
+onMounted(refreshTaskList);
+onBeforeUnmount(() => {
+  disposed = true;
+  clearTimeout(taskRefresh);
+});
 
 async function join() {
   if (disposed || busy.value || !joinCode.value.trim()) return;
@@ -138,16 +157,16 @@ async function join() {
       <div class="grow">
         <div class="row wrap">
           <h3>{{ task.title }}</h3>
-          <span
-            class="badge status-label"
-            :data-status="task.publishedVersionId ? 'published' : 'draft'"
-          >
-            {{ t(task.publishedVersionId ? "Published" : "Draft") }}
+          <span class="badge status-label" data-status="open">
+            {{ t("Open for responses") }}
           </span>
         </div>
         <p class="muted">{{ task.description }}</p>
         <small>{{
           t(task.sessionType === "tutor" ? "AI tutor" : "Assignment")
+        }}</small>
+        <small v-if="task.closesAt" class="muted task-closing-time">{{
+          t("Closing time: {0}", [dateText(task.closesAt)])
         }}</small>
       </div>
       <TButton
@@ -162,7 +181,7 @@ async function join() {
       </TButton>
     </article>
     <p v-if="!courseTasks.length" class="panel empty">
-      {{ t("Your teacher has not published a task yet.") }}
+      {{ t("No tasks are currently open.") }}
     </p>
   </div>
 </template>

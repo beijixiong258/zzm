@@ -13,6 +13,7 @@ import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { systemText, t } from "../i18n";
 import {
   call,
+  dateText,
   download,
   key,
   statusText,
@@ -22,6 +23,7 @@ import {
   type Workspace,
   type Material,
   type ContextUsage,
+  type Task,
 } from "../classroom-api";
 import { dirty } from "../classroom-state";
 import TaskContent from "../components/TaskContent.vue";
@@ -30,6 +32,7 @@ import RecordHistory from "../components/RecordHistory.vue";
 import FileUploader from "../components/FileUploader.vue";
 import ContextMeter from "../components/ContextMeter.vue";
 import MaterialProgress from "../components/MaterialProgress.vue";
+import { useTaskTime } from "../useTaskTime";
 const props = defineProps<{
   taskId: string;
   versionId?: string;
@@ -51,10 +54,28 @@ const focusQuestionId = ref("");
 const usage = ref<ContextUsage | null>(null),
   checking = ref(false);
 const record = computed(() => workspace.value?.record);
-watch(() => workspace.value?.task.content.questions, (questions) => {
-  if (!questions?.some((question) => question.id === focusQuestionId.value)) focusQuestionId.value = "";
+const accessClosed = ref(false);
+const taskTime = useTaskTime(() => [workspace.value?.task.closesAt]);
+const deadlineReached = computed(() => {
+  const closesAt = workspace.value?.task.closesAt;
+  return !props.preview && !!closesAt && Date.parse(closesAt) <= taskTime.value;
 });
-watch(() => props.taskId, () => { focusQuestionId.value = ""; });
+const unavailable = computed(
+  () => !props.preview && (accessClosed.value || deadlineReached.value),
+);
+watch(
+  () => workspace.value?.task.content.questions,
+  (questions) => {
+    if (!questions?.some((question) => question.id === focusQuestionId.value))
+      focusQuestionId.value = "";
+  },
+);
+watch(
+  () => props.taskId,
+  () => {
+    focusQuestionId.value = "";
+  },
+);
 const previewPane = ref<"lesson" | "chat">("lesson");
 const readonly = computed(
   () =>
@@ -79,6 +100,27 @@ watch(
   },
   { flush: "sync" },
 );
+function showRequestError(value: unknown) {
+  const message = (value as Error).message;
+  if (message === "Task is not currently available.") accessClosed.value = true;
+  error.value = message;
+}
+watch(deadlineReached, async (reached) => {
+  if (!reached || disposed || accessClosed.value) return;
+  clearTimeout(timer);
+  try {
+    // 老师可能已调整截止时间，过旧的时间不能阻止学生继续作答。
+    const task = await call<Task>(
+      `/sessions/${key(props.taskId)}${versionParam(props.versionId)}`,
+    );
+    if (!disposed && workspace.value) {
+      workspace.value.task = task;
+      void loadAttachments();
+    }
+  } catch (e) {
+    if (!disposed) showRequestError(e);
+  }
+});
 function updateRecord(value: LearningRecord) {
   if (!workspace.value || disposed) return;
   if (record.value?.id !== value.id) feedbackDrafts.value = {};
@@ -100,11 +142,12 @@ function accept(value: LearningRecord) {
 }
 async function loadAttachments() {
   clearTimeout(timer);
-  if (!record.value || disposed) return;
+  if (!record.value || disposed || unavailable.value) return;
   const recordId = record.value.id;
   const sequence = ++attachmentSequence;
   const current = () =>
     !disposed &&
+    !unavailable.value &&
     record.value?.id === recordId &&
     sequence === attachmentSequence;
   try {
@@ -115,7 +158,7 @@ async function loadAttachments() {
     attachments.value = files;
     if (awaiting.value) await refreshRecord();
   } catch (e) {
-    if (current()) error.value = (e as Error).message;
+    if (current()) showRequestError(e);
   }
   if (
     current() &&
@@ -132,6 +175,7 @@ async function load() {
       `/sessions/${key(props.taskId)}/${props.preview ? "preview/workspace" : `workspace${versionParam(props.versionId)}`}`,
     );
     if (disposed) return;
+    accessClosed.value = false;
     workspace.value = loaded;
     if (workspace.value.record) {
       accept(workspace.value.record);
@@ -139,7 +183,7 @@ async function load() {
       if (props.preview && awaiting.value) await refreshRecord();
     }
   } catch (e) {
-    error.value = (e as Error).message;
+    if (!disposed) showRequestError(e);
   }
 }
 async function refreshRecord() {
@@ -173,7 +217,7 @@ async function action(fn: () => Promise<void>) {
   try {
     await fn();
   } catch (e) {
-    error.value = (e as Error).message;
+    showRequestError(e);
   } finally {
     busy.value = false;
   }
@@ -394,8 +438,12 @@ void load();
         <h1 v-if="!preview">
           {{ workspace?.task.title || t("Learning task") }}
         </h1>
+        <p v-if="workspace?.task.closesAt && !unavailable" class="muted">
+          {{ t("Closing time: {0}", [dateText(workspace.task.closesAt)]) }}
+        </p>
       </div>
       <span
+        v-if="!unavailable"
         class="badge status-label"
         :data-status="record?.status || 'notStarted'"
         >{{ statusText(record?.status || "notStarted") }}</span
@@ -431,11 +479,24 @@ void load();
         {{ t(record ? "Start a new simulation" : "Start simulation") }}
       </TButton>
     </nav>
-    <p v-if="error" class="error" role="alert">{{ systemText(error) }}</p>
-    <p v-if="success" class="success" role="status">
+    <p v-if="error && !unavailable" class="error" role="alert">
+      {{ systemText(error) }}
+    </p>
+    <p v-if="success && !unavailable" class="success" role="status">
       {{ systemText(success) }}
     </p>
-    <div v-if="workspace" class="learning-layout">
+    <section v-if="unavailable" class="panel">
+      <p role="status">{{ t("Task is not currently available.") }}</p>
+      <TButton
+        theme="default"
+        variant="outline"
+        :disabled="busy"
+        @click="action(load)"
+      >
+        {{ t("Refresh") }}
+      </TButton>
+    </section>
+    <div v-else-if="workspace" class="learning-layout">
       <section v-show="!preview || previewPane === 'lesson'" class="panel">
         <div v-if="!preview" class="row end">
           <TButton

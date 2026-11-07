@@ -200,7 +200,7 @@ public class MaterialServiceImpl extends ServiceImpl<CourseMaterialMapper, Cours
             if ("student".equals(user.getRole())) {
                 LearningRecord record = records.selectById(material.getRecordId());
                 TeachingSession task = record == null ? null : sessions.selectById(record.getSessionId());
-                if (task == null || Boolean.TRUE.equals(task.getArchived())) throw error(404, "Task not found");
+                if (task == null || !task.openAt(LocalDateTime.now(ZoneOffset.UTC))) throw error(404, "Task is not currently available.");
             }
             return material;
         }
@@ -209,7 +209,7 @@ public class MaterialServiceImpl extends ServiceImpl<CourseMaterialMapper, Cours
         SessionVersion version = versions.selectById(versionId);
         if (version == null || !version.getCourseId().equals(material.getCourseId())) throw error(403, "Material access denied");
         TeachingSession session = sessions.selectById(version.getSessionId());
-        if (session == null || Boolean.TRUE.equals(session.getArchived()) || session.getPublishedVersionId() == null) throw error(404, "Task not found");
+        if (session == null || !session.openAt(LocalDateTime.now(ZoneOffset.UTC))) throw error(404, "Task is not currently available.");
         version = versions.selectById(session.getPublishedVersionId());
         if (version == null) throw error(403, "Material access denied");
         JSONArray snapshotMaterials = JSONUtil.parseObj(version.getContentJson()).getJSONArray("materials");

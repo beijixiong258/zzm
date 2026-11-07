@@ -13,10 +13,12 @@ import { t, systemText } from "../i18n";
 import {
   blankTask,
   call,
+  dateText,
   fileUrl,
   key,
   statusText,
   studentTask,
+  taskAvailability,
   type Job,
   type Material,
   type Task,
@@ -25,12 +27,14 @@ import {
   type Workspace,
   type LearningRecord,
   type ChatMessage,
+  type TaskSchedule,
 } from "../classroom-api";
 import {
   dirty,
   navigate,
   refreshCourses,
   retainTaskAddress,
+  taskTime,
 } from "../classroom-state";
 import FileUploader from "../components/FileUploader.vue";
 import ContextMeter from "../components/ContextMeter.vue";
@@ -43,6 +47,7 @@ import LessonEditor from "../components/LessonEditor.vue";
 import RichText from "../components/RichText.vue";
 import RecordHistory from "../components/RecordHistory.vue";
 import AppDialog from "../components/AppDialog.vue";
+import TaskScheduleDialog from "../components/TaskScheduleDialog.vue";
 import { useCourseMaterials } from "../useCourseMaterials";
 const props = defineProps<{
   courseId: string;
@@ -69,6 +74,7 @@ const checkingConnection = ref(false);
 const choosingFiles = ref(false),
   showPreview = ref(false);
 const previewMode = ref<"edit" | "student">("edit");
+const scheduleDialog = ref<"publish" | "edit" | "reopen" | null>(null);
 let uploadsChanged = false;
 const selectionIds = ref<string[]>([]),
   selectionPreviewId = ref(""),
@@ -95,6 +101,9 @@ let disposed = false;
 let polling = false;
 const active = computed(
   () => job.value && ["queued", "running"].includes(job.value.status),
+);
+const availability = computed(() =>
+  taskAvailability(draft.value, taskTime.value),
 );
 const hasContent = computed(
   () =>
@@ -139,6 +148,16 @@ const taskActions = computed<DropdownOption[]>(() => [
               });
             });
           },
+        },
+      ]
+    : []),
+  ...(draft.value.publishedVersionId && availability.value !== "expired"
+    ? [
+        {
+          content: t("Change availability"),
+          value: "availability",
+          disabled: busy.value || !!active.value,
+          onClick: openAvailabilityEditor,
         },
       ]
     : []),
@@ -466,23 +485,72 @@ async function poll() {
     polling = false;
   }
 }
-async function publish() {
+function requestPublish() {
+  if (draft.value.publishedVersionId) {
+    void publish();
+  } else {
+    error.value = "";
+    scheduleDialog.value = "publish";
+  }
+}
+function openAvailabilityEditor() {
+  error.value = "";
+  scheduleDialog.value = availability.value === "expired" ? "reopen" : "edit";
+}
+async function publish(schedule?: TaskSchedule) {
   await action(async () => {
     if (dirty.value || !draft.value.id) await saveDraft(false);
     if (disposed) return;
     const updating = !!draft.value.publishedVersionId;
-    if (
-      !updating &&
-      !(await confirmAction(t("Publish this task to students?")))
-    )
-      return;
-    if (disposed) return;
     await call(`/sessions/${key(draft.value.id)}/publish`, "POST", {
       revision: draft.value.revision,
+      ...schedule,
     });
+    scheduleDialog.value = null;
     accept(await call<Task>(`/sessions/${key(draft.value.id)}`));
     await refreshCourses();
     success.value = t(updating ? "Task updated." : "Task published.");
+  });
+}
+async function saveAvailability(schedule: TaskSchedule) {
+  if (scheduleDialog.value === "publish") {
+    await publish(schedule);
+    return;
+  }
+  const reopening = scheduleDialog.value === "reopen";
+  await action(async () => {
+    const {
+      available,
+      availabilityStatus,
+      opensAt,
+      closesAt,
+      revision,
+      archived,
+    } = await call<Task>(
+      `/sessions/${key(draft.value.id)}/availability`,
+      "PUT",
+      { revision: draft.value.revision, ...schedule },
+    );
+    if (disposed) return;
+    // 开放时间单独保存，保留编辑器里尚未保存的讲义改动。
+    const updated = {
+      available,
+      availabilityStatus,
+      opensAt,
+      closesAt,
+      revision,
+      archived,
+    };
+    baseline.value = JSON.stringify({
+      ...JSON.parse(baseline.value),
+      ...updated,
+    });
+    draft.value = { ...draft.value, ...updated };
+    scheduleDialog.value = null;
+    await refreshCourses();
+    success.value = t(
+      reopening ? "Task re-enabled." : "Task availability saved.",
+    );
   });
 }
 async function openFileSelection() {
@@ -601,8 +669,27 @@ void load();
         <div class="task-heading-title">
           <p class="eyebrow">{{ t("Teaching task") }}</p>
           <strong>{{ draft.title || t("New lesson") }}</strong>
+          <div v-if="draft.id" class="row wrap task-availability">
+            <span class="badge status-label" :data-status="availability">{{
+              statusText(availability)
+            }}</span>
+            <small v-if="draft.opensAt" class="muted">{{
+              t("Opening time: {0}", [dateText(draft.opensAt)])
+            }}</small>
+            <small v-if="draft.closesAt" class="muted">{{
+              t("Closing time: {0}", [dateText(draft.closesAt)])
+            }}</small>
+          </div>
         </div>
         <div class="row wrap task-heading-actions">
+          <TButton
+            v-if="availability === 'expired'"
+            theme="primary"
+            type="button"
+            :disabled="busy || !!active"
+            @click="openAvailabilityEditor"
+            >{{ t("Re-enable task") }}</TButton
+          >
           <TButton
             :variant="draft.content.handout ? 'outline' : 'base'"
             type="button"
@@ -1014,7 +1101,7 @@ void load();
           theme="default"
           variant="outline"
           :disabled="busy || !!active || !hasContent"
-          @click="publish"
+          @click="requestPublish"
         >
           {{ t(draft.publishedVersionId ? "Update task" : "Publish task") }}
         </TButton>
@@ -1044,6 +1131,32 @@ void load();
       <TaskContent v-else :task="preview" preview readonly />
     </template>
   </AppDialog>
+  <TaskScheduleDialog
+    v-if="scheduleDialog"
+    :title="
+      t(
+        scheduleDialog === 'publish'
+          ? 'Publish task'
+          : scheduleDialog === 'reopen'
+            ? 'Re-enable task'
+            : 'Change availability',
+      )
+    "
+    :submit-label="
+      t(
+        scheduleDialog === 'publish'
+          ? 'Publish task'
+          : scheduleDialog === 'reopen'
+            ? 'Re-enable task'
+            : 'Save changes',
+      )
+    "
+    :current="scheduleDialog === 'edit' ? draft : undefined"
+    :busy="busy"
+    :error="error"
+    @close="scheduleDialog = null"
+    @submit="saveAvailability"
+  />
   <AppDialog
     v-if="observed"
     :title="t('Learning record')"

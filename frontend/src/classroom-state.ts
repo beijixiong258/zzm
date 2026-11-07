@@ -2,6 +2,7 @@ import { computed, ref } from "vue";
 import {
   call,
   key,
+  taskAvailability,
   type Bootstrap,
   type Course,
   type TaskSummary,
@@ -9,6 +10,7 @@ import {
 } from "./classroom-api";
 import { savedLocale, setLocale, t } from "./i18n";
 import { confirmAction } from "./confirmAction";
+import { useTaskTime } from "./useTaskTime";
 
 export const user = ref<User | null>(null);
 export const courses = ref<Course[]>([]);
@@ -16,6 +18,28 @@ export const tasks = ref<Record<string, TaskSummary[]>>({});
 export const bootstrap = ref<Bootstrap | null>(null);
 export const dirty = ref(false);
 export const staff = computed(() => user.value?.role !== "student");
+export const taskTime = useTaskTime(() =>
+  Object.values(tasks.value).flatMap((courseTasks) =>
+    courseTasks.flatMap((task) => [task.opensAt, task.closesAt]),
+  ),
+);
+
+export function visibleCourseTasks(courseId: string) {
+  return (tasks.value[courseId] || []).filter(
+    (task) =>
+      !task.archived &&
+      (staff.value || taskAvailability(task, taskTime.value) === "open"),
+  );
+}
+function loadCourseTasks(courseId: string) {
+  return call<TaskSummary[]>(`/courses/${key(courseId)}/sessions`);
+}
+export async function refreshCourseTasks(courseId: string) {
+  const account = user.value?.id;
+  const updated = await loadCourseTasks(courseId);
+  if (user.value?.id === account)
+    tasks.value = { ...tasks.value, [courseId]: updated };
+}
 export type Route = {
   page: string;
   courseId: string;
@@ -128,10 +152,7 @@ export async function refreshCourses() {
       .filter((c) => staff.value || !c.archived)
       .map(
         async (course) =>
-          [
-            course.id,
-            await call<TaskSummary[]>(`/courses/${key(course.id)}/sessions`),
-          ] as const,
+          [course.id, await loadCourseTasks(course.id)] as const,
       ),
   );
   tasks.value = Object.fromEntries(entries);

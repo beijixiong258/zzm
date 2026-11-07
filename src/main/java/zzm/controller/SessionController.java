@@ -25,8 +25,11 @@ public class SessionController {
     }
     @PutMapping("/sessions/{id}") public Object edit(@PathVariable String id, @Valid @RequestBody Requests.SessionInput input, HttpServletRequest request) { return sessions.view(sessions.edit(id, input, accounts.current(request)), true); }
     @GetMapping("/sessions/{id}/preview") public Object preview(@PathVariable String id, HttpServletRequest request) { return sessions.view(sessions.require(id, accounts.current(request), true), false); }
-    @PostMapping("/sessions/{id}/publish") public Object publish(@PathVariable String id, @Valid @RequestBody Requests.Revision input, HttpServletRequest request) {
-        var version = sessions.publish(id, input.getRevision(), accounts.current(request)); return java.util.Map.of("versionId", version.getId(), "revision", version.getRevision());
+    @PostMapping("/sessions/{id}/publish") public Object publish(@PathVariable String id, @Valid @RequestBody Requests.TaskSchedule input, HttpServletRequest request) {
+        var version = sessions.publish(id, input, accounts.current(request)); return java.util.Map.of("versionId", version.getId(), "revision", version.getRevision());
+    }
+    @PutMapping("/sessions/{id}/availability") public Object schedule(@PathVariable String id, @Valid @RequestBody Requests.TaskSchedule input, HttpServletRequest request) {
+        return sessions.view(sessions.schedule(id, input, accounts.current(request)), true);
     }
     @PostMapping("/sessions/{id}/archive") public void archive(@PathVariable String id, @RequestParam boolean archived, HttpServletRequest request) { sessions.archive(id, archived, accounts.current(request)); }
     @DeleteMapping("/sessions/{id}") public void delete(@PathVariable String id, HttpServletRequest request) { sessions.deleteArchived(id, accounts.current(request)); }

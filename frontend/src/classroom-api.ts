@@ -137,7 +137,13 @@ export type TaskContent = {
     tone: string;
   };
 };
-export type Task = {
+export type TaskSchedule = {
+  opensAt: string | null;
+  closesAt: string | null;
+};
+export type TaskAvailability =
+  "draft" | "scheduled" | "open" | "expired" | "recycled";
+export type Task = TaskSchedule & {
   id: string;
   courseId: string;
   title: string;
@@ -154,6 +160,8 @@ export type Task = {
   versionId?: string;
   publishedVersionId: string | null;
   archived: boolean;
+  available: boolean;
+  availabilityStatus: TaskAvailability;
 };
 export type Job = {
   id: string;
@@ -243,6 +251,10 @@ export type TaskSummary = Pick<
   | "archived"
   | "publishedVersionId"
   | "revision"
+  | "available"
+  | "availabilityStatus"
+  | "opensAt"
+  | "closesAt"
 >;
 export type StudentRow = {
   userId: string;
@@ -455,6 +467,10 @@ export function blankTask(courseId: string): Task {
     revision: 0,
     publishedVersionId: null,
     archived: false,
+    available: false,
+    availabilityStatus: "draft",
+    opensAt: null,
+    closesAt: null,
   };
 }
 export function studentTask(task: Task): Task {
@@ -479,6 +495,11 @@ export function statusText(status: string) {
     (
       {
         notStarted: "Not started",
+        draft: "Draft",
+        scheduled: "Scheduled to open",
+        open: "Open for responses",
+        expired: "Expired",
+        recycled: "In the recycle bin",
         inProgress: "In progress",
         completed: "Completed",
         confirmed: "Completed",
@@ -499,6 +520,20 @@ export function statusText(status: string) {
       } as Record<string, string>
     )[status] || status,
   );
+}
+export function taskAvailability(
+  task: TaskSummary,
+  now: number,
+): TaskAvailability {
+  if (task.archived) return "recycled";
+  if (!task.publishedVersionId) return "draft";
+  if (
+    task.available === false ||
+    (task.closesAt && Date.parse(task.closesAt) <= now)
+  )
+    return "expired";
+  if (task.opensAt && Date.parse(task.opensAt) > now) return "scheduled";
+  return "open";
 }
 export const questionTypes = {
   openResponse: "Open response",

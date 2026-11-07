@@ -12,12 +12,14 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.time.*;
+import java.time.temporal.ChronoUnit;
 import java.util.*;
 import static zzm.exception.ApiErrors.error;
 
 @Service
 @RequiredArgsConstructor
 public class SessionServiceImpl extends ServiceImpl<TeachingSessionMapper, TeachingSession> implements SessionService {
+    private static final Instant MAX_SCHEDULE_TIME = Instant.parse("9999-12-31T23:59:59.999Z");
     private final CourseService courses;
     private final MaterialService materials;
     private final SessionVersionMapper versionMapper;
@@ -29,26 +31,32 @@ public class SessionServiceImpl extends ServiceImpl<TeachingSessionMapper, Teach
         TeachingSession session = getById(id);
         if (session == null) throw error(404, "Task not found");
         courses.requireAccess(session.getCourseId(), user, teacher);
-        if (!teacher && Boolean.TRUE.equals(session.getArchived())) throw error(404, "Task not found");
+        if (!teacher && !session.openAt(LocalDateTime.now(ZoneOffset.UTC))) throw error(404, "Task is not currently available.");
         return session;
     }
     @Override public List<Map<String, Object>> listCourse(String courseId, AccountUser user) {
         boolean teacher = !"student".equals(user.getRole()); courses.requireAccess(courseId, user, teacher);
         List<TeachingSession> sessions = lambdaQuery().eq(TeachingSession::getCourseId, courseId).orderByAsc(TeachingSession::getTitle).list();
+        LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
         if (teacher) return sessions.stream().map(s -> {
             Map<String, Object> value = new LinkedHashMap<>();
             value.put("id", s.getId()); value.put("courseId", s.getCourseId()); value.put("title", s.getTitle());
             value.put("description", s.getDescription()); value.put("sessionType", s.getSessionType());
-            value.put("archived", s.getArchived()); value.put("publishedVersionId", s.getPublishedVersionId()); value.put("revision", s.getRevision());
+            value.put("revision", s.getRevision());
+            putAvailability(value, s, now);
             return value;
         }).toList();
-        List<String> ids = sessions.stream().filter(s -> !Boolean.TRUE.equals(s.getArchived())).map(TeachingSession::getPublishedVersionId).filter(Objects::nonNull).toList();
-        if (ids.isEmpty()) return List.of();
-        return versionMapper.selectByIds(ids).stream().map(v -> studentProjection(JSONUtil.parseObj(v.getContentJson()))).toList();
+        Map<String, TeachingSession> open = new LinkedHashMap<>();
+        for (TeachingSession session : sessions) {
+            if (session.openAt(now)) open.put(session.getPublishedVersionId(), session);
+        }
+        if (open.isEmpty()) return List.of();
+        return versionMapper.selectByIds(open.keySet()).stream().map(version -> publishedView(open.get(version.getId()), version, now)).toList();
     }
     @Override @Transactional public TeachingSession create(String courseId, Requests.SessionInput input, AccountUser user) {
         requireTaskCourse(courseId, user);
         TeachingSession session = new TeachingSession(); session.setCourseId(courseId); session.setRevision(0L); session.setArchived(false);
+        session.setAvailable(false);
         fill(session, input); save(session); return session;
     }
     private void requireTaskCourse(String courseId, AccountUser user) {
@@ -102,12 +110,25 @@ public class SessionServiceImpl extends ServiceImpl<TeachingSessionMapper, Teach
         result.put("description", session.getDescription()); result.put("sessionType", session.getSessionType()); result.put("topic", session.getTopic());
         result.put("learningGoals", session.getLearningGoals()); result.put("additionalInstructions", session.getAdditionalInstructions());
         result.put("teachingLanguage", session.getTeachingLanguage()); result.put("revision", session.getRevision());
-        result.put("publishedVersionId", session.getPublishedVersionId()); result.put("archived", session.getArchived());
+        putAvailability(result, session, LocalDateTime.now(ZoneOffset.UTC));
         List<String> ids = JSONUtil.toList(session.getMaterialIdsJson(), String.class);
         result.put("materialIds", ids); result.put("content", JSONUtil.toBean(session.getContentJson(), TaskContent.class));
         result.put("materials", ids.isEmpty() ? List.of() : materials.listByIds(ids).stream().map(materials::view).toList());
         Course course = courses.getById(session.getCourseId()); result.put("courseInstructions", course.getSystemInstructions()); result.put("courseInformation", Objects.toString(course.getCourseInformation(), "")); result.put("studentProfile", Objects.toString(course.getStudentProfile(), ""));
         return teacher ? result : studentProjection(result);
+    }
+    private void putAvailability(Map<String, Object> view, TeachingSession session, LocalDateTime now) {
+        view.put("publishedVersionId", session.getPublishedVersionId());
+        view.put("archived", session.getArchived());
+        view.put("available", session.getAvailable());
+        view.put("availabilityStatus", session.availabilityStatus(now));
+        view.put("opensAt", session.getOpensAt() == null ? null : session.getOpensAt().toInstant(ZoneOffset.UTC).toString());
+        view.put("closesAt", session.getClosesAt() == null ? null : session.getClosesAt().toInstant(ZoneOffset.UTC).toString());
+    }
+    private Map<String, Object> publishedView(TeachingSession session, SessionVersion version, LocalDateTime now) {
+        Map<String, Object> result = studentProjection(JSONUtil.parseObj(version.getContentJson()));
+        putAvailability(result, session, now);
+        return result;
     }
     @Override public SessionVersion version(String sessionId, String versionId) {
         if (versionId == null || versionId.isBlank()) {
@@ -121,18 +142,61 @@ public class SessionServiceImpl extends ServiceImpl<TeachingSessionMapper, Teach
     }
     @Override public Map<String, Object> published(String id, String versionId, AccountUser user) {
         TeachingSession session = require(id, user, false);
-        if (session.getPublishedVersionId() == null) throw error(404, "Task is not published");
         // 兼容旧链接，但学生始终读取当前任务内容。
         if (versionId != null && !versionId.isBlank()) version(id, versionId);
-        return studentProjection(JSONUtil.parseObj(version(id, null).getContentJson()));
+        return publishedView(session, version(id, session.getPublishedVersionId()), LocalDateTime.now(ZoneOffset.UTC));
     }
-    @Override @Transactional public SessionVersion publish(String id, long revision, AccountUser user) {
-        TeachingSession session = require(id, user, true);
+    @Override @Transactional public SessionVersion publish(String id, Requests.TaskSchedule input, AccountUser user) {
+        TeachingSession session = lockTask(id, user);
         if (Boolean.TRUE.equals(session.getArchived()) || Boolean.TRUE.equals(courses.getById(session.getCourseId()).getArchived())) throw error(409, "Restore the course and task before publishing");
-        if (session.getRevision() != revision) throw error(409, "Task changed. Reload before publishing.");
-        if (session.getPublishedVersionId() == null) session.setPublishedVersionId(IdUtil.fastSimpleUUID());
+        if (!session.getRevision().equals(input.getRevision())) throw error(409, "Task changed. Reload before publishing.");
+        boolean firstPublish = session.getPublishedVersionId() == null;
+        if (firstPublish) {
+            applySchedule(session, input);
+            session.setPublishedVersionId(IdUtil.fastSimpleUUID());
+        } else if (input.getOpensAt() != null || input.getClosesAt() != null) {
+            throw error(422, "Change the schedule in task availability.");
+        }
         if (!updateById(session)) throw error(409, "Task changed. Reload before publishing.");
+        if (firstPublish) storeAvailability(session);
         return storePublishedContent(session);
+    }
+    @Override @Transactional public TeachingSession schedule(String id, Requests.TaskSchedule input, AccountUser user) {
+        TeachingSession session = lockTask(id, user);
+        requireTaskCourse(session.getCourseId(), user);
+        if (!session.getRevision().equals(input.getRevision())) throw error(409, "Task changed. Reload before saving.");
+        if (session.getPublishedVersionId() == null) throw error(409, "Publish the task before changing its availability.");
+        applySchedule(session, input);
+        session.setArchived(false);
+        if (!updateById(session)) throw error(409, "Task changed. Reload before saving.");
+        storeAvailability(session);
+        return session;
+    }
+    private void applySchedule(TeachingSession session, Requests.TaskSchedule input) {
+        String opens = input.getOpensAt(), closes = input.getClosesAt();
+        if ((opens == null) == (closes == null)) throw error(422, "Choose exactly one opening or closing time.");
+        Instant time;
+        try {
+            time = Instant.parse(opens == null ? closes : opens).truncatedTo(ChronoUnit.MILLIS);
+        } catch (DateTimeException exception) {
+            throw error(422, "Choose a valid time in the future.");
+        }
+        if (!time.isAfter(Instant.now()) || time.isAfter(MAX_SCHEDULE_TIME)) throw error(422, "Choose a valid time in the future.");
+        LocalDateTime scheduled = LocalDateTime.ofInstant(time, ZoneOffset.UTC);
+        session.setOpensAt(opens == null ? null : scheduled);
+        session.setClosesAt(closes == null ? null : scheduled);
+        session.setAvailable(true);
+    }
+    private void storeAvailability(TeachingSession session) {
+        lambdaUpdate().eq(TeachingSession::getId, session.getId())
+            .set(TeachingSession::getAvailable, session.getAvailable())
+            .set(TeachingSession::getOpensAt, session.getOpensAt())
+            .set(TeachingSession::getClosesAt, session.getClosesAt()).update();
+    }
+    @Override public void expireTasks() {
+        // 读写请求仍按实际截止时刻判定；后台任务负责把到期状态写入数据库。
+        lambdaUpdate().eq(TeachingSession::getAvailable, true).le(TeachingSession::getClosesAt, LocalDateTime.now(ZoneOffset.UTC))
+            .set(TeachingSession::getAvailable, false).update();
     }
     /** 复用同一份发布内容；学习记录继续使用原记录，不随更新另起一份。 */
     private SessionVersion storePublishedContent(TeachingSession session) {
@@ -159,10 +223,16 @@ public class SessionServiceImpl extends ServiceImpl<TeachingSessionMapper, Teach
     }
     @Override @Transactional public void archive(String id, boolean archived, AccountUser user) {
         TeachingSession session = lockTask(id, user);
+        if (Boolean.TRUE.equals(session.getArchived()) == archived) return;
         if (archived) requireIdleTask(id);
-        else requireTaskCourse(session.getCourseId(), user);
+        else {
+            requireTaskCourse(session.getCourseId(), user);
+            if (session.getPublishedVersionId() != null) throw error(422, "Choose a new schedule to re-enable this task.");
+        }
         session.setArchived(archived);
+        session.setAvailable(false);
         if (!updateById(session)) throw error(409, "Task changed. Reload before saving.");
+        storeAvailability(session);
     }
     @Override @Transactional public void deleteArchived(String id, AccountUser user) {
         TeachingSession session = lockTask(id, user);

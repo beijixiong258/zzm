@@ -11,7 +11,11 @@ import cn.hutool.json.*;
 import com.baomidou.mybatisplus.extension.conditions.query.LambdaQueryChainWrapper;
 import org.junit.jupiter.api.*;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.server.ResponseStatusException;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import static org.junit.jupiter.api.Assertions.*;
@@ -31,6 +35,7 @@ class LearningTutorTest {
     SessionVersion version;
     Requests.Chat request;
     CourseMaterial material;
+    TeachingSession publishedTask;
 
     @BeforeEach @SuppressWarnings("unchecked") void setup() {
         sessions = mock(SessionService.class); materials = mock(MaterialService.class); records = mock(LearningRecordMapper.class);
@@ -38,13 +43,16 @@ class LearningTutorTest {
         AppProperties properties = new AppProperties(); ContextBudget budget = new ContextBudget();
         service = spy(new LearningServiceImpl(sessions, mock(CourseService.class), materials, ai, properties,
             mock(LearningRecordHistoryMapper.class), mock(AccountService.class), mock(TaskExporter.class),
-            new TutorContext(properties, budget), budget, qmd, pdf));
+            new TutorContext(properties, budget), budget, qmd, pdf, new TransactionTemplate(mock(PlatformTransactionManager.class))));
         ReflectionTestUtils.setField(service, "baseMapper", records);
         var query = mock(LambdaQueryChainWrapper.class, call -> Set.of("eq", "isNull").contains(call.getMethod().getName()) ? call.getMock() : RETURNS_DEFAULTS.answer(call));
         when(materials.lambdaQuery()).thenReturn(query); when(query.list()).thenReturn(List.of());
         record = new LearningRecord(); record.setId("record"); record.setUserId("student"); record.setSessionId("task"); record.setVersionId("published");
         record.setPreview(false); record.setRevision(0L); record.setStatus("inProgress"); record.setMessagesJson("[]"); record.setAnswersJson("{\"q1\":\"Option one\"}");
         when(records.selectById("record")).thenReturn(record); when(records.updateById(any(LearningRecord.class))).thenReturn(1);
+        var taskQuery = mock(LambdaQueryChainWrapper.class, call -> Set.of("eq", "last").contains(call.getMethod().getName()) ? call.getMock() : RETURNS_DEFAULTS.answer(call));
+        publishedTask = new TeachingSession(); publishedTask.setAvailable(true); publishedTask.setPublishedVersionId("published");
+        when(sessions.lambdaQuery()).thenReturn(taskQuery); when(taskQuery.one()).thenReturn(publishedTask);
         user = new AccountUser(); user.setId("student"); user.setRole("student");
         TaskContent content = new TaskContent(); content.setHandout("PRIVATE_FULL_HANDOUT".repeat(400));
         var question = new TaskContent.Question(); question.setId("q1"); question.setType("singleChoice"); question.setPrompt("First question");
@@ -94,6 +102,15 @@ class LearningTutorTest {
         when(ai.studentReply(anyList(), any())).thenAnswer(call -> { version.setContentJson(JSONUtil.parseObj(version.getContentJson()).set("revision", 99).toString()); return reply(); });
         var error = assertThrows(ResponseStatusException.class, () -> service.chat("record", request, user));
         assertEquals(409, error.getStatusCode().value()); verify(records, never()).updateById(any(LearningRecord.class));
+    }
+    @Test void aTaskThatClosesDuringTheReplyCannotSaveThatReply() {
+        when(ai.studentReply(anyList(), any())).thenAnswer(call -> {
+            publishedTask.setClosesAt(LocalDateTime.now(ZoneOffset.UTC).minusSeconds(1));
+            return reply();
+        });
+        var error = assertThrows(ResponseStatusException.class, () -> service.chat("record", request, user));
+        assertEquals(404, error.getStatusCode().value());
+        verify(records, never()).updateById(any(LearningRecord.class));
     }
     @Test void imageReadResolvesThePartToItsPhysicalPageAndRejectsConflictingPage() throws Exception {
         material.setMimeType("application/pdf");

@@ -28,6 +28,7 @@ import {
   key,
   dateText,
   statusText,
+  taskAvailability,
   type LearningRecordSummary,
   type User,
   type Course,
@@ -43,6 +44,8 @@ import {
   routeKey,
   staff,
   tasks,
+  taskTime,
+  visibleCourseTasks,
   user,
 } from "./classroom-state";
 import ClassroomHome from "./views/ClassroomHome.vue";
@@ -105,6 +108,14 @@ const course = computed(() =>
 const activeCourses = computed(() =>
   courses.value.filter((item) => !item.archived && !item.workspace),
 );
+const availableHistory = computed(() => {
+  const visibleIds = new Set(
+    activeCourses.value.flatMap((item) =>
+      visibleCourseTasks(item.id).map((task) => task.id),
+    ),
+  );
+  return historyRows.value.filter((record) => visibleIds.has(record.sessionId));
+});
 const deletingCourse = ref("");
 function getCourseActions(item: Course): DropdownOption[] {
   const actions: DropdownOption[] = [
@@ -281,8 +292,10 @@ watch(
   async () => {
     if (!user.value || user.value.mustChangePassword) return;
     await action(async () => {
-      if (route.value.page === "history")
+      if (route.value.page === "history") {
+        await refreshCourses();
         historyRows.value = await call<LearningRecordSummary[]>("/history");
+      }
       if (route.value.page === "accounts" && user.value?.role === "admin")
         accountRows.value = await call<User[]>("/accounts");
     });
@@ -653,7 +666,7 @@ void boot();
               theme="default"
               variant="outline"
               type="button"
-              v-for="task in (tasks[item.id] || []).filter((s) => !s.archived)"
+              v-for="task in visibleCourseTasks(item.id)"
               :key="task.id"
               :class="{ active: route.taskId === task.id }"
               @click="
@@ -667,6 +680,17 @@ void boot();
             >
               <span>{{ task.sessionType === "tutor" ? "✦" : "▤" }}</span
               >{{ task.title }}
+              <small
+                v-if="
+                  staff &&
+                  ['scheduled', 'expired'].includes(
+                    taskAvailability(task, taskTime),
+                  )
+                "
+                class="sidebar-task-status"
+              >
+                {{ statusText(taskAvailability(task, taskTime)) }}
+              </small>
             </TButton>
           </details>
           <p v-if="!activeCourses.length" class="muted small">
@@ -846,7 +870,7 @@ void boot();
           <section v-else-if="route.page === 'history'">
             <h1>{{ t("Learning history") }}</h1>
             <article
-              v-for="record in historyRows"
+              v-for="record in availableHistory"
               :key="record.id"
               class="panel task-card"
             >
@@ -875,7 +899,7 @@ void boot();
                 {{ t("View learning record") }}
               </TButton>
             </article>
-            <p v-if="!historyRows.length" class="empty">
+            <p v-if="!availableHistory.length" class="empty">
               {{ t("Your learning history will appear here.") }}
             </p>
           </section>

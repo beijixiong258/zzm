@@ -35,6 +35,7 @@ public class MaterialController {
         if (!Files.isRegularFile(path)) throw error(404, "Original file is unavailable");
         boolean inline = material.getMimeType().startsWith("image/") || "application/pdf".equals(material.getMimeType());
         return ResponseEntity.ok().contentType(MediaType.parseMediaType(material.getMimeType()))
+            .cacheControl(CacheControl.noStore())
             .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.builder(inline ? "inline" : "attachment").filename(material.getFileName(), StandardCharsets.UTF_8).build().toString())
             .header("X-Content-Type-Options", "nosniff").body(new FileSystemResource(path));
     }

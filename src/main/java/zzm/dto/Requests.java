@@ -70,6 +70,11 @@ public final class Requests {
     @Data public static class Revision {
         @NotNull @Min(0) private Long revision;
     }
+    @Data public static class TaskSchedule {
+        @NotNull @Min(0) private Long revision;
+        @Size(max = 40) private String opensAt;
+        @Size(max = 40) private String closesAt;
+    }
     @Data public static class Generation {
         @NotNull @Min(0) private Long revision;
         @NotBlank @Pattern(regexp = "generate|import|revise") private String kind = "generate";
