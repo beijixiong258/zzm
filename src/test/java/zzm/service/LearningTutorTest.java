@@ -43,7 +43,8 @@ class LearningTutorTest {
         AppProperties properties = new AppProperties(); ContextBudget budget = new ContextBudget();
         service = spy(new LearningServiceImpl(sessions, mock(CourseService.class), materials, ai, properties,
             mock(LearningRecordHistoryMapper.class), mock(AccountService.class), mock(TaskExporter.class),
-            new TutorContext(properties, budget), budget, qmd, pdf, new TransactionTemplate(mock(PlatformTransactionManager.class))));
+            new TutorContext(properties, budget), budget, qmd, pdf, new TransactionTemplate(mock(PlatformTransactionManager.class)),
+            mock(LearningAssessmentService.class)));
         ReflectionTestUtils.setField(service, "baseMapper", records);
         var query = mock(LambdaQueryChainWrapper.class, call -> Set.of("eq", "isNull").contains(call.getMethod().getName()) ? call.getMock() : RETURNS_DEFAULTS.answer(call));
         when(materials.lambdaQuery()).thenReturn(query); when(query.list()).thenReturn(List.of());

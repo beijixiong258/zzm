@@ -27,6 +27,7 @@ import {
   call,
   key,
   dateText,
+  assessmentStatusText,
   statusText,
   taskAvailability,
   type LearningRecordSummary,
@@ -884,6 +885,9 @@ void boot();
                     >{{ statusText(record.status) }}</span
                   >
                 </div>
+                <small v-if="record.assessment" class="muted">{{
+                  assessmentStatusText(record.assessment.status)
+                }}</small>
               </div>
               <TButton
                 theme="default"

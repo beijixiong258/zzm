@@ -4,6 +4,7 @@ import zzm.service.GenerationService;
 import zzm.service.MaterialService;
 import zzm.service.AccountService;
 import zzm.service.SessionService;
+import zzm.service.LearningAssessmentService;
 import zzm.integration.QmdClient;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
@@ -18,6 +19,7 @@ public class BackgroundJobs {
     private final GenerationService generations;
     private final AccountService accounts;
     private final SessionService sessions;
+    private final LearningAssessmentService assessments;
     private final QmdClient qmd;
     private volatile boolean acceptingJobs;
 
@@ -26,6 +28,7 @@ public class BackgroundJobs {
         accounts.ensureDemoAccounts();
         materials.recoverProcessing();
         generations.recoverProcessing();
+        assessments.recoverProcessing();
         acceptingJobs = true;
     }
 
@@ -66,5 +69,10 @@ public class BackgroundJobs {
     @Scheduled(fixedDelay = 2000)
     public void processGenerations() {
         if (acceptingJobs) generations.processNext();
+    }
+
+    @Scheduled(fixedDelay = 2000, initialDelay = 1000)
+    public void processAssessments() {
+        if (acceptingJobs) assessments.processNext();
     }
 }

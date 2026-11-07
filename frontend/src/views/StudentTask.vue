@@ -32,6 +32,7 @@ import RecordHistory from "../components/RecordHistory.vue";
 import FileUploader from "../components/FileUploader.vue";
 import ContextMeter from "../components/ContextMeter.vue";
 import MaterialProgress from "../components/MaterialProgress.vue";
+import FormativeAssessmentPanel from "../components/FormativeAssessmentPanel.vue";
 import { useTaskTime } from "../useTaskTime";
 const props = defineProps<{
   taskId: string;
@@ -291,7 +292,7 @@ async function save() {
 }
 async function submit() {
   if (pendingUploads.value) return;
-  if (!(await confirmAction(t("Submit your work for teacher review?")))) return;
+  if (!(await confirmAction(t("Submit your answers for AI feedback?")))) return;
   await action(async () => {
     await saveAnswers();
     if (record.value)
@@ -544,7 +545,7 @@ void load();
               :disabled="busy || pendingUploads > 0"
               @click="submit"
             >
-              {{ t("Submit for review") }}
+              {{ t("Submit answers") }}
             </TButton></template
           >
           <p v-else class="muted">
@@ -552,11 +553,17 @@ void load();
               t(
                 record?.status === "confirmed"
                   ? "Your teacher has confirmed completion."
-                  : "Your work is waiting for teacher review.",
+                  : "Your answers have been submitted.",
               )
             }}
           </p>
         </div>
+        <FormativeAssessmentPanel
+          v-if="record?.assessment"
+          :record-id="record.id"
+          :latest="record.assessment"
+          @unavailable="showRequestError"
+        />
         <p v-if="pendingUploads" class="notice" role="status">
           {{
             t(

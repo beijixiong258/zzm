@@ -14,6 +14,7 @@ import {
   blankTask,
   call,
   dateText,
+  assessmentStatusText,
   fileUrl,
   key,
   statusText,
@@ -28,6 +29,7 @@ import {
   type LearningRecord,
   type ChatMessage,
   type TaskSchedule,
+  type AssessmentSummary,
 } from "../classroom-api";
 import {
   dirty,
@@ -48,6 +50,7 @@ import RichText from "../components/RichText.vue";
 import RecordHistory from "../components/RecordHistory.vue";
 import AppDialog from "../components/AppDialog.vue";
 import TaskScheduleDialog from "../components/TaskScheduleDialog.vue";
+import FormativeAssessmentPanel from "../components/FormativeAssessmentPanel.vue";
 import { useCourseMaterials } from "../useCourseMaterials";
 const props = defineProps<{
   courseId: string;
@@ -609,6 +612,16 @@ async function observe(recordId: string | null) {
     observed.value = await call<Workspace>(`/records/${key(recordId)}/observe`);
   });
 }
+function updateObservedAssessment(assessment: AssessmentSummary) {
+  const record = observed.value?.record;
+  if (record?.assessment?.id !== assessment.id) return;
+  record.assessment = assessment;
+  if (students.value) {
+    students.value = students.value.map((student) =>
+      student.recordId === record.id ? { ...student, assessment } : student,
+    );
+  }
+}
 async function reviewObserved(status: "confirmed" | "needsRevision") {
   const workspace = observed.value;
   const record = workspace?.record;
@@ -921,10 +934,12 @@ void load();
         >
           <span>{{ student.name }}</span
           ><span
-            >{{ statusText(student.status) }} · {{ student.answered }}/{{
-              student.total
-            }}</span
+            >{{ statusText(student.submissionStatus || student.status) }} ·
+            {{ student.answered }}/{{ student.total }}</span
           >
+          <small v-if="student.assessment" class="muted">{{
+            assessmentStatusText(student.assessment.status)
+          }}</small>
         </TButton>
         <p v-if="!students.length" class="muted">
           {{ t("No students have joined this course yet.") }}
@@ -1157,6 +1172,13 @@ void load();
     @close="observed = null"
   >
     <p v-if="error" role="alert" class="error">{{ systemText(error) }}</p>
+    <FormativeAssessmentPanel
+      v-if="observed.record?.assessment"
+      :record-id="observed.record.id"
+      :latest="observed.record.assessment"
+      :can-grade="!observed.record.preview"
+      @updated="updateObservedAssessment"
+    />
     <TaskContent
       :task="observed.task"
       :answers="observed.record?.answers"

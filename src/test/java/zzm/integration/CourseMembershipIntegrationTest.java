@@ -38,6 +38,8 @@ import java.time.*;
 import java.util.*;
 import java.util.concurrent.*;
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
+import static org.mockito.ArgumentMatchers.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -57,10 +59,11 @@ class CourseMembershipIntegrationTest {
     @Import({WebConfig.class, JsonConfig.class, CourseAccess.class, CourseController.class,
         SessionController.class, LearningController.class, MaterialController.class, ApiExceptionHandler.class,
         CourseServiceImpl.class, AccountServiceImpl.class, MaterialServiceImpl.class,
-        SessionServiceImpl.class, LearningServiceImpl.class, ContextBudget.class, TutorContext.class})
+        SessionServiceImpl.class, LearningServiceImpl.class, LearningAssessmentServiceImpl.class,
+        TaskExporter.class, ContextBudget.class, TutorContext.class})
     static class TestApplication {}
 
-    private static final List<String> TABLES = List.of("learning_record_history", "learning_record", "generation_job",
+    private static final List<String> TABLES = List.of("learning_assessment", "learning_record_history", "learning_record", "generation_job",
         "session_version", "teaching_session", "course_member", "course_material", "course", "auth_session", "legacy_record", "account_user");
     private static final String TEST_SCHEMA = System.getProperty("zzm.test.schema", "zzm");
     private static final Path TEST_DIRECTORY = Path.of(System.getProperty("zzm.test.directory", System.getProperty("java.io.tmpdir") + "/zzm-membership-tests"));
@@ -89,12 +92,12 @@ class CourseMembershipIntegrationTest {
     @MockitoBean DocumentParser parser;
     @MockitoBean PdfInputReader pdf;
     @MockitoBean QmdClient qmd;
-    @MockitoBean TaskExporter exporter;
     @Autowired MockMvc http;
     @Autowired JdbcTemplate jdbc;
     @Autowired CourseService courses;
     @Autowired SessionService sessions;
     @Autowired LearningService learning;
+    @Autowired LearningAssessmentService assessments;
     @Autowired MaterialService materials;
     @Autowired AccountUserMapper accounts;
     @Autowired AuthSessionMapper authSessions;
@@ -296,6 +299,154 @@ class CourseMembershipIntegrationTest {
             .andExpect(status().isOk()).andExpect(jsonPath("$").isEmpty());
         http.perform(get("/api/sessions/{id}/workspace", task.getId()).cookie(cookie(student))).andExpect(status().isNotFound());
         http.perform(post("/api/sessions/{id}/start", task.getId()).cookie(cookie(student))).andExpect(status().isNotFound());
+    }
+
+    @Test void assessmentUsesTheSubmittedQuestionsAndExportsOnlyPublicFeedback() throws Exception {
+        enrol(course, student);
+        TeachingSession task = task(course, "评价提交快照");
+        LearningRecord record = record(task, student);
+        http.perform(post("/api/records/{id}/submit", record.getId()).cookie(cookie(student)).contentType("application/json")
+            .content(JSONUtil.toJsonStr(Map.of("revision", record.getRevision()))))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.assessment.status").value("queued"));
+        LearningAssessment queued = latestAssessment(record);
+        assertEquals(records.selectById(record.getId()).getRevision(), queued.getSubmissionRevision());
+
+        var changed = JSONUtil.toBean(JSONUtil.toJsonStr(sessions.view(task, true)), Requests.SessionInput.class);
+        changed.getContent().getQuestions().get(0).setPrompt("更新后的题目。");
+        changed.getContent().getQuestions().get(0).setReferenceAnswer("更新后的参考答案");
+        sessions.edit(task.getId(), changed, teacher);
+        when(ai.assessAnswers(any(), anyList(), anyMap())).thenAnswer(call -> {
+            FormativeAssessment.Submission input = call.getArgument(0);
+            assertEquals("教师参考答案", input.questions().get(0).referenceAnswer());
+            assertEquals("说明你的思路。", input.questions().get(0).prompt());
+            assertEquals("学生作答", input.questions().get(0).answer());
+            return feedbackFor(call.getArgument(1));
+        });
+        assessments.processNext();
+        var response = http.perform(get(assessmentPath(record, queued)).cookie(cookie(student)))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("completed"))
+            .andExpect(jsonPath("$.feedback.questions[0].prompt").value("说明你的思路。"))
+            .andExpect(jsonPath("$.inputJson").doesNotExist()).andReturn().getResponse().getContentAsString(StandardCharsets.UTF_8);
+        assertFalse(response.contains("教师参考答案"));
+        http.perform(get(assessmentPath(record, queued)).cookie(cookie(otherStudent))).andExpect(status().isForbidden());
+        var markdown = http.perform(get("/api/records/{id}/export", record.getId()).cookie(cookie(student)))
+            .andExpect(status().isOk()).andReturn().getResponse().getContentAsString(StandardCharsets.UTF_8);
+        assertTrue(markdown.contains("AI 形成性评价"));
+        assertTrue(markdown.contains("补充一条可核对的依据"));
+        assertFalse(markdown.contains("教师参考答案") || markdown.contains("更新后的参考答案"));
+    }
+
+    @Test void assessmentRetryAndTeacherScoreAreIndependent() throws Exception {
+        enrol(course, student);
+        TeachingSession task = task(course, "评价重试");
+        LearningRecord record = record(task, student);
+        learning.submit(record.getId(), record.getRevision(), student);
+        LearningAssessment assessment = latestAssessment(record);
+        when(ai.assessAnswers(any(), anyList(), anyMap()))
+            .thenThrow(new IllegalStateException("provider failure"))
+            .thenAnswer(call -> feedbackFor(call.getArgument(1)));
+        assessments.processNext();
+        assertEquals("failed", assessments.getById(assessment.getId()).getStatus());
+        assertEquals("submitted", records.selectById(record.getId()).getStatus());
+        String score = assessmentPath(record, assessment) + "/score";
+        for (AccountUser person : List.of(student, otherTeacher)) {
+            http.perform(put(score).cookie(cookie(person)).contentType("application/json").content("{\"score\":82.5}"))
+                .andExpect(status().isForbidden());
+        }
+        http.perform(put(score).cookie(cookie(teacher)).contentType("application/json").content("{\"score\":101}"))
+            .andExpect(status().isUnprocessableEntity());
+        http.perform(put(score).cookie(cookie(teacher)).contentType("application/json").content("{\"score\":82.5}"))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.teacherScore").value(82.5));
+        String retry = assessmentPath(record, assessment) + "/retry";
+        http.perform(post(retry).cookie(cookie(student))).andExpect(status().isOk()).andExpect(jsonPath("$.status").value("queued"));
+        http.perform(post(retry).cookie(cookie(student))).andExpect(status().isConflict());
+        assessments.processNext();
+        http.perform(get(assessmentPath(record, assessment)).cookie(cookie(student)))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("completed"))
+            .andExpect(jsonPath("$.teacherScore").value(82.5));
+        http.perform(put(score).cookie(cookie(teacher)).contentType("application/json").content("{\"score\":null}"))
+            .andExpect(status().isOk());
+        assertNull(assessments.getById(assessment.getId()).getTeacherScore());
+    }
+
+    @Test void resubmissionKeepsThePreviousAssessmentAndItsScore() throws Exception {
+        enrol(course, student);
+        TeachingSession task = task(course, "评价历史");
+        LearningRecord record = record(task, student);
+        learning.submit(record.getId(), record.getRevision(), student);
+        LearningAssessment first = latestAssessment(record);
+        when(ai.assessAnswers(any(), anyList(), anyMap())).thenAnswer(call -> feedbackFor(call.getArgument(1)));
+        assessments.processNext();
+        assessments.saveScore(record.getId(), first.getId(), java.math.BigDecimal.valueOf(93));
+        Requests.Review review = new Requests.Review();
+        review.setStatus("needsRevision"); review.setRevision(records.selectById(record.getId()).getRevision());
+        learning.review(record.getId(), review, teacher);
+        Requests.Answer answer = new Requests.Answer();
+        answer.setRevision(records.selectById(record.getId()).getRevision()); answer.setAnswers(Map.of("q1", "修订后的作答"));
+        learning.saveAnswers(record.getId(), answer, student);
+        learning.submit(record.getId(), records.selectById(record.getId()).getRevision(), student);
+        LearningAssessment next = latestAssessment(record);
+        assertNotEquals(first.getId(), next.getId());
+        assertNull(next.getTeacherScore());
+        assessments.processNext();
+        http.perform(get("/api/records/{id}/assessments", record.getId()).cookie(cookie(student)))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.items[0].id").value(next.getId()))
+            .andExpect(jsonPath("$.items[1].teacherScore").value(93));
+        assertTrue(assessments.getById(first.getId()).getFeedbackJson().contains("学生作答"));
+        assertTrue(assessments.getById(next.getId()).getFeedbackJson().contains("修订后的作答"));
+    }
+
+    @Test void onlyLinkedQuestionAttachmentsAreAssessmentEvidence() throws Exception {
+        enrol(course, student);
+        TeachingSession task = task(course, "附件作答");
+        LearningRecord record = learning.start(task.getId(), null, student);
+        CourseMaterial linked = attachment(record, "queued");
+        CourseMaterial chatFile = attachment(record, "ready");
+        jdbc.update("UPDATE course_material SET question_id=NULL WHERE id=?", chatFile.getId());
+        assertThrows(ResponseStatusException.class, () -> learning.submit(record.getId(), record.getRevision(), student));
+        assertEquals(0, count("learning_assessment"));
+        jdbc.update("UPDATE course_material SET status='ready' WHERE id=?", linked.getId());
+        learning.submit(record.getId(), record.getRevision(), student);
+        when(ai.assessAnswers(any(), anyList(), anyMap())).thenAnswer(call -> {
+            FormativeAssessment.Submission input = call.getArgument(0);
+            assertEquals(List.of(linked.getId()), input.sources().values().stream().map(FormativeAssessment.Source::materialId).toList());
+            var question = input.questions().get(0);
+            assertEquals(List.of("source1"), question.studentSources());
+            return List.of(new FormativeAssessment.QuestionFeedback(1, question.id(), question.prompt(), "partial",
+                linked.getTitle(), "测试材料", "你已提交材料。", "补充论证。", "补充一条可核对的依据。"));
+        });
+        assessments.processNext();
+        assertEquals("completed", latestAssessment(record).getStatus());
+    }
+
+    @Test void expirationDoesNotDiscardAcceptedAssessmentAndRemovalCascades() throws Exception {
+        enrol(course, student);
+        TeachingSession task = task(course, "截止后评价");
+        LearningRecord record = record(task, student);
+        learning.submit(record.getId(), record.getRevision(), student);
+        jdbc.update("UPDATE teaching_session SET closes_at=UTC_TIMESTAMP(3)-INTERVAL 1 MINUTE WHERE id=?", task.getId());
+        when(ai.assessAnswers(any(), anyList(), anyMap())).thenAnswer(call -> feedbackFor(call.getArgument(1)));
+        assessments.processNext();
+        LearningAssessment assessment = latestAssessment(record);
+        http.perform(get(assessmentPath(record, assessment)).cookie(cookie(student))).andExpect(status().isNotFound());
+        http.perform(get(assessmentPath(record, assessment)).cookie(cookie(teacher)))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("completed"));
+        kick(course, student, teacher, 204);
+        assertNull(assessments.getById(assessment.getId()));
+    }
+
+    private List<FormativeAssessment.QuestionFeedback> feedbackFor(List<FormativeAssessment.Question> questions) {
+        return questions.stream().map(q -> new FormativeAssessment.QuestionFeedback(q.number(), q.id(), q.prompt(), "partial",
+            "", q.answer(), "你给出了自己的判断。", "需要给出支持理由。", "补充一条可核对的依据。")).toList();
+    }
+
+    private LearningAssessment latestAssessment(LearningRecord record) {
+        return assessments.lambdaQuery().eq(LearningAssessment::getRecordId, record.getId())
+            .orderByDesc(LearningAssessment::getSubmissionRevision).last("LIMIT 1").one();
+    }
+
+    private String assessmentPath(LearningRecord record, LearningAssessment assessment) {
+        return "/api/records/" + record.getId() + "/assessments/" + assessment.getId();
     }
 
     @Test void simultaneousTeacherAndStudentEnrolmentCreatesOneMembership() throws Exception {

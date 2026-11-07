@@ -42,6 +42,7 @@ public class LearningServiceImpl extends ServiceImpl<LearningRecordMapper, Learn
     private final QmdClient qmd;
     private final PdfInputReader pdf;
     private final TransactionTemplate transactions;
+    private final LearningAssessmentService assessments;
     @Override public byte[] exportResult(String id, AccountUser user, String materialBaseUrl) {
         if (!"student".equals(user.getRole())) throw error(403, "Only students can export their own learning results");
         LearningRecord record = owned(id, user, false);
@@ -50,8 +51,10 @@ public class LearningServiceImpl extends ServiceImpl<LearningRecordMapper, Learn
         JSONArray messages = JSONUtil.parseArray(record.getMessagesJson());
         filterPrivateFeedback(messages);
         List<Map<String, Object>> files = attachments(id, user);
+        Map<String, Object> latest = assessments.latest(id);
+        Map<String, Object> assessment = latest == null ? null : assessments.detail(id, Objects.toString(latest.get("id")));
         return exporter.exportResult(task, currentAnswers(record), messages,
-            record.getTeacherNote(), files, materialBaseUrl);
+            record.getTeacherNote(), assessment, files, materialBaseUrl);
     }
     @Override public Map<String, Object> workspace(String sessionId, String versionId, AccountUser user) {
         Map<String, Object> task = sessions.published(sessionId, versionId, user);
@@ -205,14 +208,40 @@ public class LearningServiceImpl extends ServiceImpl<LearningRecordMapper, Learn
     }
     @Override @Transactional public Map<String, Object> submit(String id, long revision, AccountUser user) {
         LearningRecord record = editableRecord(id, user);
-        TaskContent content = snapshot(record).getBean("content", TaskContent.class);
+        JSONObject task = snapshot(record);
+        TaskContent content = task.getBean("content", TaskContent.class);
         JSONObject answers = currentAnswers(record, content);
-        List<CourseMaterial> submittedFiles = materials.lambdaQuery().eq(CourseMaterial::getRecordId,id).eq(CourseMaterial::getOwnerId,user.getId())
-            .eq(CourseMaterial::getArchived,false).in(CourseMaterial::getStatus,"ready","needsReview").list();
+        List<String> questionIds = content.getQuestions().stream().map(TaskContent.Question::getId).toList();
+        List<CourseMaterial> submittedFiles = questionIds.isEmpty() ? List.of() : materials.lambdaQuery()
+            .eq(CourseMaterial::getRecordId, id).eq(CourseMaterial::getOwnerId, user.getId())
+            .eq(CourseMaterial::getArchived, false).isNull(CourseMaterial::getFileRemovedAt)
+            .in(CourseMaterial::getQuestionId, questionIds).orderByAsc(CourseMaterial::getId).last("FOR UPDATE").list();
         materials.requireProcessed(submittedFiles);
         Set<String> attachedQuestions = new HashSet<>(); submittedFiles.forEach(file -> {if(file.getQuestionId()!=null)attachedQuestions.add(file.getQuestionId());});
         if (content.getQuestions().stream().anyMatch(q -> answers.getStr(q.getId(), "").isBlank() && !attachedQuestions.contains(q.getId()))) throw error(422, "Answer all questions or upload a processed question attachment before submitting");
-        record.setStatus("submitted"); record.setSubmittedAt(LocalDateTime.now(ZoneOffset.UTC)); saveRevision(record, revision); return view(record);
+        record.setStatus("submitted");
+        record.setSubmittedAt(LocalDateTime.now(ZoneOffset.UTC));
+        saveRevision(record, revision);
+        assessments.enqueue(record, task.getStr("courseId"), task.getStr("teachingLanguage"), content, answers, submittedFiles);
+        return view(record);
+    }
+    @Override public Map<String, Object> assessmentHistory(String recordId, int page, AccountUser user) {
+        readableRecord(recordId, null, user);
+        return assessments.history(recordId, page);
+    }
+    @Override public Map<String, Object> assessment(String recordId, String assessmentId, AccountUser user) {
+        readableRecord(recordId, null, user);
+        return assessments.detail(recordId, assessmentId);
+    }
+    @Override public Map<String, Object> retryAssessment(String recordId, String assessmentId, AccountUser user) {
+        readableRecord(recordId, null, user);
+        return assessments.retry(recordId, assessmentId);
+    }
+    @Override public Map<String, Object> saveAssessmentScore(String recordId, String assessmentId, Requests.TeacherScore input, AccountUser user) {
+        accounts.requireStaff(user);
+        LearningRecord record = readableRecord(recordId, null, user);
+        if (Boolean.TRUE.equals(record.getPreview())) throw error(403, "Simulation records cannot be graded.");
+        return assessments.saveScore(recordId, assessmentId, input.getScore());
     }
     @Override public List<Map<String, Object>> roster(String sessionId, String versionId, AccountUser user) {
         TeachingSession session = sessions.require(sessionId, user, true);
@@ -223,6 +252,7 @@ public class LearningServiceImpl extends ServiceImpl<LearningRecordMapper, Learn
         lambdaQuery().eq(LearningRecord::getSessionId, sessionId).eq(LearningRecord::getPreview, false)
             .orderByDesc(LearningRecord::getUpdatedAt).orderByDesc(LearningRecord::getId).list()
             .forEach(record -> recordsByUser.putIfAbsent(record.getUserId(), record));
+        var latestAssessments = assessments.latestForRecords(recordsByUser.values().stream().map(LearningRecord::getId).toList());
         Map<String,Set<String>> attachmentAnswers = new HashMap<>();
         if(!recordsByUser.isEmpty()) materials.lambdaQuery().in(CourseMaterial::getRecordId,recordsByUser.values().stream().map(LearningRecord::getId).toList())
             .eq(CourseMaterial::getArchived,false).in(CourseMaterial::getStatus,"ready","needsReview").list().forEach(file -> {
@@ -234,6 +264,7 @@ public class LearningServiceImpl extends ServiceImpl<LearningRecordMapper, Learn
             result.put("recordId", record == null ? null : record.getId()); result.put("versionId", selected);
             result.put("status", record == null || "notStarted".equals(record.getStatus()) ? "notStarted" : "confirmed".equals(record.getStatus()) ? "completed" : "inProgress");
             result.put("submissionStatus", record == null ? "notStarted" : record.getStatus()); result.put("total", content.getQuestions().size());
+            result.put("assessment", record == null ? null : latestAssessments.get(record.getId()));
             JSONObject answers = record == null ? new JSONObject() : currentAnswers(record, content);
             result.put("answered", content.getQuestions().stream().filter(q -> !answers.getStr(q.getId(), "").isBlank() || record != null && attachmentAnswers.getOrDefault(record.getId(),Set.of()).contains(q.getId())).count());
             result.put("lastActive", record == null ? null : record.getUpdatedAt()); return result;
@@ -264,14 +295,17 @@ public class LearningServiceImpl extends ServiceImpl<LearningRecordMapper, Learn
             .eq(TeachingSession::getAvailable, true).list().stream().filter(task -> task.openAt(now)).map(TeachingSession::getId).toList();
         if (sessionIds.isEmpty()) return List.of();
         Set<String> seenTasks = new HashSet<>();
-        return lambdaQuery().select(LearningRecord::getId, LearningRecord::getSessionId, LearningRecord::getVersionId,
+        List<LearningRecord> visibleRecords = lambdaQuery().select(LearningRecord::getId, LearningRecord::getSessionId, LearningRecord::getVersionId,
             LearningRecord::getUserId, LearningRecord::getStatus, LearningRecord::getUpdatedAt)
             .eq(LearningRecord::getUserId, user.getId()).eq(LearningRecord::getPreview, false)
             .in(LearningRecord::getSessionId, sessionIds).orderByDesc(LearningRecord::getUpdatedAt).orderByDesc(LearningRecord::getId)
-            .list().stream().filter(record -> seenTasks.add(record.getSessionId())).map(record -> {
+            .list().stream().filter(record -> seenTasks.add(record.getSessionId())).toList();
+        var latestAssessments = assessments.latestForRecords(visibleRecords.stream().map(LearningRecord::getId).toList());
+        return visibleRecords.stream().map(record -> {
                 Map<String, Object> item = new LinkedHashMap<>();
                 item.put("id", record.getId()); item.put("sessionId", record.getSessionId()); item.put("versionId", record.getVersionId());
-                item.put("userId", record.getUserId()); item.put("status", record.getStatus()); item.put("updatedAt", record.getUpdatedAt()); return item;
+                item.put("userId", record.getUserId()); item.put("status", record.getStatus()); item.put("updatedAt", record.getUpdatedAt());
+                item.put("assessment", latestAssessments.get(record.getId())); return item;
             }).toList();
     }
     private JSONObject snapshot(LearningRecord record) {
@@ -913,6 +947,7 @@ public class LearningServiceImpl extends ServiceImpl<LearningRecordMapper, Learn
         result.put("conversationLimitReached", allMessages.size() + 2 > limit);
         result.put("attachmentMaxBytes", properties.getAttachmentMaxBytes());
         result.put("preview", Boolean.TRUE.equals(record.getPreview())); result.put("messages", messages); result.put("teacherNote", record.getTeacherNote());
+        result.put("assessment", assessments.latest(record.getId()));
         result.put("removedAttachments", removedAttachments(record, messages));
         result.put("updatedAt", record.getUpdatedAt()); result.put("submittedAt", record.getSubmittedAt()); result.put("reviewedAt", record.getReviewedAt()); return result;
     }

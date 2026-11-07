@@ -3,6 +3,7 @@ package zzm.dto;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 import lombok.Data;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -111,6 +112,9 @@ public final class Requests {
         @NotNull private Long revision;
         @NotBlank @Pattern(regexp = "confirmed|needsRevision") private String status;
         @NotNull @Size(max = 10000) private String teacherNote = "";
+    }
+    @Data public static class TeacherScore {
+        private BigDecimal score;
     }
     @Data public static class MaterialInput {
         @NotBlank @Size(max = 300) private String title;

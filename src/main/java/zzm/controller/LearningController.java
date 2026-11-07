@@ -34,6 +34,19 @@ public class LearningController {
     @PostMapping("/records/{id}/context-budget") public Object context(@PathVariable String id, @Valid @RequestBody Requests.Chat input, HttpServletRequest request) { return learning.context(id, input, accounts.current(request)); }
     @PostMapping("/records/{id}/chat") public Object chat(@PathVariable String id, @Valid @RequestBody Requests.Chat input, HttpServletRequest request) { return learning.chat(id, input, accounts.current(request)); }
     @PostMapping("/records/{id}/submit") public Object submit(@PathVariable String id, @Valid @RequestBody Requests.Revision input, HttpServletRequest request) { return learning.submit(id, input.getRevision(), accounts.current(request)); }
+    @GetMapping("/records/{id}/assessments") public Object assessments(@PathVariable String id, @RequestParam(defaultValue = "1") int page, HttpServletRequest request) {
+        return learning.assessmentHistory(id, page, accounts.current(request));
+    }
+    @GetMapping("/records/{id}/assessments/{assessmentId}") public Object assessment(@PathVariable String id, @PathVariable String assessmentId, HttpServletRequest request) {
+        return learning.assessment(id, assessmentId, accounts.current(request));
+    }
+    @PostMapping("/records/{id}/assessments/{assessmentId}/retry") public Object retryAssessment(@PathVariable String id, @PathVariable String assessmentId, HttpServletRequest request) {
+        return learning.retryAssessment(id, assessmentId, accounts.current(request));
+    }
+    @PutMapping("/records/{id}/assessments/{assessmentId}/score") public Object saveAssessmentScore(@PathVariable String id, @PathVariable String assessmentId,
+        @Valid @RequestBody Requests.TeacherScore input, HttpServletRequest request) {
+        return learning.saveAssessmentScore(id, assessmentId, input, accounts.current(request));
+    }
     @GetMapping("/sessions/{id}/students") public Object roster(@PathVariable String id, @RequestParam(required = false) String versionId, HttpServletRequest request) { return learning.roster(id, versionId, accounts.current(request)); }
     @GetMapping("/records/{id}/observe") public Object observe(@PathVariable String id, HttpServletRequest request) { return learning.observe(id, accounts.current(request)); }
     @PostMapping("/records/{id}/review") public Object review(@PathVariable String id, @Valid @RequestBody Requests.Review input, HttpServletRequest request) { return learning.review(id, input, accounts.current(request)); }

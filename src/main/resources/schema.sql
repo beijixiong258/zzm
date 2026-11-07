@@ -73,3 +73,14 @@ CREATE TABLE IF NOT EXISTS learning_record_history (
  INDEX ix_record_history(record_id,kind,id),
  FOREIGN KEY(record_id) REFERENCES learning_record(id) ON DELETE CASCADE
 ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS learning_assessment (
+ id VARCHAR(64) PRIMARY KEY, record_id VARCHAR(64) NOT NULL, submission_revision BIGINT NOT NULL,
+ status VARCHAR(20) NOT NULL, input_json JSON NOT NULL, feedback_json JSON NULL, run_id VARCHAR(64) NULL,
+ question_count INT NOT NULL, evaluated_count INT NOT NULL DEFAULT 0,
+ submitted_at DATETIME(3) NOT NULL, updated_at DATETIME(3) NOT NULL, evaluated_at DATETIME(3) NULL,
+ teacher_score DECIMAL(5,2) NULL, scored_at DATETIME(3) NULL,
+ UNIQUE(record_id,submission_revision), INDEX ix_assessment_queue(status,submitted_at),
+ CONSTRAINT ck_teacher_score CHECK (teacher_score BETWEEN 0 AND 100),
+ FOREIGN KEY(record_id) REFERENCES learning_record(id) ON DELETE CASCADE
+) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;

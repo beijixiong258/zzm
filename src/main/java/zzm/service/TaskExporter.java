@@ -12,7 +12,8 @@ import static zzm.exception.ApiErrors.error;
 @Component
 public class TaskExporter {
     public byte[] exportResult(Map<String, Object> task, cn.hutool.json.JSONObject answers,
-        cn.hutool.json.JSONArray messages, String teacherNote, List<Map<String, Object>> attachments, String base) {
+        cn.hutool.json.JSONArray messages, String teacherNote, Map<String, Object> assessment,
+        List<Map<String, Object>> attachments, String base) {
         boolean chinese = "zh-CN".equals(task.get("teachingLanguage"));
         StringBuilder out = new StringBuilder(lesson(task, base));
         TaskContent content = JSONUtil.parseObj(task.get("content")).toBean(TaskContent.class);
@@ -25,6 +26,7 @@ public class TaskExporter {
             markdown(out, "multipleChoice".equals(question.getType())
                 ? String.join("\n\n", TaskContent.multipleChoiceAnswers(answer, question.getOptions())) : answer);
         }
+        assessment(out, assessment, chinese);
         section(out, chinese ? "教师反馈" : "Teacher feedback", teacherNote);
         heading(out, 2, chinese ? "本次对话" : "Current conversation");
         for (Object item : messages) {
@@ -44,6 +46,33 @@ public class TaskExporter {
             titles.keySet().forEach(id -> resource(out, id, titles, base, "", false));
         }
         return out.toString().getBytes(StandardCharsets.UTF_8);
+    }
+    private void assessment(StringBuilder out, Map<String, Object> assessment, boolean chinese) {
+        if (assessment == null) return;
+        if (assessment.get("feedback") instanceof Map<?, ?> saved) {
+            var feedback = JSONUtil.parseObj(saved);
+            heading(out, 2, chinese ? "AI 形成性评价" : "AI formative feedback");
+            feedbackPoints(out, feedback.getJSONArray("strengths"),
+                chinese ? "你做得好的地方是" : "What you did well", chinese);
+            feedbackPoints(out, feedback.getJSONArray("improvements"),
+                chinese ? "你还需要提高的地方是" : "What you still need to improve", chinese);
+            feedbackPoints(out, feedback.getJSONArray("nextSteps"),
+                chinese ? "你可以尝试这样提高" : "What you can try next", chinese);
+        }
+        if (assessment.get("teacherScore") != null) {
+            heading(out, 2, chinese ? "教师成绩" : "Teacher score");
+            markdown(out, assessment.get("teacherScore") + " / 100");
+        }
+    }
+    private void feedbackPoints(StringBuilder out, cn.hutool.json.JSONArray points, String title, boolean chinese) {
+        if (points == null || points.isEmpty()) return;
+        heading(out, 3, title);
+        for (Object value : points) {
+            var point = JSONUtil.parseObj(value);
+            int number = point.getInt("questionNumber", 0);
+            String question = chinese ? "第" + number + "题" : "Question " + number;
+            markdown(out, "- " + question + " · " + label(point.getStr("text")));
+        }
     }
     private String lesson(Map<String, Object> snapshot, String materialBaseUrl) {
         TaskContent content = JSONUtil.parseObj(snapshot.get("content")).toBean(TaskContent.class);

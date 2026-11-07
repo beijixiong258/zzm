@@ -197,7 +197,46 @@ export type ChatMessage = {
   usage?: ContextUsage;
   createdAt?: string;
 };
+export type AssessmentStatus =
+  "queued" | "running" | "completed" | "failed" | "legacy" | "noQuestions";
+export type AssessmentSummary = {
+  id: string;
+  submissionRevision: number;
+  status: AssessmentStatus;
+  questionCount: number;
+  evaluatedCount: number;
+  submittedAt: string;
+  evaluatedAt?: string | null;
+  teacherScore?: number | null;
+  scoredAt?: string | null;
+};
+export type AssessmentPoint = { questionNumber: number; text: string };
+export type QuestionFeedback = {
+  number: number;
+  questionId: string;
+  prompt: string;
+  judgement: "met" | "partial" | "revise" | "insufficient";
+  evidenceLabel: string;
+  quote: string;
+  strength: string;
+  improvement: string;
+  nextStep: string;
+};
+export type Assessment = AssessmentSummary & {
+  feedback?: {
+    strengths: AssessmentPoint[];
+    improvements: AssessmentPoint[];
+    nextSteps: AssessmentPoint[];
+    questions: QuestionFeedback[];
+  } | null;
+};
+export type AssessmentHistory = {
+  items: AssessmentSummary[];
+  page: number;
+  hasMore: boolean;
+};
 export type LearningRecord = {
+  preview?: boolean;
   removedAttachments: Record<string, string>;
   id: string;
   sessionId: string;
@@ -227,13 +266,20 @@ export type LearningRecord = {
     messageCount: number;
   }[];
   teacherNote: string;
+  assessment?: AssessmentSummary | null;
   updatedAt: string;
   submittedAt: string | null;
   reviewedAt: string | null;
 };
 export type LearningRecordSummary = Pick<
   LearningRecord,
-  "id" | "sessionId" | "versionId" | "userId" | "status" | "updatedAt"
+  | "id"
+  | "sessionId"
+  | "versionId"
+  | "userId"
+  | "status"
+  | "updatedAt"
+  | "assessment"
 >;
 export type Workspace = {
   task: Task;
@@ -265,6 +311,7 @@ export type StudentRow = {
   versionId: string | null;
   status: string;
   submissionStatus: string;
+  assessment?: AssessmentSummary | null;
   answered: number;
   total: number;
   lastActive: string | null;
@@ -500,7 +547,7 @@ export function statusText(status: string) {
         inProgress: "In progress",
         completed: "Completed",
         confirmed: "Completed",
-        submitted: "Awaiting teacher review",
+        submitted: "Submitted",
         needsRevision: "Revision requested",
         queued: "Queued",
         running: "Generating",
@@ -516,6 +563,18 @@ export function statusText(status: string) {
         ready: "Processing complete",
       } as Record<string, string>
     )[status] || status,
+  );
+}
+export function assessmentStatusText(status: AssessmentStatus) {
+  return t(
+    {
+      queued: "Assessment queued",
+      running: "Assessing answers",
+      completed: "Feedback ready",
+      failed: "Assessment failed",
+      legacy: "No AI assessment",
+      noQuestions: "No questions to assess",
+    }[status],
   );
 }
 export function taskAvailability(

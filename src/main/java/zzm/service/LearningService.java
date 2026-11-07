@@ -19,6 +19,10 @@ public interface LearningService extends IService<LearningRecord> {
     Map<String, Object> context(String id, Requests.Chat input, AccountUser user);
     Map<String, Object> chat(String id, Requests.Chat input, AccountUser user);
     Map<String, Object> submit(String id, long revision, AccountUser user);
+    Map<String, Object> assessmentHistory(String recordId, int page, AccountUser user);
+    Map<String, Object> assessment(String recordId, String assessmentId, AccountUser user);
+    Map<String, Object> retryAssessment(String recordId, String assessmentId, AccountUser user);
+    Map<String, Object> saveAssessmentScore(String recordId, String assessmentId, Requests.TeacherScore input, AccountUser user);
     List<Map<String, Object>> roster(String sessionId, String versionId, AccountUser user);
     Map<String, Object> observe(String id, AccountUser user);
     Map<String, Object> review(String id, Requests.Review input, AccountUser user);
